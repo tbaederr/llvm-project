@@ -66,8 +66,8 @@ ByteCodeEmitter::compileFunc(const FunctionDecl *FuncDecl) {
         this->LambdaCaptures[Cap.first] = {
             Offset, Cap.second->getType()->isReferenceType()};
       }
-      // FIXME: LambdaThisCapture
-      (void)LTC;
+      if (LTC)
+        this->LambdaThisCapture = R->getField(LTC)->Offset;
     }
   }
 
