@@ -311,8 +311,10 @@ bool ByteCodeExprGen<Emitter>::VisitBinaryOperator(const BinaryOperator *BO) {
     return Discard(this->emitDiv(*T, BO));
   case BO_Assign:
     if (DiscardResult)
-      return this->emitStorePop(*T, BO);
-    return this->emitStore(*T, BO);
+      return LHS->refersToBitField() ? this->emitStoreBitFieldPop(*T, BO)
+                                     : this->emitStorePop(*T, BO);
+    return LHS->refersToBitField() ? this->emitStoreBitField(*T, BO)
+                                   : this->emitStore(*T, BO);
   case BO_And:
     return Discard(this->emitBitAnd(*T, BO));
   case BO_Or:
@@ -531,8 +533,13 @@ bool ByteCodeExprGen<Emitter>::VisitInitListExpr(const InitListExpr *E) {
         if (!this->visit(Init))
           return false;
 
-        if (!this->emitInitField(*T, FieldToInit->Offset, E))
-          return false;
+        if (FieldToInit->isBitField()) {
+          if (!this->emitInitBitField(*T, FieldToInit, E))
+            return false;
+        } else {
+          if (!this->emitInitField(*T, FieldToInit->Offset, E))
+            return false;
+        }
 
         if (!this->emitPopPtr(E))
           return false;

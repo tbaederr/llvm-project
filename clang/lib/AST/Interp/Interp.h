@@ -1025,6 +1025,7 @@ bool InitThisField(InterpState &S, CodePtr OpPC, uint32_t I) {
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitThisBitField(InterpState &S, CodePtr OpPC, const Record::Field *F) {
+  assert(F->isBitField());
   if (S.checkingPotentialConstantExpression())
     return false;
   const Pointer &This = S.Current->getThis();
@@ -1066,8 +1067,9 @@ bool InitField(InterpState &S, CodePtr OpPC, uint32_t I) {
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitBitField(InterpState &S, CodePtr OpPC, const Record::Field *F) {
+  assert(F->isBitField());
   const T &Value = S.Stk.pop<T>();
-  const Pointer &Field = S.Stk.pop<Pointer>().atField(F->Offset);
+  const Pointer &Field = S.Stk.peek<Pointer>().atField(F->Offset);
   Field.deref<T>() = Value.truncate(F->Decl->getBitWidthValue(S.getCtx()));
   Field.activate();
   Field.initialize();
@@ -1265,11 +1267,10 @@ bool StoreBitField(InterpState &S, CodePtr OpPC) {
     return false;
   if (!Ptr.isRoot())
     Ptr.initialize();
-  if (auto *FD = Ptr.getField()) {
+  if (const auto *FD = Ptr.getField())
     Ptr.deref<T>() = Value.truncate(FD->getBitWidthValue(S.getCtx()));
-  } else {
+  else
     Ptr.deref<T>() = Value;
-  }
   return true;
 }
 
@@ -1281,11 +1282,10 @@ bool StoreBitFieldPop(InterpState &S, CodePtr OpPC) {
     return false;
   if (!Ptr.isRoot())
     Ptr.initialize();
-  if (auto *FD = Ptr.getField()) {
+  if (const auto *FD = Ptr.getField())
     Ptr.deref<T>() = Value.truncate(FD->getBitWidthValue(S.getCtx()));
-  } else {
+  else
     Ptr.deref<T>() = Value;
-  }
   return true;
 }
 
