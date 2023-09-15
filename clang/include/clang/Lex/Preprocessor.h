@@ -128,6 +128,7 @@ enum MacroUse {
 class Preprocessor {
   friend class VAOptDefinitionContext;
   friend class VariadicMacroScopeGuard;
+  friend class CodeSnippetHighlighter;
 
   llvm::unique_function<void(const clang::Token &)> OnToken;
   std::shared_ptr<PreprocessorOptions> PPOpts;
@@ -140,6 +141,10 @@ class Preprocessor {
   std::unique_ptr<ScratchBuffer> ScratchBuf;
   HeaderSearch      &HeaderInfo;
   ModuleLoader      &TheModuleLoader;
+
+  llvm::SmallVector<const char *> CheckPoints;
+  void saveCheckPoint(const char *P);
+  const char *getSaveFor(const char *S) const;
 
   /// External source of macros.
   ExternalPreprocessorSource *ExternalSource;
