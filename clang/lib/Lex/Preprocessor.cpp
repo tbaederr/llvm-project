@@ -878,6 +878,35 @@ bool Preprocessor::HandleIdentifier(Token &Identifier) {
   return true;
 }
 
+void Preprocessor::saveCheckPoint(const char *P) {
+  static constexpr ptrdiff_t Limit = 1024 * 8;
+  if (CheckPoints.empty()) {
+    CheckPoints.push_back(P);
+    return;
+  }
+
+  const char *Cur = CheckPoints.back();
+  if (Cur == P)
+    return;
+  if ((P - Cur) > Limit)
+    CheckPoints.push_back(P);
+}
+
+/// We want to always return a value lower than \p S.
+/// If there is no such checkpoint, return nullptr.
+const char *Preprocessor::getSaveFor(const char *S) const {
+  const char *Result = nullptr;
+  for (ssize_t I = CheckPoints.size() - 1; I >= 0; --I) {
+    const char *C = CheckPoints[I];
+    if (C <= S) {
+      Result = C;
+      break;
+    }
+  }
+
+  return Result;
+}
+
 void Preprocessor::Lex(Token &Result) {
   ++LexLevel;
 
@@ -887,6 +916,9 @@ void Preprocessor::Lex(Token &Result) {
     switch (CurLexerKind) {
     case CLK_Lexer:
       ReturnedToken = CurLexer->Lex(Result);
+      if (ReturnedToken && Result.isAtStartOfLine() && CurLexer &&
+          CurLexer->getFileID() == SourceMgr.getMainFileID())
+        saveCheckPoint(CurLexer->BufferPtr);
       break;
     case CLK_TokenLexer:
       ReturnedToken = CurTokenLexer->Lex(Result);

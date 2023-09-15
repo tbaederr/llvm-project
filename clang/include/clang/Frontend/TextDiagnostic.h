@@ -15,10 +15,10 @@
 #ifndef LLVM_CLANG_FRONTEND_TEXTDIAGNOSTIC_H
 #define LLVM_CLANG_FRONTEND_TEXTDIAGNOSTIC_H
 
+#include "clang/Frontend/CodeSnippetHighlighter.h"
 #include "clang/Frontend/DiagnosticRenderer.h"
 
 namespace clang {
-
 /// Class to encapsulate the logic for formatting and printing a textual
 /// diagnostic message.
 ///
@@ -33,11 +33,12 @@ namespace clang {
 /// printing coming out of libclang.
 class TextDiagnostic : public DiagnosticRenderer {
   raw_ostream &OS;
+  const Preprocessor *PP;
+  CodeSnippetHighlighter SnippetHighlighter;
 
 public:
-  TextDiagnostic(raw_ostream &OS,
-                 const LangOptions &LangOpts,
-                 DiagnosticOptions *DiagOpts);
+  TextDiagnostic(raw_ostream &OS, const LangOptions &LangOpts,
+                 DiagnosticOptions *DiagOpts, const Preprocessor *PP = nullptr);
 
   ~TextDiagnostic() override;
 
@@ -104,7 +105,8 @@ private:
                            ArrayRef<FixItHint> Hints);
 
   void emitSnippet(StringRef SourceLine, unsigned MaxLineNoDisplayWidth,
-                   unsigned LineNo);
+                   FileID FID, const SourceManager &SM, unsigned LineNo,
+                   unsigned DisplayLineNo, const char *LineStart);
 
   void emitParseableFixits(ArrayRef<FixItHint> Hints, const SourceManager &SM);
 };

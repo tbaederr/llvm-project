@@ -11,7 +11,9 @@
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Frontend/CodeSnippetHighlighter.h"
 #include "clang/Lex/Lexer.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -644,10 +646,10 @@ static bool printWordWrapped(raw_ostream &OS, StringRef Str, unsigned Columns,
   return Wrapped;
 }
 
-TextDiagnostic::TextDiagnostic(raw_ostream &OS,
-                               const LangOptions &LangOpts,
-                               DiagnosticOptions *DiagOpts)
-  : DiagnosticRenderer(LangOpts, DiagOpts), OS(OS) {}
+TextDiagnostic::TextDiagnostic(raw_ostream &OS, const LangOptions &LangOpts,
+                               DiagnosticOptions *DiagOpts,
+                               const Preprocessor *PP)
+    : DiagnosticRenderer(LangOpts, DiagOpts), OS(OS), PP(PP) {}
 
 TextDiagnostic::~TextDiagnostic() {}
 
@@ -1247,7 +1249,8 @@ void TextDiagnostic::emitSnippetAndCaret(
     }
 
     // Emit what we have computed.
-    emitSnippet(SourceLine, MaxLineNoDisplayWidth, DisplayLineNo);
+    emitSnippet(SourceLine, MaxLineNoDisplayWidth, FID, SM, LineNo,
+                DisplayLineNo, LineStart);
 
     if (!CaretLine.empty()) {
       indentForLineNumbers();
@@ -1276,21 +1279,48 @@ void TextDiagnostic::emitSnippetAndCaret(
 }
 
 void TextDiagnostic::emitSnippet(StringRef SourceLine,
-                                 unsigned MaxLineNoDisplayWidth,
-                                 unsigned LineNo) {
+                                 unsigned MaxLineNoDisplayWidth, FileID FID,
+                                 const SourceManager &SM, unsigned LineNo,
+                                 unsigned DisplayLineNo,
+                                 const char *LineStart) {
+  llvm::SmallVector<StyleRange> Styles = SnippetHighlighter.highlightLine(
+      LineNo - 1, PP, LangOpts, FID, SM, LineStart);
+
   // Emit line number.
   if (MaxLineNoDisplayWidth > 0) {
-    unsigned LineNoDisplayWidth = getNumDisplayWidth(LineNo);
+    unsigned LineNoDisplayWidth = getNumDisplayWidth(DisplayLineNo);
     OS.indent(MaxLineNoDisplayWidth - LineNoDisplayWidth + 1)
-        << LineNo << " | ";
+        << DisplayLineNo << " | ";
   }
 
   // Print the source line one character at a time.
   bool PrintReversed = false;
+  bool HighlightingEnabled = DiagOpts->ShowColors;
   size_t I = 0;
   while (I < SourceLine.size()) {
     auto [Str, WasPrintable] =
         printableTextForNextCharacter(SourceLine, &I, DiagOpts->TabStop);
+
+    // Just stop highlighting anything for this line if we found a non-printable
+    // character.
+    if (!WasPrintable)
+      HighlightingEnabled = false;
+
+    // FIXME: I hope we can do this in some nicer way.
+    if (HighlightingEnabled) {
+      std::optional<enum raw_ostream::Colors> H;
+      for (auto &P : Styles) {
+        if (P.Start < I && P.End >= I) {
+          H = P.Color;
+          break;
+        }
+      }
+
+      if (H)
+        OS.changeColor(*H, false);
+      else
+        OS.resetColor();
+    }
 
     // Toggle inverted colors on or off for this character.
     if (DiagOpts->ShowColors) {
