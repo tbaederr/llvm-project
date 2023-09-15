@@ -96,6 +96,9 @@ VALUE_DIAGOPT(ShowLineNumbers, 1, DefaultShowLineNumbers)
 VALUE_DIAGOPT(TabStop, 32, DefaultTabStop) /// The distance between tab stops.
 /// Column limit for formatting message diagnostics, or 0 if unused.
 VALUE_DIAGOPT(MessageLength, 32, 0)
+/// Default maximum file size to highlight code snippets for, in bytes.
+VALUE_DIAGOPT(MaxHighlightFileSize, 32, DefaultMaxHighlightFileSize)
+
 
 DIAGOPT(ShowSafeBufferUsageSuggestions, 1, 0)
 

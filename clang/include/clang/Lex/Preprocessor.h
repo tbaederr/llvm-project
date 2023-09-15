@@ -284,6 +284,8 @@ public:
   /// The kind of translation unit we are processing.
   const TranslationUnitKind TUKind;
 
+  const char *getCheckPoint(FileID FID, const char *Start) const;
+
 private:
   /// The code-completion handler.
   CodeCompletionHandler *CodeComplete = nullptr;
@@ -310,6 +312,10 @@ private:
 
   /// The import path for named module that we're currently processing.
   SmallVector<std::pair<IdentifierInfo *, SourceLocation>, 2> NamedModuleImportPath;
+
+  llvm::DenseMap<FileID, SmallVector<const char *>> CheckPoints;
+  unsigned CheckPointCounter = 0;
+  void saveCheckPoint();
 
   /// Whether the import is an `@import` or a standard c++ modules import.
   bool IsAtImport = false;

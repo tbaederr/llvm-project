@@ -53,6 +53,10 @@ LLVM_READNONE inline bool isASCII(int64_t c) { return 0 <= c && c <= 127; }
 /// which is [a-zA-Z_].
 LLVM_READONLY inline bool isAsciiIdentifierStart(unsigned char c,
                                                  bool AllowDollar = false) {
+  if (!AllowDollar) {
+    return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+  }
+
   using namespace charinfo;
   if (InfoTable[c] & (CHAR_UPPER|CHAR_LOWER|CHAR_UNDER))
     return true;

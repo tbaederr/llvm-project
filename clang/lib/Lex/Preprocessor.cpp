@@ -183,6 +183,12 @@ Preprocessor::~Preprocessor() {
   // Delete the header search info, if we own it.
   if (OwnsHeaderSearch)
     delete &HeaderInfo;
+
+
+  llvm::errs() << "Files: " << CheckPoints.size() << "\n";
+
+
+
 }
 
 void Preprocessor::Initialize(const TargetInfo &Target,
@@ -954,6 +960,11 @@ void Preprocessor::Lex(Token &Result) {
     }
   }
 
+  if (CurLexer && ++CheckPointCounter == 1024) {
+    CheckPoints[CurLexer->getFileID()].push_back(CurLexer->BufferPtr);
+    CheckPointCounter = 0;
+  }
+
   LastTokenWasAt = Result.is(tok::at);
   --LexLevel;
 
@@ -1552,4 +1563,28 @@ void Preprocessor::createPreprocessingRecord() {
 
   Record = new PreprocessingRecord(getSourceManager());
   addPPCallbacks(std::unique_ptr<PPCallbacks>(Record));
+}
+
+void Preprocessor::saveCheckPoint() {
+  auto FID = CurLexer->getFileID();
+  auto P = CurLexer->BufferPtr;
+
+  CheckPoints[FID].push_back(P);
+  CheckPointCounter = 0;
+}
+
+const char * Preprocessor::getCheckPoint(FileID FID, const char *Start) const {
+  if (auto It = CheckPoints.find(FID);
+      It != CheckPoints.end()) {
+    const SmallVector<const char *> &FileCheckPoints = It->second;
+    const char *Last = nullptr;
+    // FIXME: Do better than a linear search.
+    for (const char *P: FileCheckPoints) {
+      if (P > Start)
+        return Last;
+      Last = P;
+    }
+  }
+
+  return nullptr;
 }

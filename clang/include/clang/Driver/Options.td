@@ -1842,6 +1842,10 @@ def : Flag<["-"], "fdiagnostics-color">, Group<f_Group>,
 def : Flag<["-"], "fno-diagnostics-color">, Group<f_Group>,
   Visibility<[ClangOption, CLOption, DXCOption]>, Alias<fno_color_diagnostics>;
 def fdiagnostics_color_EQ : Joined<["-"], "fdiagnostics-color=">, Group<f_Group>;
+def fmax_highlight_file_size_EQ : Joined<["-"], "fmax-highlight-file-size=">,
+  Visibility<[ClangOption, CC1Option]>,
+  HelpText<"Maximum file size (in bytes) to still highlight code snippets from.">,
+  MarshallingInfoInt<DiagnosticOpts<"MaxHighlightFileSize">, "DiagnosticOptions::DefaultMaxHighlightFileSize">;
 def fansi_escape_codes : Flag<["-"], "fansi-escape-codes">, Group<f_Group>,
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option]>,
   HelpText<"Use ANSI escape codes for diagnostics">,

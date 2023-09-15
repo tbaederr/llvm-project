@@ -87,6 +87,7 @@ public:
     DefaultSpellCheckingLimit = 50,
     DefaultSnippetLineLimit = 16,
     DefaultShowLineNumbers = 1,
+    DefaultMaxHighlightFileSize = 1024 * 1024
   };
 
   // Define simple diagnostic options (with no accessors).
