@@ -15314,18 +15314,18 @@ static bool FastEvaluateAsRValue(const Expr *Exp, Expr::EvalResult &Result,
                                  const ASTContext &Ctx, bool &IsConst) {
   // Fast-path evaluations of integer literals, since we sometimes see files
   // containing vast quantities of these.
-  if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(Exp)) {
-    Result.Val = APValue(APSInt(L->getValue(),
-                                L->getType()->isUnsignedIntegerType()));
-    IsConst = true;
-    return true;
-  }
+  //if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(Exp)) {
+    //Result.Val = APValue(APSInt(L->getValue(),
+                                //L->getType()->isUnsignedIntegerType()));
+    //IsConst = true;
+    //return true;
+  //}
 
-  if (const auto *L = dyn_cast<CXXBoolLiteralExpr>(Exp)) {
-    Result.Val = APValue(APSInt(APInt(1, L->getValue())));
-    IsConst = true;
-    return true;
-  }
+  //if (const auto *L = dyn_cast<CXXBoolLiteralExpr>(Exp)) {
+    //Result.Val = APValue(APSInt(APInt(1, L->getValue())));
+    //IsConst = true;
+    //return true;
+  //}
 
   if (const auto *CE = dyn_cast<ConstantExpr>(Exp)) {
     if (CE->hasAPValueResult()) {
