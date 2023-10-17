@@ -892,6 +892,9 @@ void Preprocessor::saveCheckPoint(const char *P) {
 /// We want to always return a value lower than \p S.
 /// If there is no such checkpoint, return nullptr.
 const char *Preprocessor::getSaveFor(const char *S) const {
+  //llvm::errs() << __FUNCTION__ << "\n";
+  //llvm::errs() << "Checkpoints: " << CheckPoints.size() << "\n";
+
   const char *Result = nullptr;
   for (ssize_t I = CheckPoints.size() - 1; I >= 0; --I) {
     const char *C = CheckPoints[I];
@@ -914,6 +917,7 @@ void Preprocessor::Lex(Token &Result) {
     case CLK_Lexer:
       ReturnedToken = CurLexer->Lex(Result);
       if (ReturnedToken && CurLexer &&
+          Result.isAtStartOfLine() &&
           ((CurLexer->BufferPtr - CheckPoints.back()) > CheckPointLimit) &&
           CurLexer->getFileID() == SourceMgr.getMainFileID()) {
         assert(!CheckPoints.empty());
