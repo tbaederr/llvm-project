@@ -961,9 +961,18 @@ void Preprocessor::Lex(Token &Result) {
   }
 
   if (CurLexer && ++CheckPointCounter == 1024) {
-    CheckPoints[CurLexer->getFileID()].push_back(CurLexer->BufferPtr);
-    CheckPointCounter = 0;
-  }
+      if (LastFileID.isInvalid() || LastFileID != CurLexer->getFileID()) {
+        LastFileID = CurLexer->getFileID();
+        LastFileCheckPoints = &CheckPoints[LastFileID];
+      }
+
+      assert(LastFileCheckPoints);
+      LastFileCheckPoints->push_back(CurLexer->BufferPtr);
+      /* CheckPoints[CurLexer->getFileID()].push_back(CurLexer->BufferPtr); */
+      CheckPointCounter = 0;
+      /* llvm::errs() << "Appended to " << CurLexer->getFileID().getHashValue()
+       * << "\n"; */
+    }
 
   LastTokenWasAt = Result.is(tok::at);
   --LexLevel;

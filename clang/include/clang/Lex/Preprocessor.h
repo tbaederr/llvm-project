@@ -316,6 +316,9 @@ private:
   llvm::DenseMap<FileID, SmallVector<const char *>> CheckPoints;
   unsigned CheckPointCounter = 0;
   void saveCheckPoint();
+  /* SmallVector<const char *> *LastFileCheckPoints; */
+  FileID LastFileID;
+  SmallVector<const char *> *LastFileCheckPoints;
 
   /// Whether the import is an `@import` or a standard c++ modules import.
   bool IsAtImport = false;
