@@ -1132,7 +1132,7 @@ static std::unique_ptr<llvm::SmallVector<TextDiagnostic::StyleRange>[]>
 highlightLines(StringRef FileData, unsigned StartLineNumber,
                unsigned EndLineNumber, const Preprocessor *PP,
                const LangOptions &LangOpts, uint32_t MaxHighlightFileSize,
-               FileID FID, const SourceManager &SM, const char *LineStart) {
+               FileID FID, const SourceManager &SM) {
   assert(StartLineNumber <= EndLineNumber);
   auto SnippetRanges =
       std::make_unique<SmallVector<TextDiagnostic::StyleRange>[]>(
@@ -1149,6 +1149,9 @@ highlightLines(StringRef FileData, unsigned StartLineNumber,
   Lexer L{FID, *Buff, SM, LangOpts};
   L.SetKeepWhitespaceMode(true);
 
+  const char *LineStart =
+      FileData.data() +
+      SM.getDecomposedLoc(SM.translateLineCol(FID, StartLineNumber, 1)).second;
   if (const char *CheckPoint = PP->getCheckPoint(FID, LineStart)) {
     assert(CheckPoint >= Buff->getBufferStart() && CheckPoint <= Buff->getBufferEnd());
     assert(CheckPoint <= LineStart);
@@ -1328,6 +1331,12 @@ void TextDiagnostic::emitSnippetAndCaret(
       OS.indent(MaxLineNoDisplayWidth + 2) << "| ";
   };
 
+  // Prepare source highlighting information for the lines we're about to
+  // emit, starting from the first line.
+  std::unique_ptr<SmallVector<StyleRange>[]> SourceStyles =
+      highlightLines(BufStart, Lines.first, Lines.second, PP, LangOpts,
+                     DiagOpts->MaxHighlightFileSize, FID, SM);
+
   SmallVector<LineRange> LineRanges =
       prepareAndFilterRanges(Ranges, SM, Lines, FID, LangOpts);
 
@@ -1351,11 +1360,6 @@ void TextDiagnostic::emitSnippetAndCaret(
     // FIXME: Don't print any lines in this case.
     if (size_t(LineEnd - LineStart) > MaxLineLengthToPrint)
       return;
-
-  // Prepare source highlighting information for the lines we're about to emit.
-    std::unique_ptr<SmallVector<StyleRange>[]> SourceStyles =
-      highlightLines(BufStart, Lines.first, Lines.second, PP, LangOpts,
-                     DiagOpts->MaxHighlightFileSize, FID, SM, LineStart);
 
     // Copy the line of code into an std::string for ease of manipulation.
     std::string SourceLine(LineStart, LineEnd);
