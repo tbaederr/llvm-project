@@ -903,7 +903,7 @@ NumericLiteralParser::NumericLiteralParser(StringRef TokSpelling,
                                            const LangOptions &LangOpts,
                                            const TargetInfo &Target,
                                            DiagnosticsEngine &Diags)
-    : SM(SM), LangOpts(LangOpts), Diags(Diags),
+    : LangOpts(LangOpts), Diags(Diags),
       ThisTokBegin(TokSpelling.begin()), ThisTokEnd(TokSpelling.end()) {
 
   s = DigitsBegin = ThisTokBegin;
@@ -1170,7 +1170,7 @@ NumericLiteralParser::NumericLiteralParser(StringRef TokSpelling,
     if (s != ThisTokEnd) {
       // Report an error if there are any.
       Diags.Report(Lexer::AdvanceToTokenCharacter(
-                       TokLoc, SuffixBegin - ThisTokBegin, SM, LangOpts),
+                       TokLoc, SuffixBegin - ThisTokBegin, Diags.getSourceManager(), LangOpts),
                    diag::err_invalid_suffix_constant)
           << StringRef(SuffixBegin, ThisTokEnd - SuffixBegin)
           << (isFixedPointConstant ? 2 : isFPConstant);
@@ -1194,7 +1194,7 @@ void NumericLiteralParser::ParseDecimalOrOctalCommon(SourceLocation TokLoc){
   if (isHexDigit(*s) && *s != 'e' && *s != 'E' &&
       !isValidUDSuffix(LangOpts, StringRef(s, ThisTokEnd - s))) {
     Diags.Report(
-        Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, SM, LangOpts),
+        Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, Diags.getSourceManager(), LangOpts),
         diag::err_invalid_digit)
         << StringRef(s, 1) << (radix == 8 ? 1 : 0);
     hadError = true;
@@ -1223,7 +1223,7 @@ void NumericLiteralParser::ParseDecimalOrOctalCommon(SourceLocation TokLoc){
     } else {
       if (!hadError) {
         Diags.Report(Lexer::AdvanceToTokenCharacter(
-                         TokLoc, Exponent - ThisTokBegin, SM, LangOpts),
+                         TokLoc, Exponent - ThisTokBegin, Diags.getSourceManager(), LangOpts),
                      diag::err_exponent_has_no_digits);
         hadError = true;
       }
@@ -1270,7 +1270,7 @@ void NumericLiteralParser::checkSeparator(SourceLocation TokLoc,
     return;
 
   if (isDigitSeparator(*Pos)) {
-    Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, Pos - ThisTokBegin, SM,
+    Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, Pos - ThisTokBegin, Diags.getSourceManager(),
                                                 LangOpts),
                  diag::err_digit_separator_not_between_digits)
         << IsAfterDigits;
@@ -1311,7 +1311,7 @@ void NumericLiteralParser::ParseNumberStartingWithZero(SourceLocation TokLoc) {
     }
 
     if (!HasSignificandDigits) {
-      Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, SM,
+      Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, Diags.getSourceManager(),
                                                   LangOpts),
                    diag::err_hex_constant_requires)
           << LangOpts.CPlusPlus << 1;
@@ -1331,7 +1331,7 @@ void NumericLiteralParser::ParseNumberStartingWithZero(SourceLocation TokLoc) {
       if (!containsDigits(s, first_non_digit)) {
         if (!hadError) {
           Diags.Report(Lexer::AdvanceToTokenCharacter(
-                           TokLoc, Exponent - ThisTokBegin, SM, LangOpts),
+                           TokLoc, Exponent - ThisTokBegin, Diags.getSourceManager(), LangOpts),
                        diag::err_exponent_has_no_digits);
           hadError = true;
         }
@@ -1347,7 +1347,7 @@ void NumericLiteralParser::ParseNumberStartingWithZero(SourceLocation TokLoc) {
       else if (LangOpts.CPlusPlus17)
         Diags.Report(TokLoc, diag::warn_cxx17_hex_literal);
     } else if (saw_period) {
-      Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, SM,
+      Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, Diags.getSourceManager(),
                                                   LangOpts),
                    diag::err_hex_constant_requires)
           << LangOpts.CPlusPlus << 0;
@@ -1372,7 +1372,7 @@ void NumericLiteralParser::ParseNumberStartingWithZero(SourceLocation TokLoc) {
       // Done.
     } else if (isHexDigit(*s) &&
                !isValidUDSuffix(LangOpts, StringRef(s, ThisTokEnd - s))) {
-      Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, SM,
+      Diags.Report(Lexer::AdvanceToTokenCharacter(TokLoc, s - ThisTokBegin, Diags.getSourceManager(),
                                                   LangOpts),
                    diag::err_invalid_digit)
           << StringRef(s, 1) << 2;
@@ -1425,6 +1425,24 @@ static bool alwaysFitsInto64Bits(unsigned Radix, unsigned NumDigits) {
   }
 }
 
+template<uint8_t Radix>
+static bool Conv(const char *DigitsBegin, const char *SuffixBegin, llvm::APInt &Val) {
+    uint64_t N = 0;
+    if (!NumericLiteralParser::isDigitSeparator(*DigitsBegin))
+      N = llvm::hexDigitValue(*DigitsBegin);
+
+    for (const char *Ptr = DigitsBegin + 1; Ptr != SuffixBegin; ++Ptr) {
+      if (!NumericLiteralParser::isDigitSeparator(*Ptr))
+        N = N * Radix + llvm::hexDigitValue(*Ptr);
+    }
+
+    // This will truncate the value to Val's input width. Simply check
+    // for overflow by comparing.
+    Val = N;
+    assert(Val.getZExtValue() == N);
+    return false;
+}
+
 /// GetIntegerValue - Convert this numeric literal value to an APInt that
 /// matches Val's input width.  If there is an overflow, set Val to the low bits
 /// of the result and return true.  Otherwise, return false.
@@ -1437,15 +1455,29 @@ bool NumericLiteralParser::GetIntegerValue(llvm::APInt &Val) {
   // hex/octal values which don't overflow).
   const unsigned NumDigits = SuffixBegin - DigitsBegin;
   if (alwaysFitsInto64Bits(radix, NumDigits)) {
+    if (radix == 2)
+      return Conv<2>(DigitsBegin, SuffixBegin, Val);
+    else if (radix == 8)
+      return Conv<8>(DigitsBegin, SuffixBegin, Val);
+    else if (radix == 10)
+      return Conv<10>(DigitsBegin, SuffixBegin, Val);
+    else {
+      assert(radix == 16);
+      return Conv<16>(DigitsBegin, SuffixBegin, Val);
+    }
+#if 0
     uint64_t N = 0;
     for (const char *Ptr = DigitsBegin; Ptr != SuffixBegin; ++Ptr)
-      if (!isDigitSeparator(*Ptr))
+      if (!isDigitSeparator(*Ptr)) {
+        llvm::errs() << "N = " << N << " * " << radix << " + " << llvm::hexDigitValue(*Ptr) << "\n";
         N = N * radix + llvm::hexDigitValue(*Ptr);
+      }
 
     // This will truncate the value to Val's input width. Simply check
     // for overflow by comparing.
     Val = N;
     return Val.getZExtValue() != N;
+#endif
   }
 
   Val = 0;

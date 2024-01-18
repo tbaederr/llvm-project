@@ -49,7 +49,6 @@ bool tokenIsLikeStringLiteral(const Token &Tok, const LangOptions &LO);
 /// of a ppnumber, classifying it as either integer, floating, or erroneous,
 /// determines the radix of the value and can convert it to a useful value.
 class NumericLiteralParser {
-  const SourceManager &SM;
   const LangOptions &LangOpts;
   DiagnosticsEngine &Diags;
 
@@ -137,12 +136,13 @@ public:
     return StringRef(DigitsBegin, SuffixBegin - DigitsBegin);
   }
 
+  static bool isDigitSeparator(char C) { return C == '\''; }
+
 private:
 
   void ParseNumberStartingWithZero(SourceLocation TokLoc);
   void ParseDecimalOrOctalCommon(SourceLocation TokLoc);
 
-  static bool isDigitSeparator(char C) { return C == '\''; }
 
   /// Determine whether the sequence of characters [Start, End) contains
   /// any real digits (not digit separators).
