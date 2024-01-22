@@ -36,7 +36,7 @@ public:
   explicit ActionCommentHandler(Sema &S) : S(S) { }
 
   bool HandleComment(Preprocessor &PP, SourceRange Comment) override {
-    /* S.ActOnComment(Comment); */
+    S.ActOnComment(Comment);
     return false;
   }
 };
@@ -66,8 +66,8 @@ Parser::Parser(Preprocessor &pp, Sema &actions, bool skipFunctionBodies)
   // destructor.
   initializePragmaHandlers();
 
-  CommentSemaHandler.reset(new ActionCommentHandler(actions));
-  PP.addCommentHandler(CommentSemaHandler.get());
+  /* CommentSemaHandler.reset(new ActionCommentHandler(actions)); */
+  /* PP.addCommentHandler(CommentSemaHandler.get()); */
 
   PP.setCodeCompletionHandler(*this);
 
@@ -477,7 +477,7 @@ Parser::~Parser() {
 
   resetPragmaHandlers();
 
-  PP.removeCommentHandler(CommentSemaHandler.get());
+  /* PP.removeCommentHandler(CommentSemaHandler.get()); */
 
   PP.clearCodeCompletionHandler();
 
