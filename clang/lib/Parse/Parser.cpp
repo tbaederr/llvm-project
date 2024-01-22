@@ -36,7 +36,7 @@ public:
   explicit ActionCommentHandler(Sema &S) : S(S) { }
 
   bool HandleComment(Preprocessor &PP, SourceRange Comment) override {
-    S.ActOnComment(Comment);
+    /* S.ActOnComment(Comment); */
     return false;
   }
 };
