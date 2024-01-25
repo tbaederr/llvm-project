@@ -125,3 +125,7 @@ struct XY { int before; struct XX xx, *xp; float* after; } xy[] = {
   0,              // all-warning {{initializer overrides prior initialization of this subobject}}
   &xy[2].xx.a, &xy[2].xx, &global_float
 };
+
+const int A =  ((_Complex double)1.0 ? 21 : 1);
+_Static_assert(A == 21, ""); // pedantic-ref-warning {{GNU extension}} \
+                             // pedantic-expected-warning {{GNU extension}}
