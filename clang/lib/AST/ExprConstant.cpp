@@ -1003,7 +1003,8 @@ namespace {
         : Ctx(const_cast<ASTContext &>(C)), EvalStatus(S), CurrentCall(nullptr),
           CallStackDepth(0), NextCallIndex(1),
           StepsLeft(C.getLangOpts().ConstexprStepLimit),
-          EnableNewConstInterp(C.getLangOpts().EnableNewConstInterp),
+          // EnableNewConstInterp(C.getLangOpts().EnableNewConstInterp),
+          EnableNewConstInterp(true),
           BottomFrame(*this, SourceLocation(), /*Callee=*/nullptr,
                       /*This=*/nullptr,
                       /*CallExpr=*/nullptr, CallRef()),
@@ -15455,14 +15456,16 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
     return false;
 
   if (Info.EnableNewConstInterp) {
-    if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, E, Result))
+    if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, E, Result)) {
       return false;
+    }
     return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
                                    ConstantExprKind::Normal);
   }
 
-  if (!::Evaluate(Result, Info, E))
+  if (!::Evaluate(Result, Info, E)) {
     return false;
+  }
 
   // Implicit lvalue-to-rvalue cast.
   if (E->isGLValue()) {
@@ -15711,8 +15714,9 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
   Info.setEvaluatingDecl(Base, Result.Val);
 
   if (Info.EnableNewConstInterp) {
-    if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, this, Result.Val))
+    if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, this, Result.Val)) {
       return false;
+    }
   } else {
     LValue LVal;
     LVal.set(Base);
@@ -15778,12 +15782,14 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
 
   if (Info.EnableNewConstInterp) {
     auto &InterpCtx = const_cast<ASTContext &>(Ctx).getInterpContext();
-    if (!InterpCtx.evaluateAsInitializer(Info, VD, Value))
+    if (!InterpCtx.evaluateAsInitializer(Info, VD, Value)) {
       return false;
+    }
 
     return CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
                                    ConstantExprKind::Normal);
-  } else {
+  }
+
     LValue LVal;
     LVal.set(VD);
 
@@ -15800,9 +15806,9 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
       FullExpressionRAII Scope(Info);
       if (!EvaluateInPlace(Value, Info, LVal, this,
                            /*AllowNonLiteralTypes=*/true) ||
-          EStatus.HasSideEffects)
+          EStatus.HasSideEffects) {
         return false;
-    }
+      }
 
     // At this point, any lifetime-extended temporaries are completely
     // initialized.

@@ -22,7 +22,11 @@ private:
   const Function *Func;
 
 public:
-  FunctionPointer() : Func(nullptr) {}
+  // FIXME: We might want to track the fact that the Function pointer
+  // has been created from an integer and is most likely garbage anyway.
+  FunctionPointer(int IntVal = 0, const Descriptor *Desc = nullptr)
+      : Func(reinterpret_cast<const Function *>(IntVal)) {}
+
   FunctionPointer(const Function *Func) : Func(Func) { assert(Func); }
 
   const Function *getFunction() const { return Func; }
@@ -50,6 +54,10 @@ public:
       return "nullptr";
 
     return toAPValue().getAsString(Ctx, Func->getDecl()->getType());
+  }
+
+  uint32_t getIntegerRepresentation() const {
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Func));
   }
 
   ComparisonCategoryResult compare(const FunctionPointer &RHS) const {

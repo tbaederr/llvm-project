@@ -268,6 +268,8 @@ bool CheckConstant(InterpState &S, CodePtr OpPC, const Descriptor *Desc) {
 }
 
 static bool CheckConstant(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
+  if (Ptr.isIntegralPointer())
+    return true;
   return CheckConstant(S, OpPC, Ptr.getDeclDesc());
 }
 
@@ -324,6 +326,9 @@ bool CheckConst(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
       Ptr.block() == S.Current->getThis().block()) {
     return true;
   }
+
+  if (!Ptr.isBlockPointer())
+    return false;
 
   const QualType Ty = Ptr.getType();
   const SourceInfo &Loc = S.Current->getSource(OpPC);
@@ -519,13 +524,10 @@ bool CheckPure(InterpState &S, CodePtr OpPC, const CXXMethodDecl *MD) {
 
 bool CheckPotentialReinterpretCast(InterpState &S, CodePtr OpPC,
                                    const Pointer &Ptr) {
-  if (!S.inConstantContext())
-    return true;
-
   const SourceInfo &E = S.Current->getSource(OpPC);
   S.CCEDiag(E, diag::note_constexpr_invalid_cast)
       << 2 << S.getLangOpts().CPlusPlus << S.Current->getRange(OpPC);
-  return false;
+  return true;
 }
 
 bool CheckFloatResult(InterpState &S, CodePtr OpPC, const Floating &Result,

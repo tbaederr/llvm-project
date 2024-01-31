@@ -164,7 +164,15 @@ bool ByteCodeExprGen<Emitter>::VisitCastExpr(const CastExpr *CE) {
   case CK_NullToPointer:
     if (DiscardResult)
       return true;
-    return this->emitNull(classifyPrim(CE->getType()), CE);
+
+    const Descriptor *Desc;
+    if (std::optional<PrimType> T = classify(CE->getType()->getPointeeType()))
+      Desc = P.createDescriptor(SubExpr, *T);
+    else
+      Desc = nullptr;
+    // assert(false);
+
+    return this->emitNull(classifyPrim(CE->getType()), Desc, CE);
 
   case CK_PointerToIntegral: {
     if (DiscardResult)
@@ -187,6 +195,34 @@ bool ByteCodeExprGen<Emitter>::VisitCastExpr(const CastExpr *CE) {
     return true;
   }
 
+  case CK_IntegralToPointer: {
+    QualType IntType = SubExpr->getType();
+    assert(IntType->isIntegralOrEnumerationType());
+    if (!this->visit(SubExpr))
+      return false;
+    // FIXME: I think this is wrong since the int->ptr cast might cause a
+    // diagnostic.
+    PrimType T = classifyPrim(IntType);
+    if (DiscardResult)
+      return this->emitPop(T, CE);
+
+    QualType PtrType = CE->getType();
+    assert(PtrType->isPointerType());
+
+    const Descriptor *Desc;
+    if (std::optional<PrimType> T = classify(PtrType->getPointeeType())) {
+      Desc = P.createDescriptor(SubExpr, *T);
+    } else if (PtrType->getPointeeType()->isVoidType())
+      Desc = nullptr;
+    else {
+      Desc = P.createDescriptor(CE, PtrType->getPointeeType().getTypePtr(),
+                                Descriptor::InlineDescMD, true, false,
+                                /*IsMutable=*/false, nullptr);
+    }
+
+    return this->emitGetIntPtr(T, Desc, CE);
+  }
+
   case CK_AtomicToNonAtomic:
   case CK_ConstructorConversion:
   case CK_FunctionToPointerDecay:
@@ -195,13 +231,28 @@ bool ByteCodeExprGen<Emitter>::VisitCastExpr(const CastExpr *CE) {
   case CK_UserDefinedConversion:
     return this->delegate(SubExpr);
 
-  case CK_BitCast:
+  case CK_BitCast: {
+    // Reject bitcasts to atomic types.
     if (CE->getType()->isAtomicType()) {
       if (!this->discard(SubExpr))
         return false;
       return this->emitInvalidCast(CastKind::Reinterpret, CE);
     }
-    return this->delegate(SubExpr);
+
+    if (DiscardResult)
+      return this->discard(SubExpr);
+
+    PrimType FromT = classifyPrim(SubExpr->getType());
+    PrimType ToT = classifyPrim(CE->getType());
+    assert(isPtrType(FromT));
+    assert(isPtrType(ToT));
+    if (FromT == ToT)
+      return this->delegate(SubExpr);
+
+    if (!this->visit(SubExpr))
+      return false;
+    return this->emitDecayPtr(FromT, ToT, CE);
+  }
 
   case CK_IntegralToBoolean:
   case CK_IntegralCast: {
@@ -233,7 +284,7 @@ bool ByteCodeExprGen<Emitter>::VisitCastExpr(const CastExpr *CE) {
     if (!this->visit(SubExpr))
       return false;
 
-    if (!this->emitNull(PtrT, CE))
+    if (!this->emitNull(PtrT, nullptr, CE))
       return false;
 
     return this->emitNE(PtrT, CE);
@@ -445,7 +496,7 @@ bool ByteCodeExprGen<Emitter>::VisitBinaryOperator(const BinaryOperator *BO) {
 
   // Pointer arithmetic special case.
   if (BO->getOpcode() == BO_Add || BO->getOpcode() == BO_Sub) {
-    if (T == PT_Ptr || (LT == PT_Ptr && RT == PT_Ptr))
+    if (isPtrType(*T) || (isPtrType(*LT) && isPtrType(*RT)))
       return this->VisitPointerArithBinOp(BO);
   }
 
@@ -2092,7 +2143,7 @@ bool ByteCodeExprGen<Emitter>::visitBool(const Expr *E) {
 
   // Convert pointers to bool.
   if (T == PT_Ptr || T == PT_FnPtr) {
-    if (!this->emitNull(*T, E))
+    if (!this->emitNull(*T, nullptr, E))
       return false;
     return this->emitNE(*T, E);
   }
@@ -2132,9 +2183,9 @@ bool ByteCodeExprGen<Emitter>::visitZeroInitializer(PrimType T, QualType QT,
   case PT_IntAPS:
     return this->emitZeroIntAPS(Ctx.getBitWidth(QT), E);
   case PT_Ptr:
-    return this->emitNullPtr(E);
+    return this->emitNullPtr(nullptr, E);
   case PT_FnPtr:
-    return this->emitNullFnPtr(E);
+    return this->emitNullFnPtr(nullptr, E);
   case PT_Float: {
     return this->emitConstFloat(APFloat::getZero(Ctx.getFloatSemantics(QT)), E);
   }
@@ -2797,7 +2848,9 @@ bool ByteCodeExprGen<Emitter>::VisitCXXNullPtrLiteralExpr(
   if (DiscardResult)
     return true;
 
-  return this->emitNullPtr(E);
+  // assert(false);
+  // return false;
+  return this->emitNullPtr(nullptr, E);
 }
 
 template <class Emitter>

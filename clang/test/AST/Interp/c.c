@@ -129,3 +129,21 @@ struct XY { int before; struct XX xx, *xp; float* after; } xy[] = {
 const int A =  ((_Complex double)1.0 ? 21 : 1);
 _Static_assert(A == 21, ""); // pedantic-ref-warning {{GNU extension}} \
                              // pedantic-expected-warning {{GNU extension}}
+
+_Static_assert(((void*)0 + 1) != (void*)0, ""); // pedantic-expected-warning {{arithmetic on a pointer to void is a GNU extension}} \
+                                                // pedantic-expected-warning {{not an integer constant expression}} \
+                                                // pedantic-expected-note {{cannot perform pointer arithmetic on null pointer}} \
+                                                // pedantic-ref-warning {{arithmetic on a pointer to void is a GNU extension}} \
+                                                // pedantic-ref-warning {{not an integer constant expression}} \
+                                                // pedantic-ref-note {{cannot perform pointer arithmetic on null pointer}}
+
+typedef __INTPTR_TYPE__ intptr_t;
+int array[(intptr_t)(int*)1]; // ref-warning {{variable length array folded to constant array}} \
+                              // pedantic-ref-warning {{variable length array folded to constant array}} \
+                              // expected-warning {{variable length array folded to constant array}} \
+                              // pedantic-expected-warning {{variable length array folded to constant array}}
+
+int castViaInt[*(int*)(unsigned long)"test"]; // ref-error {{variable length array}} \
+                                              // pedantic-ref-error {{variable length array}} \
+                                              // expected-error {{variable length array}} \
+                                              // pedantic-expected-error {{variable length array}}

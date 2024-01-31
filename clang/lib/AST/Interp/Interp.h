@@ -774,9 +774,9 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
     // element in the same array are NOT equal. They have the same Base value,
     // but a different Offset. This is a pretty rare case, so we fix this here
     // by comparing pointers to the first elements.
-    if (LHS.isArrayRoot())
+    if (!LHS.isZero() && LHS.isArrayRoot())
       VL = LHS.atIndex(0).getByteOffset();
-    if (RHS.isArrayRoot())
+    if (!RHS.isZero() && RHS.isArrayRoot())
       VR = RHS.atIndex(0).getByteOffset();
 
     S.Stk.push<BoolT>(BoolT::from(Fn(Compare(VL, VR))));
@@ -935,7 +935,7 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool GetField(InterpState &S, CodePtr OpPC, uint32_t I) {
   const Pointer &Obj = S.Stk.peek<Pointer>();
   if (!CheckNull(S, OpPC, Obj, CSK_Field))
-      return false;
+    return false;
   if (!CheckRange(S, OpPC, Obj, CSK_Field))
     return false;
   const Pointer &Field = Obj.atField(I);
@@ -1331,6 +1331,8 @@ bool Load(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.peek<Pointer>();
   if (!CheckLoad(S, OpPC, Ptr))
     return false;
+  if (!Ptr.isBlockPointer())
+    return false;
   S.Stk.push<T>(Ptr.deref<T>());
   return true;
 }
@@ -1339,6 +1341,8 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool LoadPop(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
   if (!CheckLoad(S, OpPC, Ptr))
+    return false;
+  if (!Ptr.isBlockPointer())
     return false;
   S.Stk.push<T>(Ptr.deref<T>());
   return true;
@@ -1451,12 +1455,17 @@ bool OffsetHelper(InterpState &S, CodePtr OpPC, const T &Offset,
     return true;
   }
 
-  if (!CheckNull(S, OpPC, Ptr, CSK_ArrayIndex))
-    return false;
+  if (!CheckNull(S, OpPC, Ptr, CSK_ArrayIndex)) {
+    // The CheckNul will have emitted a note already, but we only
+    // abort in C++, since this is fine in C.
+    if (S.getLangOpts().CPlusPlus)
+      return false;
+  }
 
   // Arrays of unknown bounds cannot have pointers into them.
-  if (!CheckArray(S, OpPC, Ptr))
+  if (!CheckArray(S, OpPC, Ptr)) {
     return false;
+  }
 
   // Get a version of the index comparable to the type.
   T Index = T::from(Ptr.getIndex(), Offset.bitWidth());
@@ -1478,23 +1487,25 @@ bool OffsetHelper(InterpState &S, CodePtr OpPC, const T &Offset,
     Invalid = true;
   };
 
-  T MaxOffset = T::from(MaxIndex - Index, Offset.bitWidth());
-  if constexpr (Op == ArithOp::Add) {
-    // If the new offset would be negative, bail out.
-    if (Offset.isNegative() && (Offset.isMin() || -Offset > Index))
-      DiagInvalidOffset();
+  if (Ptr.isBlockPointer()) {
+    T MaxOffset = T::from(MaxIndex - Index, Offset.bitWidth());
+    if constexpr (Op == ArithOp::Add) {
+      // If the new offset would be negative, bail out.
+      if (Offset.isNegative() && (Offset.isMin() || -Offset > Index))
+        DiagInvalidOffset();
 
-    // If the new offset would be out of bounds, bail out.
-    if (Offset.isPositive() && Offset > MaxOffset)
-      DiagInvalidOffset();
-  } else {
-    // If the new offset would be negative, bail out.
-    if (Offset.isPositive() && Index < Offset)
-      DiagInvalidOffset();
+      // If the new offset would be out of bounds, bail out.
+      if (Offset.isPositive() && Offset > MaxOffset)
+        DiagInvalidOffset();
+    } else {
+      // If the new offset would be negative, bail out.
+      if (Offset.isPositive() && Index < Offset)
+        DiagInvalidOffset();
 
-    // If the new offset would be out of bounds, bail out.
-    if (Offset.isNegative() && (Offset.isMin() || -Offset > MaxOffset))
-      DiagInvalidOffset();
+      // If the new offset would be out of bounds, bail out.
+      if (Offset.isNegative() && (Offset.isMin() || -Offset > MaxOffset))
+        DiagInvalidOffset();
+    }
   }
 
   if (Invalid && !Ptr.isDummy() && S.getLangOpts().CPlusPlus)
@@ -1577,6 +1588,11 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool SubPtr(InterpState &S, CodePtr OpPC) {
   const Pointer &LHS = S.Stk.pop<Pointer>();
   const Pointer &RHS = S.Stk.pop<Pointer>();
+
+  if (RHS.isZero()) {
+    S.Stk.push<T>(T::from(LHS.getIndex()));
+    return true;
+  }
 
   if (!Pointer::hasSameBase(LHS, RHS) && S.getLangOpts().CPlusPlus) {
     // TODO: Diagnose.
@@ -1722,6 +1738,7 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool CastPointerIntegral(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
+  llvm::errs() << __PRETTY_FUNCTION__ << "\n";
   if (!CheckPotentialReinterpretCast(S, OpPC, Ptr))
     return false;
 
@@ -1750,8 +1767,9 @@ static inline bool ZeroIntAPS(InterpState &S, CodePtr OpPC, uint32_t BitWidth) {
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
-inline bool Null(InterpState &S, CodePtr OpPC) {
-  S.Stk.push<T>();
+inline bool Null(InterpState &S, CodePtr OpPC, const Descriptor *Desc) {
+  // Note: Desc can be null.
+  S.Stk.push<T>(0, Desc);
   return true;
 }
 
@@ -1838,6 +1856,10 @@ inline bool NoRet(InterpState &S, CodePtr OpPC) {
 
 inline bool NarrowPtr(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
+  if (!S.getLangOpts().CPlusPlus) {
+    S.Stk.push<Pointer>(Ptr);
+    return true;
+  }
   S.Stk.push<Pointer>(Ptr.narrow());
   return true;
 }
@@ -2035,6 +2057,14 @@ inline bool GetFnPtr(InterpState &S, CodePtr OpPC, const Function *Func) {
   return true;
 }
 
+template <PrimType Name, class T = typename PrimConv<Name>::T>
+inline bool GetIntPtr(InterpState &S, CodePtr OpPC, const Descriptor *Desc) {
+  const T &IntVal = S.Stk.pop<T>();
+
+  S.Stk.push<Pointer>(static_cast<int64_t>(IntVal), Desc);
+  return true;
+}
+
 /// Just emit a diagnostic. The expression that caused emission of this
 /// op is not valid in a constant context.
 inline bool Invalid(InterpState &S, CodePtr OpPC) {
@@ -2073,6 +2103,18 @@ inline bool OffsetOf(InterpState &S, CodePtr OpPC, const OffsetOfExpr *E) {
 
   S.Stk.push<T>(T::from(Result));
 
+  return true;
+}
+
+/// OldPtr -> Integer -> NewPtr.
+template <PrimType TIn, PrimType TOut>
+inline bool DecayPtr(InterpState &S, CodePtr OpPC) {
+  static_assert(isPtrType(TIn) && isPtrType(TOut));
+  using FromT = typename PrimConv<TIn>::T;
+  using ToT = typename PrimConv<TOut>::T;
+
+  const FromT &OldPtr = S.Stk.pop<FromT>();
+  S.Stk.push<ToT>(ToT(OldPtr.getIntegerRepresentation(), nullptr));
   return true;
 }
 

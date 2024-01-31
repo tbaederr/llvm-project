@@ -29,6 +29,7 @@ Context::~Context() {}
 
 bool Context::isPotentialConstantExpr(State &Parent, const FunctionDecl *FD) {
   assert(Stk.empty());
+  FD->dump();
   Function *Func = P->getFunction(FD);
   if (!Func || !Func->hasBody())
     Func = ByteCodeStmtGen<ByteCodeEmitter>(*this, *P).compileFunc(FD);
@@ -41,6 +42,8 @@ bool Context::isPotentialConstantExpr(State &Parent, const FunctionDecl *FD) {
 }
 
 bool Context::evaluateAsRValue(State &Parent, const Expr *E, APValue &Result) {
+  llvm::errs() << __PRETTY_FUNCTION__ << "\n";
+  E->dump();
   assert(Stk.empty());
   ByteCodeExprGen<EvalEmitter> C(*this, *P, Parent, Stk, Result);
 
@@ -94,6 +97,9 @@ bool Context::evaluate(State &Parent, const Expr *E, APValue &Result) {
 
 bool Context::evaluateAsInitializer(State &Parent, const VarDecl *VD,
                                     APValue &Result) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << "\n";
+  // VD->dump();
+
   assert(Stk.empty());
   ByteCodeExprGen<EvalEmitter> C(*this, *P, Parent, Stk, Result);
 
