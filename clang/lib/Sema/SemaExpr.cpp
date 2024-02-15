@@ -4344,6 +4344,7 @@ ExprResult Sema::ActOnParenExpr(SourceLocation L, SourceLocation R, Expr *E) {
   if (getLangOpts().ProtectParens && CurFPFeatures.getAllowFPReassociate() &&
       !E->isLValue() && ExprTy->hasFloatingRepresentation())
     return BuildBuiltinCallExpr(R, Builtin::BI__arithmetic_fence, E);
+  return E;
   return new (Context) ParenExpr(L, R, E);
 }
 
