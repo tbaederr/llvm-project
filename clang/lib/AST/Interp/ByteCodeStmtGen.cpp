@@ -180,7 +180,7 @@ bool ByteCodeStmtGen<Emitter>::visitFunc(const FunctionDecl *F) {
 
     for (const auto *Init : Ctor->inits()) {
       // Scope needed for the initializers.
-      BlockScope<Emitter> Scope(this);
+      BlockScope<Emitter, ByteCodeStmtGen<Emitter>> Scope(this);
 
       const Expr *InitExpr = Init->getInit();
       if (const FieldDecl *Member = Init->getMember()) {
@@ -310,7 +310,7 @@ bool ByteCodeStmtGen<Emitter>::visitLoopBody(const Stmt *S) {
 template <class Emitter>
 bool ByteCodeStmtGen<Emitter>::visitCompoundStmt(
     const CompoundStmt *CompoundStmt) {
-  BlockScope<Emitter> Scope(this);
+  BlockScope<Emitter, ByteCodeStmtGen<Emitter>> Scope(this);
   for (auto *InnerStmt : CompoundStmt->body())
     if (!visitStmt(InnerStmt))
       return false;
@@ -336,7 +336,7 @@ bool ByteCodeStmtGen<Emitter>::visitDeclStmt(const DeclStmt *DS) {
 template <class Emitter>
 bool ByteCodeStmtGen<Emitter>::visitReturnStmt(const ReturnStmt *RS) {
   if (const Expr *RE = RS->getRetValue()) {
-    ExprScope<Emitter> RetScope(this);
+    ExprScope<Emitter, ByteCodeStmtGen<Emitter>> RetScope(this);
     if (ReturnType) {
       // Primitive types are simply returned.
       if (!this->visit(RE))
@@ -367,7 +367,7 @@ bool ByteCodeStmtGen<Emitter>::visitReturnStmt(const ReturnStmt *RS) {
 
 template <class Emitter>
 bool ByteCodeStmtGen<Emitter>::visitIfStmt(const IfStmt *IS) {
-  BlockScope<Emitter> IfScope(this);
+  BlockScope<Emitter, ByteCodeStmtGen<Emitter>> IfScope(this);
 
   if (IS->isNonNegatedConsteval())
     return visitStmt(IS->getThen());
@@ -425,9 +425,9 @@ bool ByteCodeStmtGen<Emitter>::visitWhileStmt(const WhileStmt *S) {
   if (!this->jumpFalse(EndLabel))
     return false;
 
-  LocalScope<Emitter> Scope(this);
+  LocalScope<Emitter, ByteCodeStmtGen<Emitter>> Scope(this);
   {
-    DestructorScope<Emitter> DS(Scope);
+    DestructorScope<Emitter, ByteCodeStmtGen<Emitter>> DS(Scope);
     if (!this->visitLoopBody(Body))
       return false;
   }
@@ -448,11 +448,11 @@ bool ByteCodeStmtGen<Emitter>::visitDoStmt(const DoStmt *S) {
   LabelTy EndLabel = this->getLabel();
   LabelTy CondLabel = this->getLabel();
   LoopScope<Emitter> LS(this, EndLabel, CondLabel);
-  LocalScope<Emitter> Scope(this);
+  LocalScope<Emitter, ByteCodeStmtGen<Emitter>> Scope(this);
 
   this->emitLabel(StartLabel);
   {
-    DestructorScope<Emitter> DS(Scope);
+    DestructorScope<Emitter, ByteCodeStmtGen<Emitter>> DS(Scope);
 
     if (!this->visitLoopBody(Body))
       return false;
@@ -479,7 +479,7 @@ bool ByteCodeStmtGen<Emitter>::visitForStmt(const ForStmt *S) {
   LabelTy CondLabel = this->getLabel();
   LabelTy IncLabel = this->getLabel();
   LoopScope<Emitter> LS(this, EndLabel, IncLabel);
-  LocalScope<Emitter> Scope(this);
+  LocalScope<Emitter, ByteCodeStmtGen<Emitter>> Scope(this);
 
   if (Init && !this->visitStmt(Init))
     return false;
@@ -492,7 +492,7 @@ bool ByteCodeStmtGen<Emitter>::visitForStmt(const ForStmt *S) {
   }
 
   {
-    DestructorScope<Emitter> DS(Scope);
+    DestructorScope<Emitter, ByteCodeStmtGen<Emitter>> DS(Scope);
 
     if (Body && !this->visitLoopBody(Body))
       return false;
@@ -544,9 +544,9 @@ bool ByteCodeStmtGen<Emitter>::visitCXXForRangeStmt(const CXXForRangeStmt *S) {
     return false;
 
   // Body.
-  LocalScope<Emitter> Scope(this);
+  LocalScope<Emitter, ByteCodeStmtGen<Emitter>> Scope(this);
   {
-    DestructorScope<Emitter> DS(Scope);
+    DestructorScope<Emitter, ByteCodeStmtGen<Emitter>> DS(Scope);
 
     if (!this->visitLoopBody(Body))
       return false;

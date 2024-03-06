@@ -28,17 +28,21 @@ class QualType;
 
 namespace interp {
 
-template <class Emitter> class LocalScope;
-template <class Emitter> class DestructorScope;
-template <class Emitter> class VariableScope;
-template <class Emitter> class DeclScope;
-template <class Emitter> class OptionScope;
-template <class Emitter> class ArrayIndexScope;
-template <class Emitter> class SourceLocScope;
+template <class Emitter>
+class ByteCodeStmtGen;
+
+
+template <class Emitter, class StmtGen> class LocalScope;
+template <class Emitter, class StmtGen> class DestructorScope;
+template <class Emitter, class StmtGen> class VariableScope;
+template <class Emitter, class StmtGen> class DeclScope;
+template <class Emitter, class StmtGen> class OptionScope;
+template <class Emitter, class StmtGen> class ArrayIndexScope;
+template <class Emitter, class StmtGen> class SourceLocScope;
 
 /// Compilation context for expressions.
-template <class Emitter>
-class ByteCodeExprGen : public ConstStmtVisitor<ByteCodeExprGen<Emitter>, bool>,
+template <class Emitter, class StmtGen = ByteCodeStmtGen<Emitter>>
+class ByteCodeExprGen : public ConstStmtVisitor<ByteCodeExprGen<Emitter, StmtGen>, bool>,
                         public Emitter {
 protected:
   // Aliases for types defined in the emitter.
@@ -118,6 +122,7 @@ public:
   bool VisitConceptSpecializationExpr(const ConceptSpecializationExpr *E);
   bool VisitCXXRewrittenBinaryOperator(const CXXRewrittenBinaryOperator *E);
   bool VisitPseudoObjectExpr(const PseudoObjectExpr *E);
+  bool VisitStmtExpr(const StmtExpr *E);
 
 protected:
   bool visitExpr(const Expr *E) override;
@@ -225,13 +230,13 @@ protected:
   std::optional<unsigned> allocateLocal(DeclTy &&Decl, bool IsExtended = false);
 
 private:
-  friend class VariableScope<Emitter>;
-  friend class LocalScope<Emitter>;
-  friend class DestructorScope<Emitter>;
-  friend class DeclScope<Emitter>;
-  friend class OptionScope<Emitter>;
-  friend class ArrayIndexScope<Emitter>;
-  friend class SourceLocScope<Emitter>;
+  friend class VariableScope<Emitter, StmtGen>;
+  friend class LocalScope<Emitter, StmtGen>;
+  friend class DestructorScope<Emitter, StmtGen>;
+  friend class DeclScope<Emitter, StmtGen>;
+  friend class OptionScope<Emitter, StmtGen>;
+  friend class ArrayIndexScope<Emitter, StmtGen>;
+  friend class SourceLocScope<Emitter, StmtGen>;
 
   /// Emits a zero initializer.
   bool visitZeroInitializer(PrimType T, QualType QT, const Expr *E);
@@ -282,7 +287,7 @@ protected:
   llvm::DenseMap<const OpaqueValueExpr *, unsigned> OpaqueExprs;
 
   /// Current scope.
-  VariableScope<Emitter> *VarScope = nullptr;
+  VariableScope<Emitter, StmtGen> *VarScope = nullptr;
 
   /// Current argument index. Needed to emit ArrayInitIndexExpr.
   std::optional<uint64_t> ArrayIndex;
@@ -301,13 +306,14 @@ protected:
   bool GlobalDecl = false;
 };
 
-extern template class ByteCodeExprGen<ByteCodeEmitter>;
-extern template class ByteCodeExprGen<EvalEmitter>;
+extern template class ByteCodeExprGen<ByteCodeEmitter, ByteCodeStmtGen<ByteCodeEmitter>>;
+extern template class ByteCodeExprGen<ByteCodeEmitter, ByteCodeStmtGen<EvalEmitter>>;
+// extern template class ByteCodeExprGen<EvalEmitter>;
 
 /// Scope chain managing the variable lifetimes.
-template <class Emitter> class VariableScope {
+template <class Emitter, class StmtGen> class VariableScope {
 public:
-  VariableScope(ByteCodeExprGen<Emitter> *Ctx)
+  VariableScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx)
       : Ctx(Ctx), Parent(Ctx->VarScope) {
     Ctx->VarScope = this;
   }
@@ -337,15 +343,15 @@ public:
 
 protected:
   /// ByteCodeExprGen instance.
-  ByteCodeExprGen<Emitter> *Ctx;
+  ByteCodeExprGen<Emitter, StmtGen> *Ctx;
   /// Link to the parent scope.
   VariableScope *Parent;
 };
 
 /// Generic scope for local variables.
-template <class Emitter> class LocalScope : public VariableScope<Emitter> {
+template <class Emitter, class StmtGen> class LocalScope : public VariableScope<Emitter, StmtGen> {
 public:
-  LocalScope(ByteCodeExprGen<Emitter> *Ctx) : VariableScope<Emitter>(Ctx) {}
+  LocalScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx) : VariableScope<Emitter, StmtGen>(Ctx) {}
 
   /// Emit a Destroy op for this scope.
   ~LocalScope() override {
@@ -425,31 +431,31 @@ public:
 /// Emits the destructors of the variables of \param OtherScope
 /// when this scope is destroyed. Does not create a Scope in the bytecode at
 /// all, this is just a RAII object to emit destructors.
-template <class Emitter> class DestructorScope final {
+template <class Emitter, class StmtGen> class DestructorScope final {
 public:
-  DestructorScope(LocalScope<Emitter> &OtherScope) : OtherScope(OtherScope) {}
+  DestructorScope(LocalScope<Emitter, StmtGen> &OtherScope) : OtherScope(OtherScope) {}
 
   ~DestructorScope() { OtherScope.emitDestructors(); }
 
 private:
-  LocalScope<Emitter> &OtherScope;
+  LocalScope<Emitter, StmtGen> &OtherScope;
 };
 
 /// Like a regular LocalScope, except that the destructors of all local
 /// variables are automatically emitted when the AutoScope is destroyed.
-template <class Emitter> class AutoScope : public LocalScope<Emitter> {
+template <class Emitter, class StmtGen> class AutoScope : public LocalScope<Emitter, StmtGen> {
 public:
-  AutoScope(ByteCodeExprGen<Emitter> *Ctx)
-      : LocalScope<Emitter>(Ctx), DS(*this) {}
+  AutoScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx)
+      : LocalScope<Emitter, StmtGen>(Ctx), DS(*this) {}
 
 private:
-  DestructorScope<Emitter> DS;
+  DestructorScope<Emitter, StmtGen> DS;
 };
 
 /// Scope for storage declared in a compound statement.
-template <class Emitter> class BlockScope final : public AutoScope<Emitter> {
+template <class Emitter, class StmtGen> class BlockScope final : public AutoScope<Emitter, StmtGen> {
 public:
-  BlockScope(ByteCodeExprGen<Emitter> *Ctx) : AutoScope<Emitter>(Ctx) {}
+  BlockScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx) : AutoScope<Emitter, StmtGen>(Ctx) {}
 
   void addExtended(const Scope::Local &Local) override {
     // If we to this point, just add the variable as a normal local
@@ -461,9 +467,9 @@ public:
 
 /// Expression scope which tracks potentially lifetime extended
 /// temporaries which are hoisted to the parent scope on exit.
-template <class Emitter> class ExprScope final : public AutoScope<Emitter> {
+template <class Emitter, class StmtGen> class ExprScope final : public AutoScope<Emitter, StmtGen> {
 public:
-  ExprScope(ByteCodeExprGen<Emitter> *Ctx) : AutoScope<Emitter>(Ctx) {}
+  ExprScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx) : AutoScope<Emitter, StmtGen>(Ctx) {}
 
   void addExtended(const Scope::Local &Local) override {
     if (this->Parent)
@@ -471,9 +477,9 @@ public:
   }
 };
 
-template <class Emitter> class ArrayIndexScope final {
+template <class Emitter, class StmtGen> class ArrayIndexScope final {
 public:
-  ArrayIndexScope(ByteCodeExprGen<Emitter> *Ctx, uint64_t Index) : Ctx(Ctx) {
+  ArrayIndexScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx, uint64_t Index) : Ctx(Ctx) {
     OldArrayIndex = Ctx->ArrayIndex;
     Ctx->ArrayIndex = Index;
   }
@@ -481,13 +487,13 @@ public:
   ~ArrayIndexScope() { Ctx->ArrayIndex = OldArrayIndex; }
 
 private:
-  ByteCodeExprGen<Emitter> *Ctx;
+  ByteCodeExprGen<Emitter, StmtGen> *Ctx;
   std::optional<uint64_t> OldArrayIndex;
 };
 
-template <class Emitter> class SourceLocScope final {
+template <class Emitter, class StmtGen> class SourceLocScope final {
 public:
-  SourceLocScope(ByteCodeExprGen<Emitter> *Ctx, const Expr *DefaultExpr)
+  SourceLocScope(ByteCodeExprGen<Emitter, StmtGen> *Ctx, const Expr *DefaultExpr)
       : Ctx(Ctx) {
     assert(DefaultExpr);
     // We only switch if the current SourceLocDefaultExpr is null.
@@ -503,7 +509,7 @@ public:
   }
 
 private:
-  ByteCodeExprGen<Emitter> *Ctx;
+  ByteCodeExprGen<Emitter, StmtGen> *Ctx;
   bool Enabled = false;
 };
 

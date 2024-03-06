@@ -28,7 +28,7 @@ template <class Emitter> class LabelScope;
 
 /// Compilation context for statements.
 template <class Emitter>
-class ByteCodeStmtGen final : public ByteCodeExprGen<Emitter> {
+class ByteCodeStmtGen final : public ByteCodeExprGen<Emitter, ByteCodeStmtGen<Emitter>> {
   using LabelTy = typename Emitter::LabelTy;
   using AddrTy = typename Emitter::AddrTy;
   using OptLabelTy = std::optional<LabelTy>;
@@ -37,8 +37,9 @@ class ByteCodeStmtGen final : public ByteCodeExprGen<Emitter> {
 public:
   template<typename... Tys>
   ByteCodeStmtGen(Tys&&... Args)
-      : ByteCodeExprGen<Emitter>(std::forward<Tys>(Args)...) {}
+      : ByteCodeExprGen<Emitter, ByteCodeStmtGen<Emitter>>(std::forward<Tys>(Args)...) {}
 
+  bool visitStmt(const Stmt *S);
 protected:
   bool visitFunc(const FunctionDecl *F) override;
 
@@ -48,7 +49,6 @@ private:
   friend class SwitchScope<Emitter>;
 
   // Statement visitors.
-  bool visitStmt(const Stmt *S);
   bool visitCompoundStmt(const CompoundStmt *S);
   bool visitLoopBody(const Stmt *S);
   bool visitDeclStmt(const DeclStmt *DS);
@@ -83,7 +83,7 @@ private:
   OptLabelTy DefaultLabel;
 };
 
-extern template class ByteCodeExprGen<EvalEmitter>;
+extern template class ByteCodeExprGen<EvalEmitter, ByteCodeStmtGen<EvalEmitter>>;
 
 } // namespace interp
 } // namespace clang
