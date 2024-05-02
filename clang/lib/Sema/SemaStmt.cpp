@@ -2435,7 +2435,7 @@ static bool FinishForRangeVarDecl(Sema &SemaRef, VarDecl *Decl, Expr *Init,
       SemaRef.inferObjCARCLifetime(Decl))
     Decl->setInvalidDecl();
 
-  SemaRef.AddInitializerToDecl(Decl, Init, /*DirectInit=*/false);
+  SemaRef.AddInitializerToDecl(Decl, Init, /*DirectInit=*/false, false);
   SemaRef.FinalizeDeclaration(Decl);
   SemaRef.CurContext->addHiddenDecl(Decl);
   return false;
@@ -3035,7 +3035,7 @@ StmtResult Sema::BuildCXXForRangeStmt(
       NotEqExpr = CheckBooleanCondition(ColonLoc, NotEqExpr.get());
     if (!NotEqExpr.isInvalid())
       NotEqExpr =
-          ActOnFinishFullExpr(NotEqExpr.get(), /*DiscardedValue*/ false);
+          ActOnFinishFullExpr(NotEqExpr.get(), NotEqExpr.get()->getExprLoc(),/*DiscardedValue*/ false, false, false, false);
     if (NotEqExpr.isInvalid()) {
       Diag(RangeLoc, diag::note_for_range_invalid_iterator)
         << RangeLoc << 0 << BeginRangeRef.get()->getType();
@@ -3058,7 +3058,7 @@ StmtResult Sema::BuildCXXForRangeStmt(
       // co_await during the initial parse.
       IncrExpr = ActOnCoawaitExpr(S, CoawaitLoc, IncrExpr.get());
     if (!IncrExpr.isInvalid())
-      IncrExpr = ActOnFinishFullExpr(IncrExpr.get(), /*DiscardedValue*/ false);
+      IncrExpr = ActOnFinishFullExpr(IncrExpr.get(), IncrExpr.get()->getExprLoc(),/*DiscardedValue*/ false, false, false, false);
     if (IncrExpr.isInvalid()) {
       Diag(RangeLoc, diag::note_for_range_invalid_iterator)
         << RangeLoc << 2 << BeginRangeRef.get()->getType() ;
