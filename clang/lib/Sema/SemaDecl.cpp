@@ -13503,7 +13503,7 @@ void Sema::checkNonTrivialCUnion(QualType QT, SourceLocation Loc,
 /// AddInitializerToDecl - Adds the initializer Init to the
 /// declaration dcl. If DirectInit is true, this is C++ direct
 /// initialization rather than copy initialization.
-void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
+void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit, bool DoChecks) {
   // If there is no declaration, there was an error parsing it.  Just ignore
   // the initializer.
   if (!RealDecl) {
@@ -13813,7 +13813,7 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
   // we should destroy the first Temp before constructing the second.
   ExprResult Result =
       ActOnFinishFullExpr(Init, VDecl->getLocation(),
-                          /*DiscardedValue*/ false, VDecl->isConstexpr());
+                          /*DiscardedValue=*/false, VDecl->isConstexpr(), false, DoChecks);
   if (Result.isInvalid()) {
     VDecl->setInvalidDecl();
     return;

@@ -2435,7 +2435,7 @@ static bool FinishForRangeVarDecl(Sema &SemaRef, VarDecl *Decl, Expr *Init,
       SemaRef.inferObjCARCLifetime(Decl))
     Decl->setInvalidDecl();
 
-  SemaRef.AddInitializerToDecl(Decl, Init, /*DirectInit=*/false);
+  SemaRef.AddInitializerToDecl(Decl, Init, /*DirectInit=*/false, false);
   SemaRef.FinalizeDeclaration(Decl);
   SemaRef.CurContext->addHiddenDecl(Decl);
   return false;
@@ -2875,10 +2875,10 @@ StmtResult Sema::BuildCXXForRangeStmt(
 
       // Find the array bound.
       ExprResult BoundExpr;
-      if (const ConstantArrayType *CAT = dyn_cast<ConstantArrayType>(UnqAT))
+      if (const auto *CAT = dyn_cast<ConstantArrayType>(UnqAT))
         BoundExpr = IntegerLiteral::Create(
             Context, CAT->getSize(), Context.getPointerDiffType(), RangeLoc);
-      else if (const VariableArrayType *VAT =
+      else if (const auto *VAT =
                dyn_cast<VariableArrayType>(UnqAT)) {
         // For a variably modified type we can't just use the expression within
         // the array bounds, since we don't want that to be re-evaluated here.
@@ -2936,8 +2936,10 @@ StmtResult Sema::BuildCXXForRangeStmt(
       }
 
       // end-expr is __range + __bound.
-      EndExpr = ActOnBinOp(S, ColonLoc, tok::plus, EndRangeRef.get(),
-                           BoundExpr.get());
+      // EndExpr = ActOnBinOp(S, ColonLoc, tok::plus, EndRangeRef.get(),
+                           // BoundExpr.get());
+      // EndExpr = CreateBuiltinBinOp(
+      EndExpr = CreateBuiltinBinOp(ColonLoc, BO_Add, EndRangeRef.get(), BoundExpr.get());
       if (EndExpr.isInvalid())
         return StmtError();
       if (FinishForRangeVarDecl(*this, EndVar, EndExpr.get(), ColonLoc,
@@ -3035,7 +3037,7 @@ StmtResult Sema::BuildCXXForRangeStmt(
       NotEqExpr = CheckBooleanCondition(ColonLoc, NotEqExpr.get());
     if (!NotEqExpr.isInvalid())
       NotEqExpr =
-          ActOnFinishFullExpr(NotEqExpr.get(), /*DiscardedValue*/ false);
+          ActOnFinishFullExpr(NotEqExpr.get(), NotEqExpr.get()->getExprLoc(),/*DiscardedValue*/ false, false, false, false);
     if (NotEqExpr.isInvalid()) {
       Diag(RangeLoc, diag::note_for_range_invalid_iterator)
         << RangeLoc << 0 << BeginRangeRef.get()->getType();
@@ -3058,7 +3060,7 @@ StmtResult Sema::BuildCXXForRangeStmt(
       // co_await during the initial parse.
       IncrExpr = ActOnCoawaitExpr(S, CoawaitLoc, IncrExpr.get());
     if (!IncrExpr.isInvalid())
-      IncrExpr = ActOnFinishFullExpr(IncrExpr.get(), /*DiscardedValue*/ false);
+      IncrExpr = ActOnFinishFullExpr(IncrExpr.get(), IncrExpr.get()->getExprLoc(),/*DiscardedValue*/ false, false, false, false);
     if (IncrExpr.isInvalid()) {
       Diag(RangeLoc, diag::note_for_range_invalid_iterator)
         << RangeLoc << 2 << BeginRangeRef.get()->getType() ;
@@ -3083,7 +3085,7 @@ StmtResult Sema::BuildCXXForRangeStmt(
     // Attach  *__begin  as initializer for VD. Don't touch it if we're just
     // trying to determine whether this would be a valid range.
     if (!LoopVar->isInvalidDecl() && Kind != BFRK_Check) {
-      AddInitializerToDecl(LoopVar, DerefExpr.get(), /*DirectInit=*/false);
+      AddInitializerToDecl(LoopVar, DerefExpr.get(), /*DirectInit=*/false, false);
       if (LoopVar->isInvalidDecl() ||
           (LoopVar->getInit() && LoopVar->getInit()->containsErrors()))
         NoteForRangeBeginEndFunction(*this, BeginExpr.get(), BEF_begin);

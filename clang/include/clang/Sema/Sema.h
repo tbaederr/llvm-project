@@ -3035,7 +3035,7 @@ public:
                              NonTrivialCUnionContext UseContext,
                              unsigned NonTrivialKind);
 
-  void AddInitializerToDecl(Decl *dcl, Expr *init, bool DirectInit);
+  void AddInitializerToDecl(Decl *dcl, Expr *init, bool DirectInit, bool DoChecks = true);
   void ActOnUninitializedDecl(Decl *dcl);
   void ActOnInitializerError(Decl *Dcl);
 
@@ -6736,7 +6736,7 @@ public:
   }
   ExprResult ActOnFinishFullExpr(Expr *Expr, SourceLocation CC,
                                  bool DiscardedValue, bool IsConstexpr = false,
-                                 bool IsTemplateArgument = false);
+                                 bool IsTemplateArgument = false, bool DoChecks = true);
   StmtResult ActOnFinishFullStmt(Stmt *Stmt);
 
   ExprResult ActOnDecltypeExpression(Expr *E);
