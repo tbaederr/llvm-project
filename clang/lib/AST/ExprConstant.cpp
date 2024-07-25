@@ -16871,6 +16871,16 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result,
   Status.Diag = &Diags;
   EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantExpression);
 
+  {
+    EvalResult EResult;
+    bool IsConst;
+    if (FastEvaluateAsRValue(this, EResult, Ctx, IsConst) && EResult.Val.hasValue() && IsConst) {
+      *Result = EResult.Val;
+      return true;
+    }
+      // return IsConst;
+  }
+
   APValue Scratch;
   bool IsConstExpr =
       ::EvaluateAsRValue(Info, this, Result ? *Result : Scratch) &&
