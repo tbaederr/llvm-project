@@ -13873,9 +13873,6 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
 }
 
 bool RecordExprEvaluator::VisitBinCmp(const BinaryOperator *E) {
-  if (!CheckLiteralType(Info, E))
-    return false;
-
   auto OnSuccess = [&](CmpResult CR, const BinaryOperator *E) {
     ComparisonCategoryResult CCR;
     switch (CR) {
@@ -15826,9 +15823,6 @@ static bool EvaluateInPlace(APValue &Result, EvalInfo &Info, const LValue &This,
                             const Expr *E, bool AllowNonLiteralTypes) {
   assert(!E->isValueDependent());
 
-  if (!AllowNonLiteralTypes && !CheckLiteralType(Info, E, &This))
-    return false;
-
   if (E->isPRValue()) {
     // Evaluate arrays and record types in-place, so that later initializers can
     // refer to earlier-initialized members of the object.
@@ -15854,9 +15848,6 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
   assert(!E->isValueDependent());
 
   if (E->getType().isNull())
-    return false;
-
-  if (!CheckLiteralType(Info, E))
     return false;
 
   if (Info.EnableNewConstInterp) {
