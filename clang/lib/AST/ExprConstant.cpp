@@ -2262,9 +2262,14 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
     }
 
     if (InvalidBaseKind != -1) {
+    if (Info.hasDiags()) {
       Info.FFDiag(Loc, diag::note_constexpr_invalid_template_arg)
           << IsReferenceType << !Designator.Entries.empty() << InvalidBaseKind
           << Ident;
+
+    } else Info.DiagEmitted = true;
+
+
       return false;
     }
   }
@@ -2393,9 +2398,15 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
 
   // Does this refer one past the end of some object?
   if (!Designator.Invalid && Designator.isOnePastTheEnd()) {
+    if (Info.hasDiags()) {
     Info.FFDiag(Loc, diag::note_constexpr_past_end, 1)
       << !Designator.Entries.empty() << !!BaseVD << BaseVD;
     NoteLValueLocation(Info, Base);
+
+    } else Info.DiagEmitted = true;
+
+
+
   }
 
   return true;
@@ -2448,12 +2459,19 @@ static bool CheckLiteralType(EvalInfo &Info, const Expr *E,
   if (This && Info.EvaluatingDecl == This->getLValueBase())
     return true;
 
+    if (Info.hasDiags()) {
+
+
   // Prvalue constant expressions must be of literal types.
   if (Info.getLangOpts().CPlusPlus11)
     Info.FFDiag(E, diag::note_constexpr_nonliteral)
       << E->getType();
   else
     Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    } else Info.DiagEmitted = true;
+
+
+
   return false;
 }
 
@@ -2464,15 +2482,21 @@ static bool CheckEvaluationResult(CheckEvaluationResultKind CERK,
                                   const FieldDecl *SubobjectDecl,
                                   CheckedTemporaries &CheckedTemps) {
   if (!Value.hasValue()) {
-    if (SubobjectDecl) {
-      Info.FFDiag(DiagLoc, diag::note_constexpr_uninitialized)
-          << /*(name)*/ 1 << SubobjectDecl;
-      Info.Note(SubobjectDecl->getLocation(),
-                diag::note_constexpr_subobject_declared_here);
-    } else {
-      Info.FFDiag(DiagLoc, diag::note_constexpr_uninitialized)
-          << /*of type*/ 0 << Type;
-    }
+    if (Info.hasDiags()) {
+      if (SubobjectDecl) {
+        Info.FFDiag(DiagLoc, diag::note_constexpr_uninitialized)
+            << /*(name)*/ 1 << SubobjectDecl;
+        Info.Note(SubobjectDecl->getLocation(),
+                  diag::note_constexpr_subobject_declared_here);
+      } else {
+        Info.FFDiag(DiagLoc, diag::note_constexpr_uninitialized)
+            << /*of type*/ 0 << Type;
+      }
+    } else Info.DiagEmitted = true;
+
+
+
+
     return false;
   }
 
@@ -2868,7 +2892,9 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     else if (RHS.isSigned() && RHS.isNegative()) {
       // During constant-folding, a negative shift is an opposite shift. Such
       // a shift is not a constant expression.
-      Info.CCEDiag(E, diag::note_constexpr_negative_shift) << RHS;
+    if (Info.hasDiags()) {
+        Info.CCEDiag(E, diag::note_constexpr_negative_shift) << RHS;
+    } else Info.DiagEmitted = true;
       if (!Info.noteUndefinedBehavior())
         return false;
       RHS = -RHS;
@@ -2879,8 +2905,11 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     // the shifted type.
     unsigned SA = (unsigned) RHS.getLimitedValue(LHS.getBitWidth()-1);
     if (SA != RHS) {
+    if (Info.hasDiags()) {
       Info.CCEDiag(E, diag::note_constexpr_large_shift)
         << RHS << E->getType() << LHS.getBitWidth();
+    } else Info.DiagEmitted = true;
+
       if (!Info.noteUndefinedBehavior())
         return false;
     } else if (LHS.isSigned() && !Info.getLangOpts().CPlusPlus20) {
@@ -2921,8 +2950,12 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     // shifted type.
     unsigned SA = (unsigned) RHS.getLimitedValue(LHS.getBitWidth()-1);
     if (SA != RHS) {
+    if (Info.hasDiags()) {
       Info.CCEDiag(E, diag::note_constexpr_large_shift)
         << RHS << E->getType() << LHS.getBitWidth();
+    } else Info.DiagEmitted = true;
+
+
       if (!Info.noteUndefinedBehavior())
         return false;
     }
@@ -3425,9 +3458,13 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
     // Don't diagnose during potential constant expression checking; an
     // initializer might be added later.
     if (!Info.checkingPotentialConstantExpression()) {
+
+
+        if (Info.hasDiags()) {
       Info.FFDiag(E, diag::note_constexpr_var_init_unknown, 1)
         << VD;
       NoteLValueLocation(Info, Base);
+        } else Info.DiagEmitted = true;
     }
     return false;
   }
@@ -3440,11 +3477,14 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
     // have been value-dependent too), so diagnose that.
     assert(!VD->mightBeUsableInConstantExpressions(Info.Ctx));
     if (!Info.checkingPotentialConstantExpression()) {
+
+        if (Info.hasDiags()) {
       Info.FFDiag(E, Info.getLangOpts().CPlusPlus11
                          ? diag::note_constexpr_ltor_non_constexpr
                          : diag::note_constexpr_ltor_non_integral, 1)
           << VD << VD->getType();
       NoteLValueLocation(Info, Base);
+        } else Info.DiagEmitted = true;
     }
     return false;
   }
@@ -3452,8 +3492,11 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   // Check that we can fold the initializer. In C++, we will have already done
   // this in the cases where it matters for conformance.
   if (!VD->evaluateValue()) {
-    Info.FFDiag(E, diag::note_constexpr_var_init_non_constant, 1) << VD;
-    NoteLValueLocation(Info, Base);
+    if (Info.hasDiags()) {
+      Info.FFDiag(E, diag::note_constexpr_var_init_non_constant, 1) << VD;
+      NoteLValueLocation(Info, Base);
+    } else Info.DiagEmitted = true;
+
     return false;
   }
 
@@ -3477,8 +3520,10 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   // Never use the initializer of a weak variable, not even for constant
   // folding. We can't be sure that this is the definition that will be used.
   if (VD->isWeak()) {
-    Info.FFDiag(E, diag::note_constexpr_var_init_weak) << VD;
-    NoteLValueLocation(Info, Base);
+    if (Info.hasDiags()) {
+      Info.FFDiag(E, diag::note_constexpr_var_init_weak) << VD;
+      NoteLValueLocation(Info, Base);
+    } else Info.DiagEmitted = true;
     return false;
   }
 
@@ -3769,10 +3814,13 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     if ((O->isAbsent() && !(handler.AccessKind == AK_Construct && I == N)) ||
         (O->isIndeterminate() &&
          !isValidIndeterminateAccess(handler.AccessKind))) {
-      if (!Info.checkingPotentialConstantExpression())
-        Info.FFDiag(E, diag::note_constexpr_access_uninit)
-            << handler.AccessKind << O->isIndeterminate()
-            << E->getSourceRange();
+      if (!Info.checkingPotentialConstantExpression()) {
+        if (Info.hasDiags()) {
+          Info.FFDiag(E, diag::note_constexpr_access_uninit)
+              << handler.AccessKind << O->isIndeterminate()
+              << E->getSourceRange();
+        } else Info.DiagEmitted = true;
+      }
       return handler.failed();
     }
 
@@ -8746,9 +8794,14 @@ bool LValueExprEvaluator::VisitVarDecl(const Expr *E, const VarDecl *VD) {
   }
 
   if (!Info.getLangOpts().CPlusPlus11) {
+    if (Info.hasDiags()) {
     Info.CCEDiag(E, diag::note_constexpr_ltor_non_integral, 1)
         << VD << VD->getType();
     Info.Note(VD->getLocation(), diag::note_declared_at);
+
+    } else Info.DiagEmitted = true;
+
+
   }
 
   APValue *V;
@@ -8872,9 +8925,14 @@ bool LValueExprEvaluator::VisitCXXTypeidExpr(const CXXTypeidExpr *E) {
       TypeInfo = TypeInfoLValue(E->getExprOperand()->getType().getTypePtr());
   } else {
     if (!Info.Ctx.getLangOpts().CPlusPlus20) {
+    if (Info.hasDiags()) {
       Info.CCEDiag(E, diag::note_constexpr_typeid_polymorphic)
         << E->getExprOperand()->getType()
         << E->getExprOperand()->getSourceRange();
+    } else Info.DiagEmitted = true;
+
+
+
     }
 
     if (!Visit(E->getExprOperand()))
@@ -9453,8 +9511,12 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
     return ZeroInitialization(E);
 
   case CK_IntegralToPointer: {
+    if (Info.hasDiags()) {
     CCEDiag(E, diag::note_constexpr_invalid_cast)
         << 2 << Info.Ctx.getLangOpts().CPlusPlus;
+    } else Info.DiagEmitted = true;
+
+
 
     APValue Value;
     if (!EvaluateIntegerOrLValue(SubExpr, Value, Info))
