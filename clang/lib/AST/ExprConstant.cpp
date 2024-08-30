@@ -846,6 +846,9 @@ namespace {
     /// EvalStatus - Contains information about the evaluation.
     Expr::EvalStatus &EvalStatus;
 
+    bool hasDiags() const { return EvalStatus.Diag != nullptr; }
+    bool DiagEmitted = false;
+
     /// CurrentCall - The top of the constexpr call stack.
     CallStackFrame *CurrentCall;
 
@@ -2279,25 +2282,27 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
   // assumed to be global here.
   if (!IsGlobalLValue(Base)) {
     if (Info.getLangOpts().CPlusPlus11) {
-      Info.FFDiag(Loc, diag::note_constexpr_non_global, 1)
-          << IsReferenceType << !Designator.Entries.empty() << !!BaseVD
-          << BaseVD;
-      auto *VarD = dyn_cast_or_null<VarDecl>(BaseVD);
-      if (VarD && VarD->isConstexpr()) {
-        // Non-static local constexpr variables have unintuitive semantics:
-        //   constexpr int a = 1;
-        //   constexpr const int *p = &a;
-        // ... is invalid because the address of 'a' is not constant. Suggest
-        // adding a 'static' in this case.
-        Info.Note(VarD->getLocation(), diag::note_constexpr_not_static)
-            << VarD
-            << FixItHint::CreateInsertion(VarD->getBeginLoc(), "static ");
+      if (Info.hasDiags()) {
+        Info.FFDiag(Loc, diag::note_constexpr_non_global, 1)
+            << IsReferenceType << !Designator.Entries.empty() << !!BaseVD
+            << BaseVD;
+        auto *VarD = dyn_cast_or_null<VarDecl>(BaseVD);
+        if (VarD && VarD->isConstexpr()) {
+          // Non-static local constexpr variables have unintuitive semantics:
+          //   constexpr int a = 1;
+          //   constexpr const int *p = &a;
+          // ... is invalid because the address of 'a' is not constant. Suggest
+          // adding a 'static' in this case.
+          Info.Note(VarD->getLocation(), diag::note_constexpr_not_static)
+              << VarD
+              << FixItHint::CreateInsertion(VarD->getBeginLoc(), "static ");
+        } else {
+          NoteLValueLocation(Info, Base);
+        }
       } else {
-        NoteLValueLocation(Info, Base);
+        Info.FFDiag(Loc);
       }
-    } else {
-      Info.FFDiag(Loc);
-    }
+    } else Info.DiagEmitted = true;
     // Don't allow references to temporaries to escape.
     return false;
   }
@@ -2655,8 +2660,10 @@ static bool EvaluateAsBooleanCondition(const Expr *E, bool &Result,
 template<typename T>
 static bool HandleOverflow(EvalInfo &Info, const Expr *E,
                            const T &SrcValue, QualType DestType) {
+  if (Info.hasDiags()) {
   Info.CCEDiag(E, diag::note_constexpr_overflow)
     << SrcValue << DestType;
+  } else Info.DiagEmitted = true;
   return Info.noteUndefinedBehavior();
 }
 
@@ -3395,9 +3402,11 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
         !Info.CurrentCall->Callee ||
         !Info.CurrentCall->Callee->Equals(VD->getDeclContext())) {
       if (Info.getLangOpts().CPlusPlus11) {
-        Info.FFDiag(E, diag::note_constexpr_function_param_value_unknown)
-            << VD;
-        NoteLValueLocation(Info, Base);
+        if (Info.hasDiags()) {
+          Info.FFDiag(E, diag::note_constexpr_function_param_value_unknown)
+              << VD;
+              NoteLValueLocation(Info, Base);
+          } else Info.DiagEmitted = true;
       } else {
         Info.FFDiag(E);
       }
