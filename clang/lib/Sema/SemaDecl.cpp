@@ -14390,7 +14390,7 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
       // Compute and cache the constant value, and remember that we have a
       // constant initializer.
       if (HasConstInit) {
-        (void)var->checkForConstantInitialization(Notes);
+        (void)var->checkForConstantInitialization(nullptr);
         Notes.clear();
       } else if (CacheCulprit) {
         Notes.emplace_back(CacheCulprit->getExprLoc(),
@@ -14399,7 +14399,7 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
       }
     } else {
       // Evaluate the initializer to see if it's a constant initializer.
-      HasConstInit = var->checkForConstantInitialization(Notes);
+      HasConstInit = var->checkForConstantInitialization(&Notes);
     }
 
     if (HasConstInit) {

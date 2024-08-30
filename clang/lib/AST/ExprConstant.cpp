@@ -16333,7 +16333,7 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
 
 bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
                                  const VarDecl *VD,
-                                 SmallVectorImpl<PartialDiagnosticAt> &Notes,
+                                 SmallVectorImpl<PartialDiagnosticAt> *Notes,
                                  bool IsConstantInitialization) const {
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
@@ -16346,7 +16346,7 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
   });
 
   Expr::EvalStatus EStatus;
-  EStatus.Diag = &Notes;
+  EStatus.Diag = Notes;
 
   EvalInfo Info(Ctx, EStatus,
                 (IsConstantInitialization &&
@@ -17043,8 +17043,6 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result,
 
   // Build evaluation settings.
   Expr::EvalStatus Status;
-  SmallVector<PartialDiagnosticAt, 8> Diags;
-  Status.Diag = &Diags;
   EvalInfo Info(Ctx, Status, EvalInfo::EM_ConstantExpression);
 
   APValue Scratch;
@@ -17054,9 +17052,9 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result,
       // call us on arbitrary full-expressions should generally not care.
       Info.discardCleanups() && !Status.HasSideEffects;
 
-  if (!Diags.empty()) {
+  if (Info.DiagEmitted) {//!Diags.empty()) {
     IsConstExpr = false;
-    if (Loc) *Loc = Diags[0].first;
+    if (Loc) *Loc = SourceLocation();//Diags[0].first;
   } else if (!IsConstExpr) {
     // FIXME: This shouldn't happen.
     if (Loc) *Loc = getExprLoc();
