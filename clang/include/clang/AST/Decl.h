@@ -2036,6 +2036,8 @@ private:
   /// the DeclaratorDecl base class.
   DeclarationNameLoc DNLoc;
 
+  mutable std::optional<unsigned> CachedBuiltinID;
+
   /// Specify that this function declaration is actually a function
   /// template specialization.
   ///

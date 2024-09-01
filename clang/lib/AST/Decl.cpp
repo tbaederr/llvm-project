@@ -3624,7 +3624,15 @@ FunctionDecl *FunctionDecl::getCanonicalDecl() { return getFirstDecl(); }
 /// functions as their wrapped builtins. This shouldn't be done in general, but
 /// it's useful in Sema to diagnose calls to wrappers based on their semantics.
 unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
+  if (CachedBuiltinID)
+    return *CachedBuiltinID;
+
   unsigned BuiltinID = 0;
+  auto cacheAndReturn = [&](unsigned Value) -> unsigned {
+    assert(!CachedBuiltinID);
+    CachedBuiltinID = Value;
+    return Value;
+  };
 
   if (const auto *ABAA = getAttr<ArmBuiltinAliasAttr>()) {
     BuiltinID = ABAA->getBuiltinName()->getBuiltinID();
@@ -3635,17 +3643,17 @@ unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
   }
 
   if (!BuiltinID)
-    return 0;
+    return cacheAndReturn(0);
 
   // If the function is marked "overloadable", it has a different mangled name
   // and is not the C library function.
   if (!ConsiderWrapperFunctions && hasAttr<OverloadableAttr>() &&
       (!hasAttr<ArmBuiltinAliasAttr>() && !hasAttr<BuiltinAliasAttr>()))
-    return 0;
+    return cacheAndReturn(0);
 
   const ASTContext &Context = getASTContext();
   if (!Context.BuiltinInfo.isPredefinedLibFunction(BuiltinID))
-    return BuiltinID;
+    return cacheAndReturn(BuiltinID);
 
   // This function has the name of a known C library
   // function. Determine whether it actually refers to the C library
@@ -3653,20 +3661,20 @@ unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
 
   // If this is a static function, it's not a builtin.
   if (!ConsiderWrapperFunctions && getStorageClass() == SC_Static)
-    return 0;
+    return cacheAndReturn(0);
 
   // OpenCL v1.2 s6.9.f - The library functions defined in
   // the C99 standard headers are not available.
   if (Context.getLangOpts().OpenCL &&
       Context.BuiltinInfo.isPredefinedLibFunction(BuiltinID))
-    return 0;
+    return cacheAndReturn(0);
 
   // CUDA does not have device-side standard library. printf and malloc are the
   // only special cases that are supported by device-side runtime.
   if (Context.getLangOpts().CUDA && hasAttr<CUDADeviceAttr>() &&
       !hasAttr<CUDAHostAttr>() &&
       !(BuiltinID == Builtin::BIprintf || BuiltinID == Builtin::BImalloc))
-    return 0;
+    return cacheAndReturn(0);
 
   // As AMDGCN implementation of OpenMP does not have a device-side standard
   // library, none of the predefined library functions except printf and malloc
@@ -3675,9 +3683,9 @@ unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
       Context.getLangOpts().OpenMPIsTargetDevice &&
       Context.BuiltinInfo.isPredefinedLibFunction(BuiltinID) &&
       !(BuiltinID == Builtin::BIprintf || BuiltinID == Builtin::BImalloc))
-    return 0;
+    return cacheAndReturn(0);
 
-  return BuiltinID;
+  return cacheAndReturn(BuiltinID);
 }
 
 /// getNumParams - Return the number of parameters this function must have
