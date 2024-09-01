@@ -11577,14 +11577,17 @@ QualType ASTContext::mergeObjCGCQualifiers(QualType LHS, QualType RHS) {
 //===----------------------------------------------------------------------===//
 
 unsigned ASTContext::getIntWidth(QualType T) const {
-  if (const auto *ET = T->getAs<EnumType>())
-    T = ET->getDecl()->getIntegerType();
   if (T->isBooleanType())
     return 1;
-  if (const auto *EIT = T->getAs<BitIntType>())
-    return EIT->getNumBits();
-  // For builtin types, just use the standard type sizing method
-  return (unsigned)getTypeSize(T);
+
+  switch(T->getTypeClass()) {
+    case Type::Enum:
+      return (unsigned)getTypeSize(T->castAs<EnumType>()->getDecl()->getIntegerType());
+    case Type::BitInt:
+      return T->castAs<BitIntType>()->getNumBits();
+    default:
+      return (unsigned)getTypeSize(T);
+  }
 }
 
 QualType ASTContext::getCorrespondingUnsignedType(QualType T) const {
