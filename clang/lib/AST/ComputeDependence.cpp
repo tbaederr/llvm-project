@@ -44,6 +44,9 @@ ExprDependence clang::computeDependence(UnaryOperator *E,
       toExprDependenceForImpliedType(E->getType()->getDependence()) |
       E->getSubExpr()->getDependence();
 
+  if (Dep & ExprDependence::Value)
+    return Dep;
+
   // C++ [temp.dep.constexpr]p5:
   //   An expression of the form & qualified-id where the qualified-id names a
   //   dependent member of the current instantiation is value-dependent. An
