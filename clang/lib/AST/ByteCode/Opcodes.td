@@ -836,3 +836,9 @@ def CheckNewTypeMismatchArray : Opcode {
 }
 
 def IsConstantContext: Opcode;
+
+def BitCast : Opcode {
+  let Types = [FixedSizeIntegralTypeClass];
+  let Args = [ArgBool, ArgUint32, ArgFltSemantics];
+  let HasGroup = 1;
+}
