@@ -17291,6 +17291,16 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result,
   // issues.
   assert(Ctx.getLangOpts().CPlusPlus);
 
+
+  {
+    EvalResult ER;
+    bool IsConst;
+    if (FastEvaluateAsRValue(this, ER, Ctx, IsConst) && IsConst) {
+      *Result = ER.Val;
+      return true;
+    }
+  }
+
   // Build evaluation settings.
   Expr::EvalStatus Status;
   SmallVector<PartialDiagnosticAt, 8> Diags;
