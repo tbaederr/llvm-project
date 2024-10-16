@@ -18264,7 +18264,9 @@ ExprResult Sema::VerifyBitField(SourceLocation FieldLoc,
     }
   }
 
-  return BitWidth;
+  if (isa<ConstantExpr>(BitWidth))
+    return BitWidth;
+  return ConstantExpr::Create(getASTContext(), BitWidth, APValue{Value});
 }
 
 Decl *Sema::ActOnField(Scope *S, Decl *TagD, SourceLocation DeclStart,
