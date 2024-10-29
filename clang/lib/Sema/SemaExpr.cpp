@@ -9788,8 +9788,20 @@ Sema::CheckSingleAssignmentConstraints(QualType LHSType, ExprResult &CallerRHS,
       return Compatible;
     }
 
-    if (ConvertRHS)
+    if (ConvertRHS) {
+      if (auto *IL = dyn_cast<IntegerLiteral>(RHS.get());
+          IL && IL->getValue().ult(64) && Ty->isIntegerType()) {
+        IL->setType(Ty);
+        if (Ty->isSignedIntegerType())
+          IL->setValue(Context, IL->getValue().sextOrTrunc(Context.getIntWidth(Ty)));
+        else if (Ty->isUnsignedIntegerType())
+          IL->setValue(Context, IL->getValue().zextOrTrunc(Context.getIntWidth(Ty)));
+        else
+          assert(false);
+      } else {
       RHS = ImpCastExprToType(E, Ty, Kind);
+      }
+    }
   }
 
   return result;

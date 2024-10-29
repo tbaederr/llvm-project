@@ -4491,6 +4491,20 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
                                /*BasePath=*/nullptr, CCK)
                  .get();
     } else {
+
+
+
+      if (auto *IL = dyn_cast<IntegerLiteral>(From);
+          IL && IL->getValue().ult(64) && StepTy->isIntegerType()) {
+        IL->setType(StepTy);
+        if (StepTy->isSignedIntegerType())
+          IL->setValue(Context, IL->getValue().sextOrTrunc(Context.getIntWidth(StepTy)));
+        else if (StepTy->isUnsignedIntegerType())
+          IL->setValue(Context, IL->getValue().zextOrTrunc(Context.getIntWidth(StepTy)));
+        else
+          assert(false);
+        break;
+      }
       From = ImpCastExprToType(From, StepTy, CK_IntegralCast, VK_PRValue,
                                /*BasePath=*/nullptr, CCK)
                  .get();
