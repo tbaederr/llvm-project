@@ -2432,11 +2432,11 @@ static bool CheckConstexprFunctionBody(Sema &SemaRef, const FunctionDecl *Dcl,
   // constexpr potential is expensive, skip the check if the diagnostic is
   // disabled, the function is declared in a system header, or we're in C++23
   // or later mode (see https://wg21.link/P2448).
-  bool SkipCheck =
-      !SemaRef.getLangOpts().CheckConstexprFunctionBodies ||
-      SemaRef.getSourceManager().isInSystemHeader(Dcl->getLocation()) ||
-      SemaRef.getDiagnostics().isIgnored(
-          diag::ext_constexpr_function_never_constant_expr, Dcl->getLocation());
+  bool SkipCheck = true;
+      // !SemaRef.getLangOpts().CheckConstexprFunctionBodies ||
+      // SemaRef.getSourceManager().isInSystemHeader(Dcl->getLocation()) ||
+      // SemaRef.getDiagnostics().isIgnored(
+          // diag::ext_constexpr_function_never_constant_expr, Dcl->getLocation());
   SmallVector<PartialDiagnosticAt, 8> Diags;
   if (Kind == Sema::CheckConstexprKind::Diagnose && !SkipCheck &&
       !Expr::isPotentialConstantExpr(Dcl, Diags)) {
