@@ -16471,22 +16471,30 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
 
 static bool FastEvaluateAsRValue(const Expr *Exp, Expr::EvalResult &Result,
                                  const ASTContext &Ctx, bool &IsConst) {
-  // Fast-path evaluations of integer literals, since we sometimes see files
+  // Fast-path evaluations of literals, since we sometimes see files
   // containing vast quantities of these.
-  if (const IntegerLiteral *L = dyn_cast<IntegerLiteral>(Exp)) {
-    Result.Val = APValue(APSInt(L->getValue(),
-                                L->getType()->isUnsignedIntegerType()));
+  switch (Exp->getStmtClass()) {
+  case Stmt::IntegerLiteralClass:
+    Result.Val = APValue(APSInt(cast<IntegerLiteral>(Exp)->getValue(),
+                                Exp->getType()->isUnsignedIntegerType()));
     IsConst = true;
     return true;
-  }
-
-  if (const auto *L = dyn_cast<CXXBoolLiteralExpr>(Exp)) {
-    Result.Val = APValue(APSInt(APInt(1, L->getValue())));
+  case Stmt::CXXBoolLiteralExprClass:
+    Result.Val =
+        APValue(APSInt(APInt(1, cast<CXXBoolLiteralExpr>(Exp)->getValue())));
     IsConst = true;
     return true;
-  }
-
-  if (const auto *CE = dyn_cast<ConstantExpr>(Exp)) {
+  case Stmt::FloatingLiteralClass:
+    Result.Val = APValue(cast<FloatingLiteral>(Exp)->getValue());
+    IsConst = true;
+    return true;
+  case Stmt::CharacterLiteralClass:
+    Result.Val = APValue(Ctx.MakeIntValue(
+        cast<CharacterLiteral>(Exp)->getValue(), Exp->getType()));
+    IsConst = true;
+    return true;
+  case Stmt::ConstantExprClass: {
+    const auto *CE = cast<ConstantExpr>(Exp);
     if (CE->hasAPValueResult()) {
       APValue APV = CE->getAPValueResult();
       if (!APV.isLValue()) {
@@ -16495,18 +16503,17 @@ static bool FastEvaluateAsRValue(const Expr *Exp, Expr::EvalResult &Result,
         return true;
       }
     }
-
     // The SubExpr is usually just an IntegerLiteral.
     return FastEvaluateAsRValue(CE->getSubExpr(), Result, Ctx, IsConst);
   }
 
-  // This case should be rare, but we need to check it before we check on
-  // the type below.
-  if (Exp->getType().isNull()) {
-    IsConst = false;
-    return true;
+  default:
+    // This case should be rare, but we need to check it.
+    if (Exp->getType().isNull()) {
+      IsConst = false;
+      return true;
+    }
   }
-
   return false;
 }
 
