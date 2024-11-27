@@ -3657,7 +3657,8 @@ public:
   /// AddInitializerToDecl - Adds the initializer Init to the
   /// declaration dcl. If DirectInit is true, this is C++ direct
   /// initialization rather than copy initialization.
-  void AddInitializerToDecl(Decl *dcl, Expr *init, bool DirectInit);
+  void AddInitializerToDecl(Decl *dcl, Expr *init, bool DirectInit,
+                            bool CheckInitializer = true);
   void ActOnUninitializedDecl(Decl *dcl);
 
   /// ActOnInitializerError - Given that there was an error parsing an
@@ -7022,15 +7023,16 @@ public:
 
   /// Binary Operators.  'Tok' is the token for the operator.
   ExprResult ActOnBinOp(Scope *S, SourceLocation TokLoc, tok::TokenKind Kind,
-                        Expr *LHSExpr, Expr *RHSExpr);
+                        Expr *LHSExpr, Expr *RHSExpr, bool DoChecks = true);
   ExprResult BuildBinOp(Scope *S, SourceLocation OpLoc, BinaryOperatorKind Opc,
-                        Expr *LHSExpr, Expr *RHSExpr);
+                        Expr *LHSExpr, Expr *RHSExpr, bool DoChecks = true);
 
   /// CreateBuiltinBinOp - Creates a new built-in binary operation with
   /// operator @p Opc at location @c TokLoc. This routine only supports
   /// built-in operations; ActOnBinOp handles overloaded operators.
   ExprResult CreateBuiltinBinOp(SourceLocation OpLoc, BinaryOperatorKind Opc,
-                                Expr *LHSExpr, Expr *RHSExpr);
+                                Expr *LHSExpr, Expr *RHSExpr,
+                                bool DoChecks = true);
   void LookupBinOp(Scope *S, SourceLocation OpLoc, BinaryOperatorKind Opc,
                    UnresolvedSetImpl &Functions);
 
@@ -7720,7 +7722,8 @@ public:
       bool IsCompAssign = false);
   QualType CheckAdditionOperands( // C99 6.5.6
       ExprResult &LHS, ExprResult &RHS, SourceLocation Loc,
-      BinaryOperatorKind Opc, QualType *CompLHSTy = nullptr);
+      BinaryOperatorKind Opc, QualType *CompLHSTy = nullptr,
+      bool DoChecks = true);
   QualType CheckSubtractionOperands( // C99 6.5.6
       ExprResult &LHS, ExprResult &RHS, SourceLocation Loc,
       QualType *CompLHSTy = nullptr);
@@ -8264,7 +8267,8 @@ public:
   }
   ExprResult ActOnFinishFullExpr(Expr *Expr, SourceLocation CC,
                                  bool DiscardedValue, bool IsConstexpr = false,
-                                 bool IsTemplateArgument = false);
+                                 bool IsTemplateArgument = false,
+                                 bool CheckExpr = true);
   StmtResult ActOnFinishFullStmt(Stmt *Stmt);
 
   /// Process the expression contained within a decltype. For such expressions,

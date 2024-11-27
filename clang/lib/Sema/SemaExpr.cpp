@@ -10945,7 +10945,7 @@ static void diagnosePointerIncompatibility(Sema &S, SourceLocation Loc,
 // C99 6.5.6
 QualType Sema::CheckAdditionOperands(ExprResult &LHS, ExprResult &RHS,
                                      SourceLocation Loc, BinaryOperatorKind Opc,
-                                     QualType* CompLHSTy) {
+                                     QualType *CompLHSTy, bool DoChecks) {
   checkArithmeticNull(*this, LHS, RHS, Loc, /*IsCompare=*/false);
 
   if (LHS.get()->getType()->isVectorType() ||
@@ -11050,7 +11050,8 @@ QualType Sema::CheckAdditionOperands(ExprResult &LHS, ExprResult &RHS,
   }
 
   // Check array bounds for pointer arithemtic
-  CheckArrayAccess(PExp, IExp);
+  if (DoChecks)
+    CheckArrayAccess(PExp, IExp);
 
   if (CompLHSTy) {
     QualType LHSTy = Context.isPromotableBitField(LHS.get());
@@ -14700,8 +14701,8 @@ static bool needsConversionOfHalfVec(bool OpRequiresConversion, ASTContext &Ctx,
 }
 
 ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
-                                    BinaryOperatorKind Opc,
-                                    Expr *LHSExpr, Expr *RHSExpr) {
+                                    BinaryOperatorKind Opc, Expr *LHSExpr,
+                                    Expr *RHSExpr, bool DoChecks) {
   if (getLangOpts().CPlusPlus11 && isa<InitListExpr>(RHSExpr)) {
     // The syntax only allows initializer lists on the RHS of assignment,
     // so we don't need to worry about accepting invalid code for
@@ -14814,7 +14815,7 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
     break;
   case BO_Add:
     ConvertHalfVec = true;
-    ResultTy = CheckAdditionOperands(LHS, RHS, OpLoc, Opc);
+    ResultTy = CheckAdditionOperands(LHS, RHS, OpLoc, Opc, nullptr, false);
     break;
   case BO_Sub:
     ConvertHalfVec = true;
@@ -15203,8 +15204,8 @@ static void DetectPrecisionLossInComplexDivision(Sema &S, SourceLocation OpLoc,
 }
 
 ExprResult Sema::ActOnBinOp(Scope *S, SourceLocation TokLoc,
-                            tok::TokenKind Kind,
-                            Expr *LHSExpr, Expr *RHSExpr) {
+                            tok::TokenKind Kind, Expr *LHSExpr, Expr *RHSExpr,
+                            bool DoChecks) {
   BinaryOperatorKind Opc = ConvertTokenKindToBinaryOpcode(Kind);
   assert(LHSExpr && "ActOnBinOp(): missing left expression");
   assert(RHSExpr && "ActOnBinOp(): missing right expression");
@@ -15223,7 +15224,7 @@ ExprResult Sema::ActOnBinOp(Scope *S, SourceLocation TokLoc,
   CheckInvalidBuiltinCountedByRef(LHSExpr, K);
   CheckInvalidBuiltinCountedByRef(RHSExpr, K);
 
-  return BuildBinOp(S, TokLoc, Opc, LHSExpr, RHSExpr);
+  return BuildBinOp(S, TokLoc, Opc, LHSExpr, RHSExpr, DoChecks);
 }
 
 void Sema::LookupBinOp(Scope *S, SourceLocation OpLoc, BinaryOperatorKind Opc,
@@ -15277,8 +15278,8 @@ static ExprResult BuildOverloadedBinOp(Sema &S, Scope *Sc, SourceLocation OpLoc,
 }
 
 ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
-                            BinaryOperatorKind Opc,
-                            Expr *LHSExpr, Expr *RHSExpr) {
+                            BinaryOperatorKind Opc, Expr *LHSExpr,
+                            Expr *RHSExpr, bool DoChecks) {
   ExprResult LHS, RHS;
   std::tie(LHS, RHS) = CorrectDelayedTyposInBinOp(*this, Opc, LHSExpr, RHSExpr);
   if (!LHS.isUsable() || !RHS.isUsable())
@@ -15352,7 +15353,7 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
            LHSExpr->getType()->isOverloadableType()))
         return BuildOverloadedBinOp(*this, S, OpLoc, Opc, LHSExpr, RHSExpr);
 
-      return CreateBuiltinBinOp(OpLoc, Opc, LHSExpr, RHSExpr);
+      return CreateBuiltinBinOp(OpLoc, Opc, LHSExpr, RHSExpr, DoChecks);
     }
 
     // Don't resolve overloads if the other type is overloadable.
@@ -15416,7 +15417,7 @@ ExprResult Sema::BuildBinOp(Scope *S, SourceLocation OpLoc,
   }
 
   // Build a built-in binary operation.
-  return CreateBuiltinBinOp(OpLoc, Opc, LHSExpr, RHSExpr);
+  return CreateBuiltinBinOp(OpLoc, Opc, LHSExpr, RHSExpr, DoChecks);
 }
 
 static bool isOverflowingIntegerType(ASTContext &Ctx, QualType T) {

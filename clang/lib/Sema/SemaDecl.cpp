@@ -13386,7 +13386,8 @@ void Sema::checkNonTrivialCUnion(QualType QT, SourceLocation Loc,
         .visit(QT, nullptr, false);
 }
 
-void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
+void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit,
+                                bool CheckInitializer) {
   // If there is no declaration, there was an error parsing it.  Just ignore
   // the initializer.
   if (!RealDecl) {
@@ -13696,7 +13697,8 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
   // we should destroy the first Temp before constructing the second.
   ExprResult Result =
       ActOnFinishFullExpr(Init, VDecl->getLocation(),
-                          /*DiscardedValue*/ false, VDecl->isConstexpr());
+                          /*DiscardedValue*/ false, VDecl->isConstexpr(),
+                          /*IsTemplateArgument=*/false, CheckInitializer);
   if (!Result.isUsable()) {
     VDecl->setInvalidDecl();
     return;
