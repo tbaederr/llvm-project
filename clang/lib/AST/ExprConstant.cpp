@@ -16864,7 +16864,13 @@ APSInt Expr::EvaluateKnownConstInt(const ASTContext &Ctx,
          "Expression evaluator can't be called on a dependent expression.");
 
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateKnownConstInt");
+
+  bool IsConst;
   EvalResult EVResult;
+  if (FastEvaluateAsRValue(this, EVResult, Ctx, IsConst) &&
+      EVResult.Val.hasValue())
+    return EVResult.Val.getInt();
+
   EVResult.Diag = Diag;
   EvalInfo Info(Ctx, EVResult, EvalInfo::EM_IgnoreSideEffects);
   Info.InConstantContext = true;
@@ -16883,7 +16889,13 @@ APSInt Expr::EvaluateKnownConstIntCheckOverflow(
          "Expression evaluator can't be called on a dependent expression.");
 
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateKnownConstIntCheckOverflow");
+
+  bool IsConst;
   EvalResult EVResult;
+  if (FastEvaluateAsRValue(this, EVResult, Ctx, IsConst) &&
+      EVResult.Val.hasValue())
+    return EVResult.Val.getInt();
+
   EVResult.Diag = Diag;
   EvalInfo Info(Ctx, EVResult, EvalInfo::EM_IgnoreSideEffects);
   Info.InConstantContext = true;
@@ -17461,6 +17473,13 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result,
   // We support this checking in C++98 mode in order to diagnose compatibility
   // issues.
   assert(Ctx.getLangOpts().CPlusPlus);
+
+  bool IsConst;
+  EvalResult Res;
+  if (FastEvaluateAsRValue(this, Res, Ctx, IsConst) && IsConst) {
+    *Result = Res.Val;
+    return true;
+  }
 
   // Build evaluation settings.
   Expr::EvalStatus Status;
