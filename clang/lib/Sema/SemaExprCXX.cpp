@@ -8124,6 +8124,8 @@ ExprResult Sema::ActOnStartCXXMemberReference(Scope *S, Expr *Base,
 
 static bool CheckArrow(Sema &S, QualType &ObjectType, Expr *&Base,
                        tok::TokenKind &OpKind, SourceLocation OpLoc) {
+  assert(OpKind == tok::arrow);
+
   if (Base->hasPlaceholderType()) {
     ExprResult result = S.CheckPlaceholderExpr(Base);
     if (result.isInvalid()) return true;
@@ -8137,31 +8139,30 @@ static bool CheckArrow(Sema &S, QualType &ObjectType, Expr *&Base,
   //   This scalar type is the object type.
   // Note that this is rather different from the normal handling for the
   // arrow operator.
-  if (OpKind == tok::arrow) {
-    // The operator requires a prvalue, so perform lvalue conversions.
-    // Only do this if we might plausibly end with a pointer, as otherwise
-    // this was likely to be intended to be a '.'.
-    if (ObjectType->isPointerType() || ObjectType->isArrayType() ||
-        ObjectType->isFunctionType()) {
-      ExprResult BaseResult = S.DefaultFunctionArrayLvalueConversion(Base);
-      if (BaseResult.isInvalid())
-        return true;
-      Base = BaseResult.get();
-      ObjectType = Base->getType();
-    }
+  //
+  // The operator requires a prvalue, so perform lvalue conversions.
+  // Only do this if we might plausibly end with a pointer, as otherwise
+  // this was likely to be intended to be a '.'.
+  if (ObjectType->isPointerType() || ObjectType->isArrayType() ||
+      ObjectType->isFunctionType()) {
+    ExprResult BaseResult = S.DefaultFunctionArrayLvalueConversion(Base);
+    if (BaseResult.isInvalid())
+      return true;
+    Base = BaseResult.get();
+    ObjectType = Base->getType();
+  }
 
-    if (const PointerType *Ptr = ObjectType->getAs<PointerType>()) {
-      ObjectType = Ptr->getPointeeType();
-    } else if (!Base->isTypeDependent()) {
-      // The user wrote "p->" when they probably meant "p."; fix it.
-      S.Diag(OpLoc, diag::err_typecheck_member_reference_suggestion)
-        << ObjectType << true
-        << FixItHint::CreateReplacement(OpLoc, ".");
-      if (S.isSFINAEContext())
-        return true;
+  if (const PointerType *Ptr = ObjectType->getAs<PointerType>()) {
+    ObjectType = Ptr->getPointeeType();
+  } else if (!Base->isTypeDependent()) {
+    // The user wrote "p->" when they probably meant "p."; fix it.
+    S.Diag(OpLoc, diag::err_typecheck_member_reference_suggestion)
+      << ObjectType << true
+      << FixItHint::CreateReplacement(OpLoc, ".");
+    if (S.isSFINAEContext())
+      return true;
 
-      OpKind = tok::period;
-    }
+    OpKind = tok::period;
   }
 
   return false;
@@ -8196,7 +8197,7 @@ ExprResult Sema::BuildPseudoDestructorExpr(Expr *Base,
   TypeSourceInfo *DestructedTypeInfo = Destructed.getTypeSourceInfo();
 
   QualType ObjectType;
-  if (CheckArrow(*this, ObjectType, Base, OpKind, OpLoc))
+  if (OpKind == tok::arrow && CheckArrow(*this, ObjectType, Base, OpKind, OpLoc))
     return ExprError();
 
   if (!ObjectType->isDependentType() && !ObjectType->isScalarType() &&
@@ -8320,7 +8321,7 @@ ExprResult Sema::ActOnPseudoDestructorExpr(Scope *S, Expr *Base,
          "Invalid second type name in pseudo-destructor");
 
   QualType ObjectType;
-  if (CheckArrow(*this, ObjectType, Base, OpKind, OpLoc))
+  if (OpKind == tok::arrow && CheckArrow(*this, ObjectType, Base, OpKind, OpLoc))
     return ExprError();
 
   // Compute the object type that we should use for name lookup purposes. Only
@@ -8457,7 +8458,7 @@ ExprResult Sema::ActOnPseudoDestructorExpr(Scope *S, Expr *Base,
   QualType ObjectType;
   QualType T;
   TypeLocBuilder TLB;
-  if (CheckArrow(*this, ObjectType, Base, OpKind, OpLoc) ||
+  if ((OpKind == tok::arrow &&CheckArrow(*this, ObjectType, Base, OpKind, OpLoc)) ||
       DS.getTypeSpecType() == DeclSpec::TST_error)
     return ExprError();
 
