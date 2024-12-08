@@ -714,14 +714,16 @@ ExprResult Sema::ImpCastExprToType(Expr *E, QualType Ty,
          "can't cast prvalue to glvalue");
 #endif
 
+  QualType ExprTy = Context.getCanonicalType(E->getType());
+  QualType TypeTy = Context.getCanonicalType(Ty);
+  if (ExprTy == TypeTy)
+    return E;
+
   diagnoseNullableToNonnullConversion(Ty, E->getType(), E->getBeginLoc());
   diagnoseZeroToNullptrConversion(Kind, E);
   if (Context.hasAnyFunctionEffects() && !isCast(CCK) &&
       Kind != CK_NullToPointer && Kind != CK_NullToMemberPointer)
     diagnoseFunctionEffectConversion(Ty, E->getType(), E->getBeginLoc());
-
-  QualType ExprTy = Context.getCanonicalType(E->getType());
-  QualType TypeTy = Context.getCanonicalType(Ty);
 
   // This cast is used in place of a regular LValue to RValue cast for
   // HLSL Array Parameter Types. It needs to be emitted even if
@@ -732,8 +734,6 @@ ExprResult Sema::ImpCastExprToType(Expr *E, QualType Ty,
     return ImplicitCastExpr::Create(Context, Ty, Kind, E, BasePath, VK,
                                     CurFPFeatureOverrides());
 
-  if (ExprTy == TypeTy)
-    return E;
 
   if (Kind == CK_ArrayToPointerDecay) {
     // C++1z [conv.array]: The temporary materialization conversion is applied.
