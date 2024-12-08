@@ -49,6 +49,13 @@ static_assert(round_trip<bytes>(ld), "");
 
 static_assert(round_trip<long double>(10.0L));
 
+constexpr long double foo() {
+  bytes A = __builtin_bit_cast(bytes, ld);
+  long double ld = __builtin_bit_cast(long double, A);
+  return ld;
+}
+static_assert(foo() == ld);
+
 #if 0
 constexpr bool f(bool read_uninit) {
   bytes b = bit_cast<bytes>(ld);
