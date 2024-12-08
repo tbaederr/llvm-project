@@ -281,7 +281,7 @@ static CallExpr *create_call_once_funcptr_call(ASTContext &C, ASTMaker M,
   }
 
   return CallExpr::Create(C, SubExpr, CallArgs, C.VoidTy, VK_PRValue,
-                          SourceLocation(), FPOptionsOverride());
+                          SubExpr->getBeginLoc(), SourceLocation(), FPOptionsOverride());
 }
 
 static CallExpr *create_call_once_lambda_call(ASTContext &C, ASTMaker M,
@@ -545,6 +545,7 @@ static Stmt *create_dispatch_once(ASTContext &C, const FunctionDecl *D) {
       /*Args=*/{},
       /*QualType=*/C.VoidTy,
       /*ExprValueType=*/VK_PRValue,
+      SourceLocation(),
       /*SourceLocation=*/SourceLocation(), FPOptionsOverride());
 
   // (2) Create the assignment to the predicate.
@@ -611,6 +612,7 @@ static Stmt *create_dispatch_sync(ASTContext &C, const FunctionDecl *D) {
   DeclRefExpr *DR = M.makeDeclRefExpr(PV);
   ImplicitCastExpr *ICE = M.makeLvalueToRvalue(DR, Ty);
   CallExpr *CE = CallExpr::Create(C, ICE, {}, C.VoidTy, VK_PRValue,
+      ICE->getBeginLoc(),
                                   SourceLocation(), FPOptionsOverride());
   return CE;
 }

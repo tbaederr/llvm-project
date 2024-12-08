@@ -594,12 +594,13 @@ CXXOperatorCallExpr::CXXOperatorCallExpr(OverloadedOperatorKind OpKind,
                                          FPOptionsOverride FPFeatures,
                                          ADLCallKind UsesADL)
     : CallExpr(CXXOperatorCallExprClass, Fn, /*PreArgs=*/{}, Args, Ty, VK,
-               OperatorLoc, FPFeatures, /*MinNumArgs=*/0, UsesADL) {
+               SourceLocation(), OperatorLoc, FPFeatures, /*MinNumArgs=*/0, UsesADL) {
   CXXOperatorCallExprBits.OperatorKind = OpKind;
   assert(
       (CXXOperatorCallExprBits.OperatorKind == static_cast<unsigned>(OpKind)) &&
       "OperatorKind overflow!");
   Range = getSourceRangeImpl();
+  setBeginLoc(Range.getBegin());
 }
 
 CXXOperatorCallExpr::CXXOperatorCallExpr(unsigned NumArgs, bool HasFPFeatures,
@@ -664,7 +665,7 @@ CXXMemberCallExpr::CXXMemberCallExpr(Expr *Fn, ArrayRef<Expr *> Args,
                                      SourceLocation RP,
                                      FPOptionsOverride FPOptions,
                                      unsigned MinNumArgs)
-    : CallExpr(CXXMemberCallExprClass, Fn, /*PreArgs=*/{}, Args, Ty, VK, RP,
+    : CallExpr(CXXMemberCallExprClass, Fn, /*PreArgs=*/{}, Args, Ty, VK, Fn->getBeginLoc(), RP,
                FPOptions, MinNumArgs, NotADL) {}
 
 CXXMemberCallExpr::CXXMemberCallExpr(unsigned NumArgs, bool HasFPFeatures,
@@ -938,7 +939,7 @@ UserDefinedLiteral::UserDefinedLiteral(Expr *Fn, ArrayRef<Expr *> Args,
                                        SourceLocation SuffixLoc,
                                        FPOptionsOverride FPFeatures)
     : CallExpr(UserDefinedLiteralClass, Fn, /*PreArgs=*/{}, Args, Ty, VK,
-               LitEndLoc, FPFeatures, /*MinNumArgs=*/0, NotADL),
+               Fn->getBeginLoc(), LitEndLoc, FPFeatures, /*MinNumArgs=*/0, NotADL),
       UDSuffixLoc(SuffixLoc) {}
 
 UserDefinedLiteral::UserDefinedLiteral(unsigned NumArgs, bool HasFPFeatures,
@@ -1895,7 +1896,7 @@ CUDAKernelCallExpr::CUDAKernelCallExpr(Expr *Fn, CallExpr *Config,
                                        FPOptionsOverride FPFeatures,
                                        unsigned MinNumArgs)
     : CallExpr(CUDAKernelCallExprClass, Fn, /*PreArgs=*/Config, Args, Ty, VK,
-               RP, FPFeatures, MinNumArgs, NotADL) {}
+               Fn->getBeginLoc(), RP, FPFeatures, MinNumArgs, NotADL) {}
 
 CUDAKernelCallExpr::CUDAKernelCallExpr(unsigned NumArgs, bool HasFPFeatures,
                                        EmptyShell Empty)

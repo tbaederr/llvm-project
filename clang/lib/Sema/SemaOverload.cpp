@@ -8085,7 +8085,7 @@ void Sema::AddConversionCandidate(
 
   alignas(CallExpr) char Buffer[sizeof(CallExpr) + sizeof(Stmt *)];
   CallExpr *TheTemporaryCall = CallExpr::CreateTemporary(
-      Buffer, &ConversionFn, CallResultType, VK, From->getBeginLoc());
+      Buffer, &ConversionFn, CallResultType, VK, ConversionFn.getBeginLoc(), From->getBeginLoc());
 
   ImplicitConversionSequence ICS =
       TryCopyInitialization(*this, TheTemporaryCall, ToType,
@@ -13969,7 +13969,7 @@ bool Sema::buildOverloadedCallSet(Scope *S, Expr *Fn,
       // base classes.
       CallExpr *CE =
           CallExpr::Create(Context, Fn, Args, Context.DependentTy, VK_PRValue,
-                           RParenLoc, CurFPFeatureOverrides());
+                           Fn->getBeginLoc(), RParenLoc, CurFPFeatureOverrides());
       CE->markDependentForPostponedNameLookup();
       *Result = CE;
       return true;
@@ -14185,7 +14185,7 @@ ExprResult Sema::BuildOverloadedCallExpr(Scope *S, Expr *Fn,
               FDecl->getTemplateInstantiationPattern(/*ForDefinition=*/false);
           TP && TP->willHaveBody()) {
         return CallExpr::Create(Context, Fn, Args, Context.DependentTy,
-                                VK_PRValue, RParenLoc, CurFPFeatureOverrides());
+                                VK_PRValue, Fn->getBeginLoc(), RParenLoc, CurFPFeatureOverrides());
       }
     }
   }
@@ -14260,7 +14260,7 @@ ExprResult Sema::BuildCXXMemberCallExpr(Expr *E, NamedDecl *FoundDecl,
       return ExprError();
     Expr *ObjectParam = Exp.get();
     CE = CallExpr::Create(Context, FnExpr.get(), MultiExprArg(&ObjectParam, 1),
-                          ResultType, VK, Exp.get()->getEndLoc(),
+                          ResultType, VK, FnExpr.get()->getBeginLoc(), Exp.get()->getEndLoc(),
                           CurFPFeatureOverrides());
   } else {
     MemberExpr *ME =
@@ -15407,7 +15407,7 @@ ExprResult Sema::BuildCallToMemberFunction(Scope *S, Expr *MemExprE,
   };
   if (isa<CXXPseudoDestructorExpr>(NakedMemExpr))
     return CallExpr::Create(Context, MemExprE, Args, Context.VoidTy, VK_PRValue,
-                            RParenLoc, CurFPFeatureOverrides());
+                            MemExprE->getBeginLoc(), RParenLoc, CurFPFeatureOverrides());
 
   UnbridgedCastsSet UnbridgedCasts;
   if (checkArgPlaceholdersForOverload(*this, Args, UnbridgedCasts))
@@ -15580,7 +15580,7 @@ ExprResult Sema::BuildCallToMemberFunction(Scope *S, Expr *MemExprE,
       return ExprError();
 
     TheCall =
-        CallExpr::Create(Context, FnExpr.get(), Args, ResultType, VK, RParenLoc,
+        CallExpr::Create(Context, FnExpr.get(), Args, ResultType, VK, FnExpr.get()->getBeginLoc(), RParenLoc,
                          CurFPFeatureOverrides(), Proto->getNumParams());
   } else {
     // Convert the object argument (for a non-static member function call).

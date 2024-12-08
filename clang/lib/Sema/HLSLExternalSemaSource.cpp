@@ -568,7 +568,7 @@ public:
       ReturnType = FD->getReturnType();
 
     Expr *Call = CallExpr::Create(AST, DRE, Args, ReturnType, VK_PRValue,
-                                  SourceLocation(), FPOptionsOverride());
+                                  SourceLocation(), SourceLocation(), FPOptionsOverride());
     StmtsList.push_back(Call);
     return *this;
   }

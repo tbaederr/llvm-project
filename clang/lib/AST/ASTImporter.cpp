@@ -8695,6 +8695,7 @@ ExpectedStmt ASTNodeImporter::VisitCallExpr(CallExpr *E) {
   Error Err = Error::success();
   auto ToCallee = importChecked(Err, E->getCallee());
   auto ToType = importChecked(Err, E->getType());
+  auto ToBeginLoc = importChecked(Err, E->getBeginLoc());
   auto ToRParenLoc = importChecked(Err, E->getRParenLoc());
   if (Err)
     return std::move(Err);
@@ -8712,7 +8713,7 @@ ExpectedStmt ASTNodeImporter::VisitCallExpr(CallExpr *E) {
   }
 
   return CallExpr::Create(Importer.getToContext(), ToCallee, ToArgs, ToType,
-                          E->getValueKind(), ToRParenLoc, E->getFPFeatures(),
+                          E->getValueKind(), ToBeginLoc, ToRParenLoc, E->getFPFeatures(),
                           /*MinNumArgs=*/0, E->getADLCallKind());
 }
 

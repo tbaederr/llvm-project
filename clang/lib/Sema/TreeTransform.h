@@ -3951,7 +3951,7 @@ public:
     // Build the CallExpr
     ExprResult TheCall = CallExpr::Create(
         SemaRef.Context, Callee, SubExprs, Builtin->getCallResultType(),
-        Expr::getValueKindForType(Builtin->getReturnType()), RParenLoc,
+        Expr::getValueKindForType(Builtin->getReturnType()), BuiltinLoc, RParenLoc,
         FPOptionsOverride());
 
     // Type-check the __builtin_shufflevector expression.

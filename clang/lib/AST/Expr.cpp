@@ -1444,9 +1444,10 @@ OverloadedOperatorKind UnaryOperator::getOverloadedOperator(Opcode Opc) {
 
 CallExpr::CallExpr(StmtClass SC, Expr *Fn, ArrayRef<Expr *> PreArgs,
                    ArrayRef<Expr *> Args, QualType Ty, ExprValueKind VK,
+                   SourceLocation BeginLoc,
                    SourceLocation RParenLoc, FPOptionsOverride FPFeatures,
                    unsigned MinNumArgs, ADLCallKind UsesADL)
-    : Expr(SC, Ty, VK, OK_Ordinary), RParenLoc(RParenLoc) {
+    : Expr(SC, Ty, VK, OK_Ordinary), BeginLoc(BeginLoc), RParenLoc(RParenLoc) {
   NumArgs = std::max<unsigned>(Args.size(), MinNumArgs);
   unsigned NumPreArgs = PreArgs.size();
   CallExprBits.NumPreArgs = NumPreArgs;
@@ -1491,6 +1492,7 @@ CallExpr::CallExpr(StmtClass SC, unsigned NumPreArgs, unsigned NumArgs,
 
 CallExpr *CallExpr::Create(const ASTContext &Ctx, Expr *Fn,
                            ArrayRef<Expr *> Args, QualType Ty, ExprValueKind VK,
+                           SourceLocation BeginLoc, 
                            SourceLocation RParenLoc,
                            FPOptionsOverride FPFeatures, unsigned MinNumArgs,
                            ADLCallKind UsesADL) {
@@ -1500,16 +1502,16 @@ CallExpr *CallExpr::Create(const ASTContext &Ctx, Expr *Fn,
   void *Mem =
       Ctx.Allocate(sizeof(CallExpr) + SizeOfTrailingObjects, alignof(CallExpr));
   return new (Mem) CallExpr(CallExprClass, Fn, /*PreArgs=*/{}, Args, Ty, VK,
-                            RParenLoc, FPFeatures, MinNumArgs, UsesADL);
+                            BeginLoc, RParenLoc, FPFeatures, MinNumArgs, UsesADL);
 }
 
 CallExpr *CallExpr::CreateTemporary(void *Mem, Expr *Fn, QualType Ty,
-                                    ExprValueKind VK, SourceLocation RParenLoc,
+                                    ExprValueKind VK, SourceLocation BeginLoc, SourceLocation RParenLoc,
                                     ADLCallKind UsesADL) {
   assert(!(reinterpret_cast<uintptr_t>(Mem) % alignof(CallExpr)) &&
          "Misaligned memory in CallExpr::CreateTemporary!");
   return new (Mem) CallExpr(CallExprClass, Fn, /*PreArgs=*/{}, /*Args=*/{}, Ty,
-                            VK, RParenLoc, FPOptionsOverride(),
+                            VK, BeginLoc, RParenLoc, FPOptionsOverride(),
                             /*MinNumArgs=*/0, UsesADL);
 }
 
@@ -1636,6 +1638,8 @@ CallExpr::getUnusedResultAttr(const ASTContext &Ctx) const {
 }
 
 SourceLocation CallExpr::getBeginLoc() const {
+  return BeginLoc;
+#if 0
   if (const auto *OCE = dyn_cast<CXXOperatorCallExpr>(this))
     return OCE->getBeginLoc();
 
@@ -1650,6 +1654,7 @@ SourceLocation CallExpr::getBeginLoc() const {
   if (begin.isInvalid() && getNumArgs() > 0 && getArg(0))
     begin = getArg(0)->getBeginLoc();
   return begin;
+#endif
 }
 
 SourceLocation CallExpr::getEndLoc() const {

@@ -2877,9 +2877,11 @@ class CallExpr : public Expr {
   /// The number of arguments in the call expression.
   unsigned NumArgs;
 
+  SourceLocation BeginLoc;
   /// The location of the right parentheses. This has a different meaning for
   /// the derived classes of CallExpr.
   SourceLocation RParenLoc;
+
 
   // CallExpr store some data in trailing objects. However since CallExpr
   // is used a base of other expression classes we cannot use
@@ -2936,6 +2938,7 @@ protected:
   /// allocated for the trailing objects.
   CallExpr(StmtClass SC, Expr *Fn, ArrayRef<Expr *> PreArgs,
            ArrayRef<Expr *> Args, QualType Ty, ExprValueKind VK,
+           SourceLocation BeginLoc,
            SourceLocation RParenLoc, FPOptionsOverride FPFeatures,
            unsigned MinNumArgs, ADLCallKind UsesADL);
 
@@ -2963,6 +2966,8 @@ protected:
     assert(I < getNumPreArgs() && "Prearg access out of range!");
     getTrailingStmts()[PREARGS_START + I] = PreArg;
   }
+
+  void setBeginLoc(SourceLocation Loc) { BeginLoc = Loc; }
 
   unsigned getNumPreArgs() const { return CallExprBits.NumPreArgs; }
 
@@ -3001,6 +3006,7 @@ public:
   /// expression on the stack.
   static CallExpr *Create(const ASTContext &Ctx, Expr *Fn,
                           ArrayRef<Expr *> Args, QualType Ty, ExprValueKind VK,
+                          SourceLocation BeginLoc, 
                           SourceLocation RParenLoc,
                           FPOptionsOverride FPFeatures, unsigned MinNumArgs = 0,
                           ADLCallKind UsesADL = NotADL);
@@ -3014,7 +3020,7 @@ public:
   ///   CallExpr *TheCall = CallExpr::CreateTemporary(Buffer, etc);
   /// \endcode
   static CallExpr *CreateTemporary(void *Mem, Expr *Fn, QualType Ty,
-                                   ExprValueKind VK, SourceLocation RParenLoc,
+                                   ExprValueKind VK, SourceLocation BeginLoc, SourceLocation RParenLoc,
                                    ADLCallKind UsesADL = NotADL);
 
   /// Create an empty call expression, for deserialization.

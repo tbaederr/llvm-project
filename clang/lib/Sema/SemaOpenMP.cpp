@@ -18921,7 +18921,7 @@ static bool actOnOMPReductionKindClause(
           S.DefaultLvalueConversion(DeclareReductionRef.get()).get());
       Expr *Args[] = {LHS.get(), RHS.get()};
       ReductionOp =
-          CallExpr::Create(Context, OVE, Args, Context.VoidTy, VK_PRValue, ELoc,
+          CallExpr::Create(Context, OVE, Args, Context.VoidTy, VK_PRValue, OVE->getBeginLoc(), ELoc,
                            S.CurFPFeatureOverrides());
     } else {
       BinaryOperatorKind CombBOK = getRelatedCompoundReductionOp(BOK);
