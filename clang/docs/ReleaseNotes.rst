@@ -744,6 +744,9 @@ Improvements to Clang's diagnostics
       require(scope); // Warning!  Requires mu1.
     }
 
+ - Improved diagnostics for compile-time comparisons between different literals,
+   especially comparisons between two evaluations of the same string literal.
+
 Improvements to Clang's time-trace
 ----------------------------------
 
