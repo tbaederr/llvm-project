@@ -17,10 +17,10 @@ using namespace clang::interp;
 
 EvalEmitter::EvalEmitter(Context &Ctx, Program &P, State &Parent,
                          InterpStack &Stk)
-    : Ctx(Ctx), P(P), S(Parent, P, Stk, Ctx, this), EvalResult(&Ctx) {
+    : Ctx(Ctx), P(P), S(Parent, P, Stk, Ctx, this), EvalResult(&Ctx), BottomFrame(S) {
   // Create a dummy frame for the interpreter which does not have locals.
-  S.Current =
-      new InterpFrame(S, /*Func=*/nullptr, /*Caller=*/nullptr, CodePtr(), 0);
+  S.Current = &BottomFrame;
+      // new InterpFrame(S);
 }
 
 EvalEmitter::~EvalEmitter() {

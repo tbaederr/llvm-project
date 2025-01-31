@@ -325,11 +325,13 @@ bool Ret(InterpState &S, CodePtr &PC) {
 
   if (InterpFrame *Caller = S.Current->Caller) {
     PC = S.Current->getRetPC();
-    delete S.Current;
+    if (!S.Current->isBottomFrame())
+      delete S.Current;
     S.Current = Caller;
     S.Stk.push<T>(Ret);
   } else {
-    delete S.Current;
+    if (!S.Current->isBottomFrame())
+      delete S.Current;
     S.Current = nullptr;
     // The topmost frame should come from an EvalEmitter,
     // which has its own implementation of the Ret<> instruction.
