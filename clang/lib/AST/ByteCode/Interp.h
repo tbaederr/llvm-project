@@ -1740,6 +1740,20 @@ bool StorePop(InterpState &S, CodePtr OpPC) {
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
+bool StorePop2(InterpState &S, CodePtr OpPC) {
+  const Pointer &Ptr = S.Stk.pop<Pointer>();
+  const T &Value = S.Stk.pop<T>();
+  if (!CheckStore(S, OpPC, Ptr))
+    return false;
+  if (Ptr.canBeInitialized()) {
+    Ptr.initialize();
+    Ptr.activate();
+  }
+  Ptr.deref<T>() = Value;
+  return true;
+}
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool StoreBitField(InterpState &S, CodePtr OpPC) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
@@ -1768,6 +1782,23 @@ bool StoreBitFieldPop(InterpState &S, CodePtr OpPC) {
     Ptr.deref<T>() = Value;
   return true;
 }
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
+bool StoreBitFieldPop2(InterpState &S, CodePtr OpPC) {
+  const Pointer &Ptr = S.Stk.pop<Pointer>();
+  const T &Value = S.Stk.pop<T>();
+  if (!CheckStore(S, OpPC, Ptr))
+    return false;
+  if (Ptr.canBeInitialized())
+    Ptr.initialize();
+  if (const auto *FD = Ptr.getField())
+    Ptr.deref<T>() = Value.truncate(FD->getBitWidthValue());
+  else
+    Ptr.deref<T>() = Value;
+  return true;
+}
+
+
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool Init(InterpState &S, CodePtr OpPC) {

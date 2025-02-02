@@ -482,11 +482,13 @@ class StoreBitFieldOpcode : Opcode {
 def Store : StoreOpcode {}
 // [Pointer, Value] -> []
 def StorePop : StoreOpcode {}
+def StorePop2 : StoreOpcode {}
 
 // [Pointer, Value] -> [Pointer]
 def StoreBitField : StoreBitFieldOpcode {}
 // [Pointer, Value] -> []
 def StoreBitFieldPop : StoreBitFieldOpcode {}
+def StoreBitFieldPop2 : StoreBitFieldOpcode {}
 
 // [Pointer, Value] -> []
 def Init : StoreOpcode {}

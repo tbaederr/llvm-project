@@ -888,8 +888,7 @@ bool Compiler<Emitter>::VisitBinaryOperator(const BinaryOperator *BO) {
   if (BO->getOpcode() == BO_Assign) {
     if (!visit(RHS) || !visit(LHS))
       return false;
-    if (!this->emitFlip(*LT, *RT, BO))
-      return false;
+
   } else {
     if (!visit(LHS) || !visit(RHS))
       return false;
@@ -946,8 +945,10 @@ bool Compiler<Emitter>::VisitBinaryOperator(const BinaryOperator *BO) {
     return Discard(this->emitDiv(*T, BO));
   case BO_Assign:
     if (DiscardResult)
-      return LHS->refersToBitField() ? this->emitStoreBitFieldPop(*T, BO)
-                                     : this->emitStorePop(*T, BO);
+      return LHS->refersToBitField() ? this->emitStoreBitFieldPop2(*T, BO)
+                                     : this->emitStorePop2(*T, BO);
+    if (!this->emitFlip(*LT, *RT, BO))
+      return false;
     if (LHS->refersToBitField()) {
       if (!this->emitStoreBitField(*T, BO))
         return false;
