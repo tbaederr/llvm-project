@@ -399,7 +399,7 @@ bool CheckConstant(InterpState &S, CodePtr OpPC, const Descriptor *Desc) {
 }
 
 static bool CheckConstant(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
-  if (!Ptr.isStatic() || !Ptr.isBlockPointer())
+  if (!Ptr.isStatic() || !Ptr.isBlockPointer() || Ptr.isDummy())
     return true;
   return CheckConstant(S, OpPC, Ptr.getDeclDesc());
 }
