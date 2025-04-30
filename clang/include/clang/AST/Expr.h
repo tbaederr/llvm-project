@@ -612,6 +612,7 @@ public:
     /// For example, 1.0 / 0.0 can be folded to Inf, but has undefined behavior.
     /// Likewise, INT_MAX + 1 can be folded to INT_MIN, but has UB.
     bool HasUndefinedBehavior = false;
+    bool HasOverflow = false;
 
     /// Diag - If this is non-null, it will be filled in with a stack of notes
     /// indicating why evaluation failed (or why it failed to produce a constant
@@ -720,7 +721,7 @@ public:
       const ASTContext &Ctx,
       SmallVectorImpl<PartialDiagnosticAt> *Diag = nullptr) const;
 
-  void EvaluateForOverflow(const ASTContext &Ctx) const;
+  bool EvaluateForOverflow(const ASTContext &Ctx) const;
 
   /// EvaluateAsLValue - Evaluate an expression to see if we can fold it to an
   /// lvalue with link time known address, with no side-effects.

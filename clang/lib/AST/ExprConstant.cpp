@@ -1273,6 +1273,12 @@ namespace {
       return keepEvaluatingAfterUndefinedBehavior();
     }
 
+    bool noteOverflow () override {
+      EvalStatus.HasUndefinedBehavior = true;
+      EvalStatus.HasOverflow = true;
+      return keepEvaluatingAfterUndefinedBehavior();
+    }
+
     /// Should we continue evaluation as much as possible after encountering a
     /// construct which can't be reduced to a value?
     bool keepEvaluatingAfterFailure() const override {
@@ -2784,7 +2790,7 @@ static bool HandleOverflow(EvalInfo &Info, const Expr *E,
                            const T &SrcValue, QualType DestType) {
   Info.CCEDiag(E, diag::note_constexpr_overflow)
     << SrcValue << DestType;
-  return Info.noteUndefinedBehavior();
+  return Info.noteOverflow();
 }
 
 static bool HandleFloatToIntCast(EvalInfo &Info, const Expr *E,
@@ -8003,7 +8009,9 @@ private:
   template<typename ConditionalOperator>
   bool HandleConditionalOperator(const ConditionalOperator *E) {
     bool BoolResult;
-    if (!EvaluateAsBooleanCondition(E->getCond(), BoolResult, Info)) {
+    if (!EvaluateAsBooleanCondition(E->getCond(), BoolResult, Info)) return false;
+#if 0
+    {
       if (Info.checkingPotentialConstantExpression() && Info.noteFailure()) {
         CheckPotentialConstantConditional(E);
         return false;
@@ -8014,6 +8022,7 @@ private:
       }
       return false;
     }
+#endif
 
     Expr *EvalExpr = BoolResult ? E->getTrueExpr() : E->getFalseExpr();
     return StmtVisitorTy::Visit(EvalExpr);
@@ -17181,7 +17190,7 @@ APSInt Expr::EvaluateKnownConstIntCheckOverflow(
   return EVResult.Val.getInt();
 }
 
-void Expr::EvaluateForOverflow(const ASTContext &Ctx) const {
+bool Expr::EvaluateForOverflow(const ASTContext &Ctx) const {
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
 
@@ -17191,8 +17200,12 @@ void Expr::EvaluateForOverflow(const ASTContext &Ctx) const {
   if (!FastEvaluateAsRValue(this, EVResult, Ctx, IsConst)) {
     EvalInfo Info(Ctx, EVResult, EvalInfo::EM_IgnoreSideEffects);
     Info.CheckingForUndefinedBehavior = true;
-    (void)::EvaluateAsRValue(Info, this, EVResult.Val);
+    bool b =  ::EvaluateAsRValue(Info, this, EVResult.Val);
+    // llvm::errs() << "Evaluate result: "<< b << '\n';
+    // llvm::errs() << "Overflow reported: " << EVResult.HasOverflow << '\n';
+    return !(!b && !EVResult.HasOverflow);
   }
+  return true;
 }
 
 bool Expr::EvalResult::isGlobalLValue() const {

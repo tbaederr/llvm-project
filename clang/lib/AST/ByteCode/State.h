@@ -61,6 +61,7 @@ public:
   virtual bool checkingForUndefinedBehavior() const = 0;
   virtual bool checkingPotentialConstantExpression() const = 0;
   virtual bool noteUndefinedBehavior() = 0;
+  virtual bool noteOverflow() = 0;
   virtual bool keepEvaluatingAfterFailure() const = 0;
   virtual bool keepEvaluatingAfterSideEffect() const = 0;
   virtual Frame *getCurrentFrame() = 0;

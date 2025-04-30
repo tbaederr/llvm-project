@@ -12836,7 +12836,16 @@ void Sema::CheckForIntOverflow (const Expr *E) {
     const Expr *OriginalE = Exprs.pop_back_val();
     const Expr *E = OriginalE->IgnoreParenCasts();
 
-    if (isa<BinaryOperator, UnaryOperator>(E)) {
+    if (const auto *BO = dyn_cast<BinaryOperator>(E)) {
+      if (!BO->EvaluateForOverflow(Context)) {
+        Exprs.push_back(BO->getLHS());
+        Exprs.push_back(BO->getRHS());
+      }
+      continue;
+
+    }
+
+    if (isa<UnaryOperator>(E)) {
       E->EvaluateForOverflow(Context);
       continue;
     }
@@ -12857,7 +12866,10 @@ void Sema::CheckForIntOverflow (const Expr *E) {
       Exprs.push_back(Array->getIdx());
     else if (const auto *Compound = dyn_cast<CompoundLiteralExpr>(E))
       Exprs.push_back(Compound->getInitializer());
-    else if (const auto *New = dyn_cast<CXXNewExpr>(E);
+    else if (const auto *CO = dyn_cast<AbstractConditionalOperator>(E)) {
+      Exprs.push_back(CO->getTrueExpr());
+      Exprs.push_back(CO->getFalseExpr());
+    } else if (const auto *New = dyn_cast<CXXNewExpr>(E);
              New && New->isArray()) {
       if (auto ArraySize = New->getArraySize())
         Exprs.push_back(*ArraySize);

@@ -168,7 +168,7 @@ template <typename T>
 static bool handleOverflow(InterpState &S, CodePtr OpPC, const T &SrcValue) {
   const Expr *E = S.Current->getExpr(OpPC);
   S.CCEDiag(E, diag::note_constexpr_overflow) << SrcValue << E->getType();
-  return S.noteUndefinedBehavior();
+  return S.noteOverflow();
 }
 bool handleFixedPointOverflow(InterpState &S, CodePtr OpPC,
                               const FixedPoint &FP);

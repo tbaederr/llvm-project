@@ -85,6 +85,9 @@ public:
   bool noteUndefinedBehavior() override {
     return Parent.noteUndefinedBehavior();
   }
+  bool noteOverflow() override {
+    return Parent.noteOverflow();
+  }
   bool inConstantContext() const;
   bool hasActiveDiagnostic() override { return Parent.hasActiveDiagnostic(); }
   void setActiveDiagnostic(bool Flag) override {
