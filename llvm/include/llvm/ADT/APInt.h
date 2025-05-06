@@ -18,6 +18,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/float128.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <cassert>
 #include <climits>
 #include <cstring>
@@ -156,6 +157,14 @@ public:
   /// constructor.
   APInt(unsigned numBits, unsigned numWords, const uint64_t bigVal[]);
 
+  struct Unowned {};
+
+  APInt(unsigned BitWidth, uint64_t *pVal, Unowned) {
+    U.pVal.setPointerAndInt(pVal, false);
+    this->BitWidth = BitWidth;
+  }
+
+
   /// Construct an APInt from a string representation.
   ///
   /// This constructor interprets the string \p str in the given radix. The
@@ -189,7 +198,7 @@ public:
   /// Destructor.
   ~APInt() {
     if (needsCleanup())
-      delete[] U.pVal;
+      delete[] U.pVal.getPointer();
   }
 
   /// @}
@@ -569,7 +578,7 @@ public:
   const uint64_t *getRawData() const {
     if (isSingleWord())
       return &U.VAL;
-    return &U.pVal[0];
+    return &U.pVal.getPointer()[0];
   }
 
   /// @}
@@ -637,7 +646,7 @@ public:
 #endif
     assert(this != &that && "Self-move not supported");
     if (!isSingleWord())
-      delete[] U.pVal;
+      delete[] U.pVal.getPointer();
 
     // Use memcpy so that type based alias analysis sees both VAL and pVal
     // as modified.
@@ -660,8 +669,8 @@ public:
       U.VAL = RHS;
       return clearUnusedBits();
     }
-    U.pVal[0] = RHS;
-    memset(U.pVal + 1, 0, (getNumWords() - 1) * APINT_WORD_SIZE);
+    U.pVal.getPointer()[0] = RHS;
+    memset(U.pVal.getPointer() + 1, 0, (getNumWords() - 1) * APINT_WORD_SIZE);
     return *this;
   }
 
@@ -690,8 +699,8 @@ public:
       U.VAL &= RHS;
       return *this;
     }
-    U.pVal[0] &= RHS;
-    memset(U.pVal + 1, 0, (getNumWords() - 1) * APINT_WORD_SIZE);
+    U.pVal.getPointer()[0] &= RHS;
+    memset(U.pVal.getPointer() + 1, 0, (getNumWords() - 1) * APINT_WORD_SIZE);
     return *this;
   }
 
@@ -720,7 +729,7 @@ public:
       U.VAL |= RHS;
       return clearUnusedBits();
     }
-    U.pVal[0] |= RHS;
+    U.pVal.getPointer()[0] |= RHS;
     return *this;
   }
 
@@ -749,7 +758,7 @@ public:
       U.VAL ^= RHS;
       return clearUnusedBits();
     }
-    U.pVal[0] ^= RHS;
+    U.pVal.getPointer()[0] ^= RHS;
     return *this;
   }
 
@@ -1321,7 +1330,7 @@ public:
       U.VAL = WORDTYPE_MAX;
     else
       // Set all the bits in all the words.
-      memset(U.pVal, -1, getNumWords() * APINT_WORD_SIZE);
+      memset(U.pVal.getPointer(), -1, getNumWords() * APINT_WORD_SIZE);
     // Clear the unused ones
     clearUnusedBits();
   }
@@ -1333,7 +1342,7 @@ public:
     if (isSingleWord())
       U.VAL |= Mask;
     else
-      U.pVal[whichWord(BitPosition)] |= Mask;
+      U.pVal.getPointer()[whichWord(BitPosition)] |= Mask;
   }
 
   /// Set the sign bit to 1.
@@ -1376,7 +1385,7 @@ public:
       if (isSingleWord())
         U.VAL |= mask;
       else
-        U.pVal[0] |= mask;
+        U.pVal.getPointer()[0] |= mask;
     } else {
       setBitsSlowCase(loBit, hiBit);
     }
@@ -1398,7 +1407,7 @@ public:
     if (isSingleWord())
       U.VAL = 0;
     else
-      memset(U.pVal, 0, getNumWords() * APINT_WORD_SIZE);
+      memset(U.pVal.getPointer(), 0, getNumWords() * APINT_WORD_SIZE);
   }
 
   /// Set a given bit to 0.
@@ -1410,7 +1419,7 @@ public:
     if (isSingleWord())
       U.VAL &= Mask;
     else
-      U.pVal[whichWord(BitPosition)] &= Mask;
+      U.pVal.getPointer()[whichWord(BitPosition)] &= Mask;
   }
 
   /// Set bottom loBits bits to 0.
@@ -1521,7 +1530,7 @@ public:
     if (isSingleWord())
       return U.VAL;
     assert(getActiveBits() <= 64 && "Too many bits for uint64_t");
-    return U.pVal[0];
+    return U.pVal.getPointer()[0];
   }
 
   /// Get zero extended value if possible
@@ -1543,7 +1552,7 @@ public:
     if (isSingleWord())
       return SignExtend64(U.VAL, BitWidth);
     assert(getSignificantBits() <= 64 && "Too many bits for int64_t");
-    return int64_t(U.pVal[0]);
+    return int64_t(U.pVal.getPointer()[0]);
   }
 
   /// Get sign extended value if possible
@@ -1701,7 +1710,7 @@ public:
 
 #ifdef HAS_IEE754_FLOAT128
   float128 bitsToQuad() const {
-    __uint128_t ul = ((__uint128_t)U.pVal[1] << 64) + U.pVal[0];
+    __uint128_t ul = ((__uint128_t)U.pVal.getPointer()[1] << 64) + U.pVal.getPointer()[0];
     return llvm::bit_cast<float128>(ul);
   }
 #endif
@@ -1901,15 +1910,18 @@ public:
   void dump() const;
 
   /// Returns whether this instance allocated memory.
-  bool needsCleanup() const { return !isSingleWord(); }
+  bool needsCleanup() const { return !isSingleWord() && U.pVal.getInt(); }
+
+  bool ownsMemory() const { return isSingleWord() || U.pVal.getInt(); }
 
 private:
   /// This union is used to store the integer value. When the
   /// integer bit-width <= 64, it uses VAL, otherwise it uses pVal.
   union {
     uint64_t VAL;   ///< Used to store the <= 64 bits integer value.
-    uint64_t *pVal; ///< Used to store the >64 bits integer value.
-  } U;
+    // uint64_t *pVal; ///< Used to store the >64 bits integer value.
+    llvm::PointerIntPair<uint64_t *, 1, bool> pVal;  // Pointer to memory and a bool indicating if we have ownership of the memory.
+  } U = {0};
 
   unsigned BitWidth = 1; ///< The number of bits in this APInt.
 
@@ -1922,7 +1934,14 @@ private:
   /// This constructor is used only internally for speed of construction of
   /// temporaries. It is unsafe since it takes ownership of the pointer, so it
   /// is not public.
-  APInt(uint64_t *val, unsigned bits) : BitWidth(bits) { U.pVal = val; }
+  APInt(uint64_t *val, unsigned bits) : BitWidth(bits) {
+    if (bits <= 64) {
+      U.VAL = *val;
+    } else  {
+      U.pVal.setPointerAndInt(val, true);
+      assert(needsCleanup());
+    }
+  }
 
   /// Determine which word a bit is in.
   ///
@@ -1964,14 +1983,14 @@ private:
     if (isSingleWord())
       U.VAL &= mask;
     else
-      U.pVal[getNumWords() - 1] &= mask;
+      U.pVal.getPointer()[getNumWords() - 1] &= mask;
     return *this;
   }
 
   /// Get the word corresponding to a bit position
   /// \returns the corresponding word for the specified bit position.
   uint64_t getWord(unsigned bitPosition) const {
-    return isSingleWord() ? U.VAL : U.pVal[whichWord(bitPosition)];
+    return isSingleWord() ? U.VAL : U.pVal.getPointer()[whichWord(bitPosition)];
   }
 
   /// Utility method to change the bit width of this APInt to new bit width,

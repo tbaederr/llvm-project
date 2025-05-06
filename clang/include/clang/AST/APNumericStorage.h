@@ -40,9 +40,9 @@ protected:
 
   llvm::APInt getIntValue() const {
     unsigned NumWords = llvm::APInt::getNumWords(BitWidth);
-    if (NumWords > 1)
-      return llvm::APInt(BitWidth, NumWords, pVal);
-    else
+    if (NumWords > 1) {
+      return llvm::APInt(BitWidth, pVal, llvm::APInt::Unowned{});
+    } else
       return llvm::APInt(BitWidth, VAL);
   }
   void setIntValue(const ASTContext &C, const llvm::APInt &Val);

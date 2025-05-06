@@ -73,19 +73,19 @@ inline static unsigned getDigit(char cdigit, uint8_t radix) {
 
 void APInt::initSlowCase(uint64_t val, bool isSigned) {
   if (isSigned && int64_t(val) < 0) {
-    U.pVal = getMemory(getNumWords());
-    U.pVal[0] = val;
-    memset(&U.pVal[1], 0xFF, APINT_WORD_SIZE * (getNumWords() - 1));
+    U.pVal.setPointerAndInt(getMemory(getNumWords()), true);
+    U.pVal.getPointer()[0] = val;
+    memset(&U.pVal.getPointer()[1], 0xFF, APINT_WORD_SIZE * (getNumWords() - 1));
     clearUnusedBits();
   } else {
-    U.pVal = getClearedMemory(getNumWords());
-    U.pVal[0] = val;
+    U.pVal.setPointerAndInt(getClearedMemory(getNumWords()), true);
+    U.pVal.getPointer()[0] = val;
   }
 }
 
 void APInt::initSlowCase(const APInt& that) {
-  U.pVal = getMemory(getNumWords());
-  memcpy(U.pVal, that.U.pVal, getNumWords() * APINT_WORD_SIZE);
+  U.pVal.setPointerAndInt(getMemory(getNumWords()), true);
+  memcpy(U.pVal.getPointer(), that.U.pVal.getPointer(), getNumWords() * APINT_WORD_SIZE);
 }
 
 void APInt::initFromArray(ArrayRef<uint64_t> bigVal) {
@@ -94,11 +94,11 @@ void APInt::initFromArray(ArrayRef<uint64_t> bigVal) {
     U.VAL = bigVal[0];
   else {
     // Get memory, cleared to 0
-    U.pVal = getClearedMemory(getNumWords());
+    U.pVal.setPointerAndInt(getClearedMemory(getNumWords()), true);
     // Calculate the number of words to copy
     unsigned words = std::min<unsigned>(bigVal.size(), getNumWords());
     // Copy the words from bigVal to pVal
-    memcpy(U.pVal, bigVal.data(), words * APINT_WORD_SIZE);
+    memcpy(U.pVal.getPointer(), bigVal.data(), words * APINT_WORD_SIZE);
   }
   // Make sure unused high bits are cleared
   clearUnusedBits();
@@ -121,20 +121,22 @@ APInt::APInt(unsigned numbits, StringRef Str, uint8_t radix)
 void APInt::reallocate(unsigned NewBitWidth) {
   // If the number of words is the same we can just change the width and stop.
   if (getNumWords() == getNumWords(NewBitWidth)) {
-    BitWidth = NewBitWidth;
-    return;
+    if (ownsMemory()) {
+      BitWidth = NewBitWidth;
+      return;
+    }
   }
 
   // If we have an allocation, delete it.
-  if (!isSingleWord())
-    delete [] U.pVal;
+  if (needsCleanup())
+    delete [] U.pVal.getPointer();
 
   // Update BitWidth.
   BitWidth = NewBitWidth;
 
   // If we are supposed to have an allocation, create it.
   if (!isSingleWord())
-    U.pVal = getMemory(getNumWords());
+    U.pVal.setPointerAndInt(getMemory(getNumWords()), true);
 }
 
 void APInt::assignSlowCase(const APInt &RHS) {
@@ -149,7 +151,7 @@ void APInt::assignSlowCase(const APInt &RHS) {
   if (isSingleWord())
     U.VAL = RHS.U.VAL;
   else
-    memcpy(U.pVal, RHS.U.pVal, getNumWords() * APINT_WORD_SIZE);
+    memcpy(U.pVal.getPointer(), RHS.U.pVal.getPointer(), getNumWords() * APINT_WORD_SIZE);
 }
 
 /// This method 'profiles' an APInt for use with FoldingSet.
@@ -163,7 +165,7 @@ void APInt::Profile(FoldingSetNodeID& ID) const {
 
   unsigned NumWords = getNumWords();
   for (unsigned i = 0; i < NumWords; ++i)
-    ID.AddInteger(U.pVal[i]);
+    ID.AddInteger(U.pVal.getPointer()[i]);
 }
 
 bool APInt::isAligned(Align A) const {
@@ -179,7 +181,7 @@ APInt& APInt::operator++() {
   if (isSingleWord())
     ++U.VAL;
   else
-    tcIncrement(U.pVal, getNumWords());
+    tcIncrement(U.pVal.getPointer(), getNumWords());
   return clearUnusedBits();
 }
 
@@ -188,7 +190,7 @@ APInt& APInt::operator--() {
   if (isSingleWord())
     --U.VAL;
   else
-    tcDecrement(U.pVal, getNumWords());
+    tcDecrement(U.pVal.getPointer(), getNumWords());
   return clearUnusedBits();
 }
 
@@ -200,7 +202,7 @@ APInt& APInt::operator+=(const APInt& RHS) {
   if (isSingleWord())
     U.VAL += RHS.U.VAL;
   else
-    tcAdd(U.pVal, RHS.U.pVal, 0, getNumWords());
+    tcAdd(U.pVal.getPointer(), RHS.U.pVal.getPointer(), 0, getNumWords());
   return clearUnusedBits();
 }
 
@@ -208,7 +210,7 @@ APInt& APInt::operator+=(uint64_t RHS) {
   if (isSingleWord())
     U.VAL += RHS;
   else
-    tcAddPart(U.pVal, RHS, getNumWords());
+    tcAddPart(U.pVal.getPointer(), RHS, getNumWords());
   return clearUnusedBits();
 }
 
@@ -220,7 +222,7 @@ APInt& APInt::operator-=(const APInt& RHS) {
   if (isSingleWord())
     U.VAL -= RHS.U.VAL;
   else
-    tcSubtract(U.pVal, RHS.U.pVal, 0, getNumWords());
+    tcSubtract(U.pVal.getPointer(), RHS.U.pVal.getPointer(), 0, getNumWords());
   return clearUnusedBits();
 }
 
@@ -228,7 +230,7 @@ APInt& APInt::operator-=(uint64_t RHS) {
   if (isSingleWord())
     U.VAL -= RHS;
   else
-    tcSubtractPart(U.pVal, RHS, getNumWords());
+    tcSubtractPart(U.pVal.getPointer(), RHS, getNumWords());
   return clearUnusedBits();
 }
 
@@ -239,25 +241,25 @@ APInt APInt::operator*(const APInt& RHS) const {
                  /*implicitTrunc=*/true);
 
   APInt Result(getMemory(getNumWords()), getBitWidth());
-  tcMultiply(Result.U.pVal, U.pVal, RHS.U.pVal, getNumWords());
+  tcMultiply(Result.U.pVal.getPointer(), U.pVal.getPointer(), RHS.U.pVal.getPointer(), getNumWords());
   Result.clearUnusedBits();
   return Result;
 }
 
 void APInt::andAssignSlowCase(const APInt &RHS) {
-  WordType *dst = U.pVal, *rhs = RHS.U.pVal;
+  WordType *dst = U.pVal.getPointer(), *rhs = RHS.U.pVal.getPointer();
   for (size_t i = 0, e = getNumWords(); i != e; ++i)
     dst[i] &= rhs[i];
 }
 
 void APInt::orAssignSlowCase(const APInt &RHS) {
-  WordType *dst = U.pVal, *rhs = RHS.U.pVal;
+  WordType *dst = U.pVal.getPointer(), *rhs = RHS.U.pVal.getPointer();
   for (size_t i = 0, e = getNumWords(); i != e; ++i)
     dst[i] |= rhs[i];
 }
 
 void APInt::xorAssignSlowCase(const APInt &RHS) {
-  WordType *dst = U.pVal, *rhs = RHS.U.pVal;
+  WordType *dst = U.pVal.getPointer(), *rhs = RHS.U.pVal.getPointer();
   for (size_t i = 0, e = getNumWords(); i != e; ++i)
     dst[i] ^= rhs[i];
 }
@@ -272,13 +274,13 @@ APInt& APInt::operator*=(uint64_t RHS) {
     U.VAL *= RHS;
   } else {
     unsigned NumWords = getNumWords();
-    tcMultiplyPart(U.pVal, U.pVal, RHS, 0, NumWords, NumWords, false);
+    tcMultiplyPart(U.pVal.getPointer(), U.pVal.getPointer(), RHS, 0, NumWords, NumWords, false);
   }
   return clearUnusedBits();
 }
 
 bool APInt::equalSlowCase(const APInt &RHS) const {
-  return std::equal(U.pVal, U.pVal + getNumWords(), RHS.U.pVal);
+  return std::equal(U.pVal.getPointer(), U.pVal.getPointer() + getNumWords(), RHS.U.pVal.getPointer());
 }
 
 int APInt::compare(const APInt& RHS) const {
@@ -286,7 +288,7 @@ int APInt::compare(const APInt& RHS) const {
   if (isSingleWord())
     return U.VAL < RHS.U.VAL ? -1 : U.VAL > RHS.U.VAL;
 
-  return tcCompare(U.pVal, RHS.U.pVal, getNumWords());
+  return tcCompare(U.pVal.getPointer(), RHS.U.pVal.getPointer(), getNumWords());
 }
 
 int APInt::compareSigned(const APInt& RHS) const {
@@ -306,7 +308,7 @@ int APInt::compareSigned(const APInt& RHS) const {
 
   // Otherwise we can just use an unsigned comparison, because even negative
   // numbers compare correctly this way if both have the same signed-ness.
-  return tcCompare(U.pVal, RHS.U.pVal, getNumWords());
+  return tcCompare(U.pVal.getPointer(), RHS.U.pVal.getPointer(), getNumWords());
 }
 
 void APInt::setBitsSlowCase(unsigned loBit, unsigned hiBit) {
@@ -326,14 +328,14 @@ void APInt::setBitsSlowCase(unsigned loBit, unsigned hiBit) {
     if (hiWord == loWord)
       loMask &= hiMask;
     else
-      U.pVal[hiWord] |= hiMask;
+      U.pVal.getPointer()[hiWord] |= hiMask;
   }
   // Apply the mask to the low word.
-  U.pVal[loWord] |= loMask;
+  U.pVal.getPointer()[loWord] |= loMask;
 
   // Fill any words between loWord and hiWord with all ones.
   for (unsigned word = loWord + 1; word < hiWord; ++word)
-    U.pVal[word] = WORDTYPE_MAX;
+    U.pVal.getPointer()[word] = WORDTYPE_MAX;
 }
 
 // Complement a bignum in-place.
@@ -344,7 +346,7 @@ static void tcComplement(APInt::WordType *dst, unsigned parts) {
 
 /// Toggle every bit to its opposite value.
 void APInt::flipAllBitsSlowCase() {
-  tcComplement(U.pVal, getNumWords());
+  tcComplement(U.pVal.getPointer(), getNumWords());
   clearUnusedBits();
 }
 
@@ -396,8 +398,8 @@ void APInt::insertBits(const APInt &subBits, unsigned bitPosition) {
   // Insertion within a single word can be done as a direct bitmask.
   if (loWord == hi1Word) {
     uint64_t mask = WORDTYPE_MAX >> (APINT_BITS_PER_WORD - subBitWidth);
-    U.pVal[loWord] &= ~(mask << loBit);
-    U.pVal[loWord] |= (subBits.U.VAL << loBit);
+    U.pVal.getPointer()[loWord] &= ~(mask << loBit);
+    U.pVal.getPointer()[loWord] |= (subBits.U.VAL << loBit);
     return;
   }
 
@@ -405,15 +407,15 @@ void APInt::insertBits(const APInt &subBits, unsigned bitPosition) {
   if (loBit == 0) {
     // Direct copy whole words.
     unsigned numWholeSubWords = subBitWidth / APINT_BITS_PER_WORD;
-    memcpy(U.pVal + loWord, subBits.getRawData(),
+    memcpy(U.pVal.getPointer() + loWord, subBits.getRawData(),
            numWholeSubWords * APINT_WORD_SIZE);
 
     // Mask+insert remaining bits.
     unsigned remainingBits = subBitWidth % APINT_BITS_PER_WORD;
     if (remainingBits != 0) {
       uint64_t mask = WORDTYPE_MAX >> (APINT_BITS_PER_WORD - remainingBits);
-      U.pVal[hi1Word] &= ~mask;
-      U.pVal[hi1Word] |= subBits.getWord(subBitWidth - 1);
+      U.pVal.getPointer()[hi1Word] &= ~mask;
+      U.pVal.getPointer()[hi1Word] |= subBits.getWord(subBitWidth - 1);
     }
     return;
   }
@@ -438,18 +440,18 @@ void APInt::insertBits(uint64_t subBits, unsigned bitPosition, unsigned numBits)
   unsigned loWord = whichWord(bitPosition);
   unsigned hiWord = whichWord(bitPosition + numBits - 1);
   if (loWord == hiWord) {
-    U.pVal[loWord] &= ~(maskBits << loBit);
-    U.pVal[loWord] |= subBits << loBit;
+    U.pVal.getPointer()[loWord] &= ~(maskBits << loBit);
+    U.pVal.getPointer()[loWord] |= subBits << loBit;
     return;
   }
 
   static_assert(8 * sizeof(WordType) <= 64, "This code assumes only two words affected");
   unsigned wordBits = 8 * sizeof(WordType);
-  U.pVal[loWord] &= ~(maskBits << loBit);
-  U.pVal[loWord] |= subBits << loBit;
+  U.pVal.getPointer()[loWord] &= ~(maskBits << loBit);
+  U.pVal.getPointer()[loWord] |= subBits << loBit;
 
-  U.pVal[hiWord] &= ~(maskBits >> (wordBits - loBit));
-  U.pVal[hiWord] |= subBits >> (wordBits - loBit);
+  U.pVal.getPointer()[hiWord] &= ~(maskBits >> (wordBits - loBit));
+  U.pVal.getPointer()[hiWord] |= subBits >> (wordBits - loBit);
 }
 
 APInt APInt::extractBits(unsigned numBits, unsigned bitPosition) const {
@@ -466,24 +468,24 @@ APInt APInt::extractBits(unsigned numBits, unsigned bitPosition) const {
 
   // Single word result extracting bits from a single word source.
   if (loWord == hiWord)
-    return APInt(numBits, U.pVal[loWord] >> loBit, /*isSigned=*/false,
+    return APInt(numBits, U.pVal.getPointer()[loWord] >> loBit, /*isSigned=*/false,
                  /*implicitTrunc=*/true);
 
   // Extracting bits that start on a source word boundary can be done
   // as a fast memory copy.
   if (loBit == 0)
-    return APInt(numBits, ArrayRef(U.pVal + loWord, 1 + hiWord - loWord));
+    return APInt(numBits, ArrayRef(U.pVal.getPointer() + loWord, 1 + hiWord - loWord));
 
   // General case - shift + copy source words directly into place.
   APInt Result(numBits, 0);
   unsigned NumSrcWords = getNumWords();
   unsigned NumDstWords = Result.getNumWords();
 
-  uint64_t *DestPtr = Result.isSingleWord() ? &Result.U.VAL : Result.U.pVal;
+  uint64_t *DestPtr = Result.isSingleWord() ? &Result.U.VAL : Result.U.pVal.getPointer();
   for (unsigned word = 0; word < NumDstWords; ++word) {
-    uint64_t w0 = U.pVal[loWord + word];
+    uint64_t w0 = U.pVal.getPointer()[loWord + word];
     uint64_t w1 =
-        (loWord + word + 1) < NumSrcWords ? U.pVal[loWord + word + 1] : 0;
+        (loWord + word + 1) < NumSrcWords ? U.pVal.getPointer()[loWord + word + 1] : 0;
     DestPtr[word] = (w0 >> loBit) | (w1 << (APINT_BITS_PER_WORD - loBit));
   }
 
@@ -506,10 +508,10 @@ uint64_t APInt::extractBitsAsZExtValue(unsigned numBits,
   unsigned loWord = whichWord(bitPosition);
   unsigned hiWord = whichWord(bitPosition + numBits - 1);
   if (loWord == hiWord)
-    return (U.pVal[loWord] >> loBit) & maskBits;
+    return (U.pVal.getPointer()[loWord] >> loBit) & maskBits;
 
-  uint64_t retBits = U.pVal[loWord] >> loBit;
-  retBits |= U.pVal[hiWord] << (APINT_BITS_PER_WORD - loBit);
+  uint64_t retBits = U.pVal.getPointer()[loWord] >> loBit;
+  retBits |= U.pVal.getPointer()[hiWord] << (APINT_BITS_PER_WORD - loBit);
   retBits &= maskBits;
   return retBits;
 }
@@ -593,7 +595,7 @@ hash_code llvm::hash_value(const APInt &Arg) {
 
   return hash_combine(
       Arg.BitWidth,
-      hash_combine_range(Arg.U.pVal, Arg.U.pVal + Arg.getNumWords()));
+      hash_combine_range(Arg.U.pVal.getPointer(), Arg.U.pVal.getPointer() + Arg.getNumWords()));
 }
 
 unsigned DenseMapInfo<APInt, void>::getHashValue(const APInt &Key) {
@@ -634,7 +636,7 @@ APInt APInt::getSplat(unsigned NewLen, const APInt &V) {
 unsigned APInt::countLeadingZerosSlowCase() const {
   unsigned Count = 0;
   for (int i = getNumWords()-1; i >= 0; --i) {
-    uint64_t V = U.pVal[i];
+    uint64_t V = U.pVal.getPointer()[i];
     if (V == 0)
       Count += APINT_BITS_PER_WORD;
     else {
@@ -658,13 +660,13 @@ unsigned APInt::countLeadingOnesSlowCase() const {
     shift = APINT_BITS_PER_WORD - highWordBits;
   }
   int i = getNumWords() - 1;
-  unsigned Count = llvm::countl_one(U.pVal[i] << shift);
+  unsigned Count = llvm::countl_one(U.pVal.getPointer()[i] << shift);
   if (Count == highWordBits) {
     for (i--; i >= 0; --i) {
-      if (U.pVal[i] == WORDTYPE_MAX)
+      if (U.pVal.getPointer()[i] == WORDTYPE_MAX)
         Count += APINT_BITS_PER_WORD;
       else {
-        Count += llvm::countl_one(U.pVal[i]);
+        Count += llvm::countl_one(U.pVal.getPointer()[i]);
         break;
       }
     }
@@ -675,20 +677,20 @@ unsigned APInt::countLeadingOnesSlowCase() const {
 unsigned APInt::countTrailingZerosSlowCase() const {
   unsigned Count = 0;
   unsigned i = 0;
-  for (; i < getNumWords() && U.pVal[i] == 0; ++i)
+  for (; i < getNumWords() && U.pVal.getPointer()[i] == 0; ++i)
     Count += APINT_BITS_PER_WORD;
   if (i < getNumWords())
-    Count += llvm::countr_zero(U.pVal[i]);
+    Count += llvm::countr_zero(U.pVal.getPointer()[i]);
   return std::min(Count, BitWidth);
 }
 
 unsigned APInt::countTrailingOnesSlowCase() const {
   unsigned Count = 0;
   unsigned i = 0;
-  for (; i < getNumWords() && U.pVal[i] == WORDTYPE_MAX; ++i)
+  for (; i < getNumWords() && U.pVal.getPointer()[i] == WORDTYPE_MAX; ++i)
     Count += APINT_BITS_PER_WORD;
   if (i < getNumWords())
-    Count += llvm::countr_one(U.pVal[i]);
+    Count += llvm::countr_one(U.pVal.getPointer()[i]);
   assert(Count <= BitWidth);
   return Count;
 }
@@ -696,13 +698,13 @@ unsigned APInt::countTrailingOnesSlowCase() const {
 unsigned APInt::countPopulationSlowCase() const {
   unsigned Count = 0;
   for (unsigned i = 0; i < getNumWords(); ++i)
-    Count += llvm::popcount(U.pVal[i]);
+    Count += llvm::popcount(U.pVal.getPointer()[i]);
   return Count;
 }
 
 bool APInt::intersectsSlowCase(const APInt &RHS) const {
   for (unsigned i = 0, e = getNumWords(); i != e; ++i)
-    if ((U.pVal[i] & RHS.U.pVal[i]) != 0)
+    if ((U.pVal.getPointer()[i] & RHS.U.pVal.getPointer()[i]) != 0)
       return true;
 
   return false;
@@ -710,7 +712,7 @@ bool APInt::intersectsSlowCase(const APInt &RHS) const {
 
 bool APInt::isSubsetOfSlowCase(const APInt &RHS) const {
   for (unsigned i = 0, e = getNumWords(); i != e; ++i)
-    if ((U.pVal[i] & ~RHS.U.pVal[i]) != 0)
+    if ((U.pVal.getPointer()[i] & ~RHS.U.pVal.getPointer()[i]) != 0)
       return false;
 
   return true;
@@ -730,7 +732,7 @@ APInt APInt::byteSwap() const {
 
   APInt Result(getNumWords() * APINT_BITS_PER_WORD, 0);
   for (unsigned I = 0, N = getNumWords(); I != N; ++I)
-    Result.U.pVal[I] = llvm::byteswap<uint64_t>(U.pVal[N - I - 1]);
+    Result.U.pVal.getPointer()[I] = llvm::byteswap<uint64_t>(U.pVal.getPointer()[N - I - 1]);
   if (Result.BitWidth != BitWidth) {
     Result.lshrInPlace(Result.BitWidth - BitWidth);
     Result.BitWidth = BitWidth;
@@ -886,17 +888,17 @@ double APInt::roundToDouble(bool isSigned) const {
   exp += 1023; // Increment for 1023 bias
 
   // Number of bits in mantissa is 52. To obtain the mantissa value, we must
-  // extract the high 52 bits from the correct words in pVal.
+  // extract the high 52 bits from the correct words in pVal.getPointer().
   uint64_t mantissa;
   unsigned hiWord = whichWord(n-1);
   if (hiWord == 0) {
-    mantissa = Tmp.U.pVal[0];
+    mantissa = Tmp.U.pVal.getPointer()[0];
     if (n > 52)
       mantissa >>= n - 52; // shift down, we want the top 52 bits.
   } else {
     assert(hiWord > 0 && "huh?");
-    uint64_t hibits = Tmp.U.pVal[hiWord] << (52 - n % APINT_BITS_PER_WORD);
-    uint64_t lobits = Tmp.U.pVal[hiWord-1] >> (11 + n % APINT_BITS_PER_WORD);
+    uint64_t hibits = Tmp.U.pVal.getPointer()[hiWord] << (52 - n % APINT_BITS_PER_WORD);
+    uint64_t lobits = Tmp.U.pVal.getPointer()[hiWord-1] >> (11 + n % APINT_BITS_PER_WORD);
     mantissa = hibits | lobits;
   }
 
@@ -922,12 +924,12 @@ APInt APInt::trunc(unsigned width) const {
   // Copy full words.
   unsigned i;
   for (i = 0; i != width / APINT_BITS_PER_WORD; i++)
-    Result.U.pVal[i] = U.pVal[i];
+    Result.U.pVal.getPointer()[i] = U.pVal.getPointer()[i];
 
   // Truncate and copy any partial word.
   unsigned bits = (0 - width) % APINT_BITS_PER_WORD;
   if (bits != 0)
-    Result.U.pVal[i] = U.pVal[i] << bits >> bits;
+    Result.U.pVal.getPointer()[i] = U.pVal.getPointer()[i] << bits >> bits;
 
   return Result;
 }
@@ -968,15 +970,15 @@ APInt APInt::sext(unsigned Width) const {
   APInt Result(getMemory(getNumWords(Width)), Width);
 
   // Copy words.
-  std::memcpy(Result.U.pVal, getRawData(), getNumWords() * APINT_WORD_SIZE);
+  std::memcpy(Result.U.pVal.getPointer(), getRawData(), getNumWords() * APINT_WORD_SIZE);
 
   // Sign extend the last word since there may be unused bits in the input.
-  Result.U.pVal[getNumWords() - 1] =
-      SignExtend64(Result.U.pVal[getNumWords() - 1],
+  Result.U.pVal.getPointer()[getNumWords() - 1] =
+      SignExtend64(Result.U.pVal.getPointer()[getNumWords() - 1],
                    ((BitWidth - 1) % APINT_BITS_PER_WORD) + 1);
 
   // Fill with sign bits.
-  std::memset(Result.U.pVal + getNumWords(), isNegative() ? -1 : 0,
+  std::memset(Result.U.pVal.getPointer() + getNumWords(), isNegative() ? -1 : 0,
               (Result.getNumWords() - getNumWords()) * APINT_WORD_SIZE);
   Result.clearUnusedBits();
   return Result;
@@ -995,10 +997,10 @@ APInt APInt::zext(unsigned width) const {
   APInt Result(getMemory(getNumWords(width)), width);
 
   // Copy words.
-  std::memcpy(Result.U.pVal, getRawData(), getNumWords() * APINT_WORD_SIZE);
+  std::memcpy(Result.U.pVal.getPointer(), getRawData(), getNumWords() * APINT_WORD_SIZE);
 
   // Zero remaining words.
-  std::memset(Result.U.pVal + getNumWords(), 0,
+  std::memset(Result.U.pVal.getPointer() + getNumWords(), 0,
               (Result.getNumWords() - getNumWords()) * APINT_WORD_SIZE);
 
   return Result;
@@ -1043,27 +1045,27 @@ void APInt::ashrSlowCase(unsigned ShiftAmt) {
   unsigned WordsToMove = getNumWords() - WordShift;
   if (WordsToMove != 0) {
     // Sign extend the last word to fill in the unused bits.
-    U.pVal[getNumWords() - 1] = SignExtend64(
-        U.pVal[getNumWords() - 1], ((BitWidth - 1) % APINT_BITS_PER_WORD) + 1);
+    U.pVal.getPointer()[getNumWords() - 1] = SignExtend64(
+        U.pVal.getPointer()[getNumWords() - 1], ((BitWidth - 1) % APINT_BITS_PER_WORD) + 1);
 
     // Fastpath for moving by whole words.
     if (BitShift == 0) {
-      std::memmove(U.pVal, U.pVal + WordShift, WordsToMove * APINT_WORD_SIZE);
+      std::memmove(U.pVal.getPointer(), U.pVal.getPointer() + WordShift, WordsToMove * APINT_WORD_SIZE);
     } else {
       // Move the words containing significant bits.
       for (unsigned i = 0; i != WordsToMove - 1; ++i)
-        U.pVal[i] = (U.pVal[i + WordShift] >> BitShift) |
-                    (U.pVal[i + WordShift + 1] << (APINT_BITS_PER_WORD - BitShift));
+        U.pVal.getPointer()[i] = (U.pVal.getPointer()[i + WordShift] >> BitShift) |
+                    (U.pVal.getPointer()[i + WordShift + 1] << (APINT_BITS_PER_WORD - BitShift));
 
       // Handle the last word which has no high bits to copy. Use an arithmetic
       // shift to preserve the sign bit.
-      U.pVal[WordsToMove - 1] =
-          (int64_t)U.pVal[WordShift + WordsToMove - 1] >> BitShift;
+      U.pVal.getPointer()[WordsToMove - 1] =
+          (int64_t)U.pVal.getPointer()[WordShift + WordsToMove - 1] >> BitShift;
     }
   }
 
   // Fill in the remainder based on the original sign.
-  std::memset(U.pVal + WordsToMove, Negative ? -1 : 0,
+  std::memset(U.pVal.getPointer() + WordsToMove, Negative ? -1 : 0,
               WordShift * APINT_WORD_SIZE);
   clearUnusedBits();
 }
@@ -1077,7 +1079,7 @@ void APInt::lshrInPlace(const APInt &shiftAmt) {
 /// Logical right-shift this APInt by shiftAmt.
 /// Logical right-shift function.
 void APInt::lshrSlowCase(unsigned ShiftAmt) {
-  tcShiftRight(U.pVal, getNumWords(), ShiftAmt);
+  tcShiftRight(U.pVal.getPointer(), getNumWords(), ShiftAmt);
 }
 
 /// Left-shift this APInt by shiftAmt.
@@ -1089,7 +1091,7 @@ APInt &APInt::operator<<=(const APInt &shiftAmt) {
 }
 
 void APInt::shlSlowCase(unsigned ShiftAmt) {
-  tcShiftLeft(U.pVal, getNumWords(), ShiftAmt);
+  tcShiftLeft(U.pVal.getPointer(), getNumWords(), ShiftAmt);
   clearUnusedBits();
 }
 
@@ -1187,7 +1189,7 @@ APInt APInt::sqrt() const {
       /* 21-30 */ 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
       /*    31 */ 6
     };
-    return APInt(BitWidth, results[ (isSingleWord() ? U.VAL : U.pVal[0]) ]);
+    return APInt(BitWidth, results[ (isSingleWord() ? U.VAL : U.pVal.getPointer()[0]) ]);
   }
 
   // If the magnitude of the value fits in less than 52 bits (the precision of
@@ -1197,7 +1199,7 @@ APInt APInt::sqrt() const {
   if (magnitude < 52) {
     return APInt(BitWidth,
                  uint64_t(::round(::sqrt(double(isSingleWord() ? U.VAL
-                                                               : U.pVal[0])))));
+                                                               : U.pVal.getPointer()[0])))));
   }
 
   // Okay, all the short cuts are exhausted. We must compute it. The following
@@ -1574,11 +1576,11 @@ APInt APInt::udiv(const APInt &RHS) const {
     return APInt(BitWidth, 1);
   if (lhsWords == 1) // rhsWords is 1 if lhsWords is 1.
     // All high words are zero, just use native divide
-    return APInt(BitWidth, this->U.pVal[0] / RHS.U.pVal[0]);
+    return APInt(BitWidth, this->U.pVal.getPointer()[0] / RHS.U.pVal.getPointer()[0]);
 
   // We have to compute it the hard way. Invoke the Knuth divide algorithm.
   APInt Quotient(BitWidth, 0); // to hold result.
-  divide(U.pVal, lhsWords, RHS.U.pVal, rhsWords, Quotient.U.pVal, nullptr);
+  divide(U.pVal.getPointer(), lhsWords, RHS.U.pVal.getPointer(), rhsWords, Quotient.U.pVal.getPointer(), nullptr);
   return Quotient;
 }
 
@@ -1607,11 +1609,11 @@ APInt APInt::udiv(uint64_t RHS) const {
     return APInt(BitWidth, 1);
   if (lhsWords == 1) // rhsWords is 1 if lhsWords is 1.
     // All high words are zero, just use native divide
-    return APInt(BitWidth, this->U.pVal[0] / RHS);
+    return APInt(BitWidth, this->U.pVal.getPointer()[0] / RHS);
 
   // We have to compute it the hard way. Invoke the Knuth divide algorithm.
   APInt Quotient(BitWidth, 0); // to hold result.
-  divide(U.pVal, lhsWords, &RHS, 1, Quotient.U.pVal, nullptr);
+  divide(U.pVal.getPointer(), lhsWords, &RHS, 1, Quotient.U.pVal.getPointer(), nullptr);
   return Quotient;
 }
 
@@ -1667,11 +1669,11 @@ APInt APInt::urem(const APInt &RHS) const {
     return APInt(BitWidth, 0);
   if (lhsWords == 1)
     // All high words are zero, just use native remainder
-    return APInt(BitWidth, U.pVal[0] % RHS.U.pVal[0]);
+    return APInt(BitWidth, U.pVal.getPointer()[0] % RHS.U.pVal.getPointer()[0]);
 
   // We have to compute it the hard way. Invoke the Knuth divide algorithm.
   APInt Remainder(BitWidth, 0);
-  divide(U.pVal, lhsWords, RHS.U.pVal, rhsWords, nullptr, Remainder.U.pVal);
+  divide(U.pVal.getPointer(), lhsWords, RHS.U.pVal.getPointer(), rhsWords, nullptr, Remainder.U.pVal.getPointer());
   return Remainder;
 }
 
@@ -1699,11 +1701,11 @@ uint64_t APInt::urem(uint64_t RHS) const {
     return 0;
   if (lhsWords == 1)
     // All high words are zero, just use native remainder
-    return U.pVal[0] % RHS;
+    return U.pVal.getPointer()[0] % RHS;
 
   // We have to compute it the hard way. Invoke the Knuth divide algorithm.
   uint64_t Remainder;
-  divide(U.pVal, lhsWords, &RHS, 1, nullptr, &Remainder);
+  divide(U.pVal.getPointer(), lhsWords, &RHS, 1, nullptr, &Remainder);
   return Remainder;
 }
 
@@ -1783,20 +1785,20 @@ void APInt::udivrem(const APInt &LHS, const APInt &RHS,
 
   if (lhsWords == 1) { // rhsWords is 1 if lhsWords is 1.
     // There is only one word to consider so use the native versions.
-    uint64_t lhsValue = LHS.U.pVal[0];
-    uint64_t rhsValue = RHS.U.pVal[0];
+    uint64_t lhsValue = LHS.U.pVal.getPointer()[0];
+    uint64_t rhsValue = RHS.U.pVal.getPointer()[0];
     Quotient = lhsValue / rhsValue;
     Remainder = lhsValue % rhsValue;
     return;
   }
 
   // Okay, lets do it the long way
-  divide(LHS.U.pVal, lhsWords, RHS.U.pVal, rhsWords, Quotient.U.pVal,
-         Remainder.U.pVal);
+  divide(LHS.U.pVal.getPointer(), lhsWords, RHS.U.pVal.getPointer(), rhsWords, Quotient.U.pVal.getPointer(),
+         Remainder.U.pVal.getPointer());
   // Clear the rest of the Quotient and Remainder.
-  std::memset(Quotient.U.pVal + lhsWords, 0,
+  std::memset(Quotient.U.pVal.getPointer() + lhsWords, 0,
               (getNumWords(BitWidth) - lhsWords) * APINT_WORD_SIZE);
-  std::memset(Remainder.U.pVal + rhsWords, 0,
+  std::memset(Remainder.U.pVal.getPointer() + rhsWords, 0,
               (getNumWords(BitWidth) - rhsWords) * APINT_WORD_SIZE);
 }
 
@@ -1848,16 +1850,16 @@ void APInt::udivrem(const APInt &LHS, uint64_t RHS, APInt &Quotient,
 
   if (lhsWords == 1) { // rhsWords is 1 if lhsWords is 1.
     // There is only one word to consider so use the native versions.
-    uint64_t lhsValue = LHS.U.pVal[0];
+    uint64_t lhsValue = LHS.U.pVal.getPointer()[0];
     Quotient = lhsValue / RHS;
     Remainder = lhsValue % RHS;
     return;
   }
 
   // Okay, lets do it the long way
-  divide(LHS.U.pVal, lhsWords, &RHS, 1, Quotient.U.pVal, &Remainder);
+  divide(LHS.U.pVal.getPointer(), lhsWords, &RHS, 1, Quotient.U.pVal.getPointer(), &Remainder);
   // Clear the rest of the Quotient.
-  std::memset(Quotient.U.pVal + lhsWords, 0,
+  std::memset(Quotient.U.pVal.getPointer() + lhsWords, 0,
               (getNumWords(BitWidth) - lhsWords) * APINT_WORD_SIZE);
 }
 
@@ -2109,7 +2111,7 @@ void APInt::fromString(unsigned numbits, StringRef str, uint8_t radix) {
   if (isSingleWord())
     U.VAL = 0;
   else
-    U.pVal = getClearedMemory(getNumWords());
+    U.pVal.setPointerAndInt(getClearedMemory(getNumWords()), true);
 
   // Figure out if we can shift instead of multiply
   unsigned shift = (radix == 16 ? 4 : radix == 8 ? 3 : radix == 2 ? 1 : 0);
