@@ -11221,6 +11221,16 @@ static void AnalyzeComparison(Sema &S, BinaryOperator *E) {
     std::optional<llvm::APSInt> LHSValue =
         LHS->getIntegerConstantExpr(S.Context);
 
+    if (RHSValue) {
+      RHS = ConstantExpr::Create(S.Context, RHS, APValue(*RHSValue));
+      E->setRHS(RHS);
+    }
+
+    if (LHSValue) {
+      LHS = ConstantExpr::Create(S.Context, LHS, APValue(*LHSValue));
+      E->setLHS(LHS);
+    }
+
     // We don't care about expressions whose result is a constant.
     if (RHSValue && LHSValue)
       return AnalyzeImpConvsInComparison(S, E);
