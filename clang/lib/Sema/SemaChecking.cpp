@@ -12234,6 +12234,10 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
   IntRange TargetRange = IntRange::forTargetOfCanonicalType(Context, Target);
 
   if (LikelySourceRange->Width > TargetRange.Width) {
+    // People want to build with -Wshorten-64-to-32 and not -Wconversion.
+    if (SourceMgr.isInSystemMacro(CC))
+      return;
+
     // If the source is a constant, use a default-on diagnostic.
     // TODO: this should happen for bitfield stores, too.
     Expr::EvalResult Result;
@@ -12241,9 +12245,6 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
                          isConstantEvaluatedContext())) {
       llvm::APSInt Value(32);
       Value = Result.Val.getInt();
-
-      if (SourceMgr.isInSystemMacro(CC))
-        return;
 
       std::string PrettySourceValue = toString(Value, 10);
       std::string PrettyTargetValue = PrettyPrintInRange(Value, TargetRange);
@@ -12255,10 +12256,6 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
                               << SourceRange(CC));
       return;
     }
-
-    // People want to build with -Wshorten-64-to-32 and not -Wconversion.
-    if (SourceMgr.isInSystemMacro(CC))
-      return;
 
     if (TargetRange.Width == 32 && Context.getIntWidth(E->getType()) == 64)
       return DiagnoseImpCast(*this, E, T, CC, diag::warn_impcast_integer_64_32,
