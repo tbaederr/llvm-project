@@ -370,6 +370,7 @@ static bool BuiltinAlignment(Sema &S, CallExpr *TheCall, unsigned ID) {
       S.Diag(AlignOp->getExprLoc(), diag::warn_alignment_builtin_useless)
           << IsBooleanAlignBuiltin;
     }
+    TheCall->setArg(1, ConstantExpr::Create(S.Context, AlignOp, APValue(AlignValue)));
   }
 
   ExprResult SrcArg = S.PerformCopyInitialization(
