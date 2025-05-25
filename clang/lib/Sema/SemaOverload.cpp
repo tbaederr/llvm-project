@@ -6627,7 +6627,7 @@ diagnoseAmbiguousConversion(Sema &SemaRef, SourceLocation Loc, Expr *From,
 }
 
 static bool
-diagnoseNoViableConversion(Sema &SemaRef, SourceLocation Loc, Expr *&From,
+diagnoseNoViableConversion(Sema &SemaRef, LazyLoc Loc, Expr *&From,
                            Sema::ContextualImplicitConverter &Converter,
                            QualType T, bool HadMultipleCandidates,
                            UnresolvedSetImpl &ExplicitConversions) {
@@ -6752,7 +6752,7 @@ collectViableConversionCandidates(Sema &SemaRef, Expr *From, QualType ToType,
 /// \returns The expression, converted to an integral or enumeration type if
 /// successful.
 ExprResult Sema::PerformContextualImplicitConversion(
-    SourceLocation Loc, Expr *From, ContextualImplicitConverter &Converter) {
+    LazyLoc Loc, Expr *From, ContextualImplicitConverter &Converter) {
   // We can't perform any more checking for type-dependent expressions.
   if (From->isTypeDependent())
     return From;

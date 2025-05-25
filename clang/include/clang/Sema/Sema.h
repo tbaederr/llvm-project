@@ -247,8 +247,6 @@ public:
 // Sad but true.
 static_assert(sizeof(LazyLoc) == (sizeof(void*) * 2));
 
-
-
 namespace sema {
 class BlockScopeInfo;
 class Capture;
@@ -10431,7 +10429,7 @@ public:
 
   /// Perform a contextual implicit conversion.
   ExprResult
-  PerformContextualImplicitConversion(SourceLocation Loc, Expr *FromE,
+  PerformContextualImplicitConversion(LazyLoc Loc, Expr *FromE,
                                       ContextualImplicitConverter &Converter);
 
   /// ReferenceCompareResult - Expresses the result of comparing two
