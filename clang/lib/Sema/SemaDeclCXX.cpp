@@ -1859,7 +1859,6 @@ static bool CheckConstexprParameterTypes(Sema &SemaRef,
        i != e; ++i, ++ArgIndex) {
     const ParmVarDecl *PD = FD->getParamDecl(ArgIndex);
     assert(PD && "null in a parameter list");
-    SourceLocation ParamLoc = PD->getLocation();
     if (CheckLiteralType(SemaRef, Kind, PD, *i,
                          diag::err_constexpr_non_literal_param, ArgIndex + 1,
                          PD->getSourceRange(), isa<CXXConstructorDecl>(FD),

@@ -5205,7 +5205,7 @@ Sema::DeduceAutoType(TypeLoc Type, Expr *Init, QualType &Result,
     LocalInstantiationScope InstScope(*this);
 
     // Build template<class TemplParam> void Func(FuncParam);
-    SourceLocation Loc = Init->getExprLoc();
+    LazyLoc Loc(Init);
     TemplateTypeParmDecl *TemplParam = TemplateTypeParmDecl::Create(
         Context, nullptr, SourceLocation(), Loc, Info.getDeducedDepth(), 0,
         nullptr, false, false, false);

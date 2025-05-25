@@ -530,7 +530,7 @@ ExprResult Sema::DefaultFunctionArrayConversion(Expr *E, bool Diagnose) {
   if (Ty->isFunctionType()) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E->IgnoreParenCasts()))
       if (auto *FD = dyn_cast<FunctionDecl>(DRE->getDecl()))
-        if (!checkAddressOfFunctionIsAvailable(FD, Diagnose, E->getExprLoc()))
+        if (!checkAddressOfFunctionIsAvailable(FD, Diagnose, E))
           return ExprError();
 
     E = ImpCastExprToType(E, Context.getPointerType(Ty),
@@ -1510,7 +1510,7 @@ static QualType handleFixedPointConversion(Sema &S, QualType LHSTy,
 /// Check that the usual arithmetic conversions can be performed on this pair of
 /// expressions that might be of enumeration type.
 void Sema::checkEnumArithmeticConversions(Expr *LHS, Expr *RHS,
-                                          SourceLocation Loc,
+                                          const LazyLoc &Loc,
                                           ArithConvKind ACK) {
   // C++2a [expr.arith.conv]p1:
   //   If one operand is of enumeration type and the other operand is of a
@@ -1570,7 +1570,7 @@ void Sema::checkEnumArithmeticConversions(Expr *LHS, Expr *RHS,
 }
 
 static void CheckUnicodeArithmeticConversions(Sema &SemaRef, Expr *LHS,
-                                              Expr *RHS, SourceLocation Loc,
+                                              Expr *RHS, LazyLoc Loc,
                                               ArithConvKind ACK) {
   QualType LHSType = LHS->getType().getUnqualifiedType();
   QualType RHSType = RHS->getType().getUnqualifiedType();
@@ -1646,7 +1646,7 @@ static void CheckUnicodeArithmeticConversions(Sema &SemaRef, Expr *LHS,
 /// routine returns the first non-arithmetic type found. The client is
 /// responsible for emitting appropriate error diagnostics.
 QualType Sema::UsualArithmeticConversions(ExprResult &LHS, ExprResult &RHS,
-                                          SourceLocation Loc,
+                                          LazyLoc Loc,
                                           ArithConvKind ACK) {
 
   checkEnumArithmeticConversions(LHS.get(), RHS.get(), Loc, ACK);
@@ -6787,7 +6787,7 @@ ExprResult Sema::BuildCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
 
   if (FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(NDecl)) {
     if (CallingNDeclIndirectly && !checkAddressOfFunctionIsAvailable(
-                                      FD, /*Complain=*/true, Fn->getBeginLoc()))
+                                      FD, /*Complain=*/true, Fn))
       return ExprError();
 
     checkDirectCallValidity(*this, Fn, FD, ArgExprs);
@@ -7359,7 +7359,7 @@ Sema::BuildCompoundLiteralExpr(SourceLocation LParenLoc, TypeSourceInfo *TInfo,
     // Emit diagnostics if it is or contains a C union type that is non-trivial
     // to destruct.
     if (E->getType().hasNonTrivialToPrimitiveDestructCUnion())
-      checkNonTrivialCUnion(E->getType(), E->getExprLoc(),
+      checkNonTrivialCUnion(E->getType(), E,
                             NonTrivialCUnionContext::CompoundLiteral,
                             NTCUK_Destruct);
 
@@ -9134,7 +9134,7 @@ static bool IsInvalidCmseNSCallConversion(Sema &S, QualType FromType,
 static AssignConvertType checkPointerTypesForAssignment(Sema &S,
                                                         QualType LHSType,
                                                         QualType RHSType,
-                                                        SourceLocation Loc) {
+                                                        const LazyLoc &Loc) {
   assert(LHSType.isCanonical() && "LHS not canonicalized!");
   assert(RHSType.isCanonical() && "RHS not canonicalized!");
 
@@ -9213,11 +9213,12 @@ static AssignConvertType checkPointerTypesForAssignment(Sema &S,
     return AssignConvertType::FunctionVoidPointer;
   }
 
-  if (!S.Diags.isIgnored(
+  if (RHSType->isFunctionPointerType() && LHSType->isFunctionPointerType() &&
+      !S.TryFunctionConversion(RHSType, LHSType, RHSType) &&
+      !S.Diags.isIgnored(
           diag::warn_typecheck_convert_incompatible_function_pointer_strict,
-          Loc) &&
-      RHSType->isFunctionPointerType() && LHSType->isFunctionPointerType() &&
-      !S.TryFunctionConversion(RHSType, LHSType, RHSType))
+          Loc)
+      )
     return AssignConvertType::IncompatibleFunctionPointerStrict;
 
   // C99 6.5.16.1p1 (constraint 3): both operands are pointers to qualified or
@@ -9589,7 +9590,7 @@ AssignConvertType Sema::CheckAssignmentConstraints(QualType LHSType,
       else
         Kind = CK_BitCast;
       return checkPointerTypesForAssignment(*this, LHSType, RHSType,
-                                            RHS.get()->getBeginLoc());
+                                            RHS.get());
     }
 
     // int -> T*
@@ -9978,7 +9979,7 @@ AssignConvertType Sema::CheckSingleAssignmentConstraints(QualType LHSType,
         QualType CanLHS = LHSType.getCanonicalType().getUnqualifiedType();
         if (CanRHS->isVoidPointerType() && CanLHS->isPointerType()) {
           Ret = checkPointerTypesForAssignment(*this, CanLHS, CanRHS,
-                                               RHS.get()->getExprLoc());
+                                               RHS.get());
           // Anything that's not considered perfectly compatible would be
           // incompatible in C++.
           if (Ret != AssignConvertType::Compatible)
@@ -12470,7 +12471,7 @@ static QualType checkArithmeticOrEnumeralThreeWayCompare(Sema &S,
 
 static QualType checkArithmeticOrEnumeralCompare(Sema &S, ExprResult &LHS,
                                                  ExprResult &RHS,
-                                                 SourceLocation Loc,
+                                                 LazyLoc Loc,
                                                  BinaryOperatorKind Opc) {
   if (Opc == BO_Cmp)
     return checkArithmeticOrEnumeralThreeWayCompare(S, LHS, RHS, Loc);
@@ -14577,7 +14578,7 @@ QualType Sema::CheckAddressOfOperand(ExprResult &OrigOp, SourceLocation OpLoc) {
 
   if (auto *FD = dyn_cast_or_null<FunctionDecl>(dcl))
     if (!checkAddressOfFunctionIsAvailable(FD, /*Complain=*/true,
-                                           op->getBeginLoc()))
+                                           op))
       return QualType();
 
   Expr::LValueClassification lval = op->ClassifyLValue(Context);
@@ -15207,7 +15208,7 @@ ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
               BE->getBlockDecl()->setCanAvoidCopyToHeap();
 
       if (LHS.get()->getType().hasNonTrivialToPrimitiveCopyCUnion())
-        checkNonTrivialCUnion(LHS.get()->getType(), LHS.get()->getExprLoc(),
+        checkNonTrivialCUnion(LHS.get()->getType(), LHS.get(),
                               NonTrivialCUnionContext::Assignment, NTCUK_Copy);
     }
     RecordModifiableNonNullParam(*this, LHS.get());
@@ -17131,7 +17132,7 @@ static bool maybeDiagnoseAssignmentToFunction(Sema &S, QualType DstType,
 
   return !S.checkAddressOfFunctionIsAvailable(FD,
                                               /*Complain=*/true,
-                                              SrcExpr->getBeginLoc());
+                                              SrcExpr);
 }
 
 bool Sema::DiagnoseAssignmentResult(AssignConvertType ConvTy,
@@ -20002,7 +20003,7 @@ ExprResult Sema::CheckLValueToRValueConversionOperand(Expr *E) {
   if (E->getType().isVolatileQualified() &&
       (E->getType().hasNonTrivialToPrimitiveDestructCUnion() ||
        E->getType().hasNonTrivialToPrimitiveCopyCUnion()))
-    checkNonTrivialCUnion(E->getType(), E->getExprLoc(),
+    checkNonTrivialCUnion(E->getType(), E,
                           NonTrivialCUnionContext::LValueToRValueVolatile,
                           NTCUK_Destruct | NTCUK_Copy);
 
@@ -20556,7 +20557,7 @@ void Sema::MarkDeclarationsReferencedInExpr(Expr *E,
 ///        CFG (eg, in the initializer of a global or in a constant expression).
 ///        For example,
 ///        namespace { auto *p = new double[3][false ? (1, 2) : 3]; }
-bool Sema::DiagIfReachable(SourceLocation Loc, ArrayRef<const Stmt *> Stmts,
+bool Sema::DiagIfReachable(LazyLoc Loc, ArrayRef<const Stmt *> Stmts,
                            const PartialDiagnostic &PD) {
   if (!Stmts.empty() && getCurFunctionOrMethodDecl()) {
     if (!FunctionScopes.empty())
@@ -20599,7 +20600,7 @@ bool Sema::DiagIfReachable(SourceLocation Loc, ArrayRef<const Stmt *> Stmts,
 /// behavior of a program, such as passing a non-POD value through an ellipsis.
 /// Failure to do so will likely result in spurious diagnostics or failures
 /// during overload resolution or within sizeof/alignof/typeof/typeid.
-bool Sema::DiagRuntimeBehavior(SourceLocation Loc, ArrayRef<const Stmt*> Stmts,
+bool Sema::DiagRuntimeBehavior(LazyLoc Loc, ArrayRef<const Stmt*> Stmts,
                                const PartialDiagnostic &PD) {
 
   if (ExprEvalContexts.back().isDiscardedStatementContext())
@@ -20626,7 +20627,7 @@ bool Sema::DiagRuntimeBehavior(SourceLocation Loc, ArrayRef<const Stmt*> Stmts,
   return false;
 }
 
-bool Sema::DiagRuntimeBehavior(SourceLocation Loc, const Stmt *Statement,
+bool Sema::DiagRuntimeBehavior(LazyLoc Loc, const Stmt *Statement,
                                const PartialDiagnostic &PD) {
   return DiagRuntimeBehavior(
       Loc, Statement ? llvm::ArrayRef(Statement) : llvm::ArrayRef<Stmt *>(),

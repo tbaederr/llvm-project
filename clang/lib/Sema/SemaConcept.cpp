@@ -788,7 +788,7 @@ Sema::SetupConstraintCheckingTemplateArgumentsAndScope(
 
 bool Sema::CheckFunctionConstraints(const FunctionDecl *FD,
                                     ConstraintSatisfaction &Satisfaction,
-                                    SourceLocation UsageLoc,
+                                    LazyLoc UsageLoc,
                                     bool ForOverloadResolution) {
   // Don't check constraints if the function is dependent. Also don't check if
   // this is a function template specialization, as the call to
@@ -846,7 +846,7 @@ bool Sema::CheckFunctionConstraints(const FunctionDecl *FD,
 
   return CheckConstraintSatisfaction(
       FD, FD->getTrailingRequiresClause(), *MLTAL,
-      SourceRange(UsageLoc.isValid() ? UsageLoc : FD->getLocation()),
+      SourceRange(UsageLoc.isValid() ? (SourceLocation)UsageLoc : FD->getLocation()),
       Satisfaction);
 }
 

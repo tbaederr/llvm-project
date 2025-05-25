@@ -16,6 +16,7 @@
 
 #include "clang/Sema/Ownership.h"
 #include "clang/Sema/SemaConcept.h"
+#include "clang/Sema/Sema.h"
 #include "clang/AST/ASTConcept.h"
 #include "clang/AST/DeclAccessPair.h"
 #include "clang/AST/DeclTemplate.h"
@@ -46,7 +47,7 @@ class TemplateDeductionInfo {
 
   /// The source location at which template argument
   /// deduction is occurring.
-  SourceLocation Loc;
+  LazyLoc Loc;
 
   /// Have we suppressed an error during deduction?
   bool HasSFINAEDiagnostic = false;
@@ -68,7 +69,7 @@ class TemplateDeductionInfo {
   SmallVector<PartialDiagnosticAt, 4> SuppressedDiagnostics;
 
 public:
-  TemplateDeductionInfo(SourceLocation Loc, unsigned DeducedDepth = 0)
+  TemplateDeductionInfo(LazyLoc Loc, unsigned DeducedDepth = 0)
       : Loc(Loc), DeducedDepth(DeducedDepth) {}
   TemplateDeductionInfo(const TemplateDeductionInfo &) = delete;
   TemplateDeductionInfo &operator=(const TemplateDeductionInfo &) = delete;
@@ -82,7 +83,7 @@ public:
 
   /// Returns the location at which template argument is
   /// occurring.
-  SourceLocation getLocation() const {
+  LazyLoc getLocation() const {
     return Loc;
   }
 

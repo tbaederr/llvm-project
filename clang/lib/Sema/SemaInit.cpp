@@ -6058,7 +6058,7 @@ static void TryOrBuildParenListInitialization(
     *Result = CPLIE;
     S.Diag(Kind.getLocation(),
            diag::warn_cxx17_compat_aggregate_init_paren_list)
-        << Kind.getLocation() << SR << ResultType;
+        << (SourceLocation)Kind.getLocation() << SR << ResultType;
   }
 }
 

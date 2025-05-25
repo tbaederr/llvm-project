@@ -218,6 +218,9 @@ public:
       return S->getLocation();
     return cast<const Expr *>(Source)->getExprLoc();
   }
+  operator SourceRange() const {
+    return (SourceLocation) *this;
+  }
 
   SourceLocation toSourceLocation() const {
     return (SourceLocation) *this;
@@ -2918,7 +2921,7 @@ private:
   /// object that is less aligned than the parameter. This can happen when
   /// creating a typedef with a lower alignment than the original type and then
   /// calling functions defined in terms of the original type.
-  void CheckArgAlignment(SourceLocation Loc, NamedDecl *FDecl,
+  void CheckArgAlignment(LazyLoc Loc, NamedDecl *FDecl,
                          StringRef ParamName, QualType ArgTy, QualType ParamTy);
 
   ExprResult CheckOSLogFormatStringArg(Expr *Arg);
@@ -3083,11 +3086,11 @@ private:
   /// \param CC the "context" location of the implicit conversion, i.e.
   ///   the most location of the syntactic entity requiring the implicit
   ///   conversion
-  void CheckImplicitConversions(Expr *E, SourceLocation CC = SourceLocation());
+  void CheckImplicitConversions(Expr *E, LazyLoc CC = LazyLoc());
 
   /// CheckBoolLikeConversion - Check conversion of given expression to boolean.
   /// Input argument E is a logical expression.
-  void CheckBoolLikeConversion(Expr *E, SourceLocation CC);
+  void CheckBoolLikeConversion(Expr *E, LazyLoc CC);
 
   /// Diagnose when expression is an integer constant expression and its
   /// evaluation results in integer overflow
@@ -4085,7 +4088,7 @@ public:
 
   /// Emit diagnostics if a non-trivial C union type or a struct that contains
   /// a non-trivial C union is used in an invalid context.
-  void checkNonTrivialCUnion(QualType QT, SourceLocation Loc,
+  void checkNonTrivialCUnion(QualType QT, LazyLoc Loc,
                              NonTrivialCUnionContext UseContext,
                              unsigned NonTrivialKind);
 
@@ -7117,7 +7120,7 @@ public:
   /// the function body is parsed, and then do a basic reachability analysis to
   /// determine if the statement is reachable. If it is unreachable, the
   /// diagnostic will not be emitted.
-  bool DiagIfReachable(SourceLocation Loc, ArrayRef<const Stmt *> Stmts,
+  bool DiagIfReachable(LazyLoc Loc, ArrayRef<const Stmt *> Stmts,
                        const PartialDiagnostic &PD);
 
   /// Conditionally issue a diagnostic based on the current
@@ -7127,11 +7130,11 @@ public:
   /// diagnostic until the function body is parsed, and then do a basic
   /// reachability analysis to determine if the statement is reachable.
   /// If it is unreachable, the diagnostic will not be emitted.
-  bool DiagRuntimeBehavior(SourceLocation Loc, const Stmt *Statement,
+  bool DiagRuntimeBehavior(LazyLoc Loc, const Stmt *Statement,
                            const PartialDiagnostic &PD);
   /// Similar, but diagnostic is only produced if all the specified statements
   /// are reachable.
-  bool DiagRuntimeBehavior(SourceLocation Loc, ArrayRef<const Stmt *> Stmts,
+  bool DiagRuntimeBehavior(LazyLoc Loc, ArrayRef<const Stmt *> Stmts,
                            const PartialDiagnostic &PD);
 
   // Primary Expressions.
@@ -7995,7 +7998,7 @@ public:
 
   // Check that the usual arithmetic conversions can be performed on this pair
   // of expressions that might be of enumeration type.
-  void checkEnumArithmeticConversions(Expr *LHS, Expr *RHS, SourceLocation Loc,
+  void checkEnumArithmeticConversions(Expr *LHS, Expr *RHS, const LazyLoc &Loc,
                                       ArithConvKind ACK);
 
   // UsualArithmeticConversions - performs the UsualUnaryConversions on it's
@@ -8004,7 +8007,7 @@ public:
   // routine returns the first non-arithmetic type found. The client is
   // responsible for emitting appropriate error diagnostics.
   QualType UsualArithmeticConversions(ExprResult &LHS, ExprResult &RHS,
-                                      SourceLocation Loc, ArithConvKind ACK);
+                                      LazyLoc Loc, ArithConvKind ACK);
 
   bool IsAssignConvertCompatible(AssignConvertType ConvTy) {
     switch (ConvTy) {
@@ -10707,7 +10710,7 @@ public:
   /// Returns false if taking the address of the function is illegal.
   bool checkAddressOfFunctionIsAvailable(const FunctionDecl *Function,
                                          bool Complain = false,
-                                         SourceLocation Loc = SourceLocation());
+                                         LazyLoc Loc = LazyLoc());
 
   // [PossiblyAFunctionType]  -->   [Return]
   // NonFunctionType --> NonFunctionType
@@ -14795,7 +14798,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool CheckFunctionConstraints(const FunctionDecl *FD,
                                 ConstraintSatisfaction &Satisfaction,
-                                SourceLocation UsageLoc = SourceLocation(),
+                                LazyLoc UsageLoc = LazyLoc(),
                                 bool ForOverloadResolution = false);
 
   // Calculates whether two constraint expressions are equal irrespective of a

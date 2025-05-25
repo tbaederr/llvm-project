@@ -11484,7 +11484,7 @@ static bool isFunctionAlwaysEnabled(const ASTContext &Ctx,
 static bool checkAddressOfFunctionIsAvailable(Sema &S, const FunctionDecl *FD,
                                               bool Complain,
                                               bool InOverloadResolution,
-                                              SourceLocation Loc) {
+                                              LazyLoc Loc) {
   if (!isFunctionAlwaysEnabled(S.Context, FD)) {
     if (Complain) {
       if (InOverloadResolution)
@@ -11547,12 +11547,12 @@ static bool checkAddressOfCandidateIsAvailable(Sema &S,
                                                const FunctionDecl *FD) {
   return checkAddressOfFunctionIsAvailable(S, FD, /*Complain=*/true,
                                            /*InOverloadResolution=*/true,
-                                           /*Loc=*/SourceLocation());
+                                           /*Loc=*/LazyLoc());
 }
 
 bool Sema::checkAddressOfFunctionIsAvailable(const FunctionDecl *Function,
                                              bool Complain,
-                                             SourceLocation Loc) {
+                                             LazyLoc Loc) {
   return ::checkAddressOfFunctionIsAvailable(*this, Function, Complain,
                                              /*InOverloadResolution=*/false,
                                              Loc);
@@ -14623,7 +14623,7 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
         auto *FD = dyn_cast<FunctionDecl>(DRE->getDecl());
         if (FD &&
             !SemaRef.checkAddressOfFunctionIsAvailable(FD, /*Complain=*/true,
-                                                       Arg->getExprLoc()))
+                                                       Arg))
           return ExprError();
       }
     }

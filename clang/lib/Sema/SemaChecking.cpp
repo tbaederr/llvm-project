@@ -299,7 +299,7 @@ static bool BuiltinFunctionStart(Sema &S, CallExpr *TheCall) {
   }
 
   return !S.checkAddressOfFunctionIsAvailable(FD, /*Complain=*/true,
-                                              TheCall->getBeginLoc());
+                                              TheCall);
 }
 
 /// Check the number of arguments and set the result type to
@@ -3288,7 +3288,7 @@ static void CheckNonNullArguments(Sema &S,
   }
 }
 
-void Sema::CheckArgAlignment(SourceLocation Loc, NamedDecl *FDecl,
+void Sema::CheckArgAlignment(LazyLoc Loc, NamedDecl *FDecl,
                              StringRef ParamName, QualType ArgTy,
                              QualType ParamTy) {
 
@@ -3456,7 +3456,7 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
         if (ParamTy->isSizelessVectorType())
           IsScalableArg = true;
         QualType ArgTy = Arg->getType();
-        CheckArgAlignment(Arg->getExprLoc(), FDecl, std::to_string(ArgIdx + 1),
+        CheckArgAlignment(Arg, FDecl, std::to_string(ArgIdx + 1),
                           ArgTy, ParamTy);
       }
     }
@@ -5112,7 +5112,7 @@ bool Sema::BuiltinUnorderedCompare(CallExpr *TheCall, unsigned BuiltinID) {
   // Do standard promotions between the two arguments, returning their common
   // type.
   QualType Res = UsualArithmeticConversions(
-      OrigArg0, OrigArg1, TheCall->getExprLoc(), ArithConvKind::Comparison);
+      OrigArg0, OrigArg1, TheCall, ArithConvKind::Comparison);
   if (OrigArg0.isInvalid() || OrigArg1.isInvalid())
     return true;
 
@@ -8031,7 +8031,7 @@ isArithmeticArgumentPromotion(Sema &S, const ImplicitCastExpr *ICE) {
 
 static analyze_format_string::ArgType::MatchKind
 handleFormatSignedness(analyze_format_string::ArgType::MatchKind Match,
-                       DiagnosticsEngine &Diags, SourceLocation Loc) {
+                       DiagnosticsEngine &Diags, LazyLoc Loc) {
   if (Match == analyze_format_string::ArgType::NoMatchSignedness) {
     Match =
         Diags.isIgnored(
@@ -8098,7 +8098,7 @@ CheckPrintfHandler::checkFormatExpr(const analyze_printf::PrintfSpecifier &FS,
   ArgType::MatchKind Match = AT.matchesType(S.Context, ExprTy);
   ArgType::MatchKind OrigMatch = Match;
 
-  Match = handleFormatSignedness(Match, S.getDiagnostics(), E->getExprLoc());
+  Match = handleFormatSignedness(Match, S.getDiagnostics(), E);
   if (Match == ArgType::Match)
     return true;
 
@@ -8129,7 +8129,7 @@ CheckPrintfHandler::checkFormatExpr(const analyze_printf::PrintfSpecifier &FS,
           // might introduce new unexpected warnings from -Wformat-signedness.
           return true;
         ImplicitMatch = handleFormatSignedness(
-            ImplicitMatch, S.getDiagnostics(), E->getExprLoc());
+            ImplicitMatch, S.getDiagnostics(), E);
         if (ImplicitMatch == ArgType::Match)
           return true;
       }
@@ -8289,7 +8289,7 @@ CheckPrintfHandler::checkFormatExpr(const analyze_printf::PrintfSpecifier &FS,
       SmallVector<FixItHint,4> Hints;
       ArgType::MatchKind IntendedMatch = AT.matchesType(S.Context, IntendedTy);
       IntendedMatch = handleFormatSignedness(IntendedMatch, S.getDiagnostics(),
-                                             E->getExprLoc());
+                                             E);
       if ((IntendedMatch != ArgType::Match) || ShouldNotPrintDirectly)
         Hints.push_back(FixItHint::CreateReplacement(SpecRange, os.str()));
 
@@ -8576,7 +8576,7 @@ bool CheckScanfHandler::HandleScanfSpecifier(
 
   analyze_format_string::ArgType::MatchKind Match =
       AT.matchesType(S.Context, Ex->getType());
-  Match = handleFormatSignedness(Match, S.getDiagnostics(), Ex->getExprLoc());
+  Match = handleFormatSignedness(Match, S.getDiagnostics(), Ex);
   bool Pedantic = Match == analyze_format_string::ArgType::NoMatchPedantic;
   if (Match == analyze_format_string::ArgType::Match)
     return true;
@@ -9225,10 +9225,11 @@ void Sema::CheckAbsoluteValueFunction(const CallExpr *Call,
   // Unsigned types cannot be negative.  Suggest removing the absolute value
   // function call.
   if (ArgType->isUnsignedIntegerType()) {
+    SourceLocation Loc = Call->getExprLoc();
     std::string FunctionName =
         IsStdAbs ? "std::abs" : Context.BuiltinInfo.getName(AbsKind);
-    Diag(Call->getExprLoc(), diag::warn_unsigned_abs) << ArgType << ParamType;
-    Diag(Call->getExprLoc(), diag::note_remove_abs)
+    Diag(Loc, diag::warn_unsigned_abs) << ArgType << ParamType;
+    Diag(Loc, diag::note_remove_abs)
         << FunctionName
         << FixItHint::CreateRemoval(Call->getCallee()->getSourceRange());
     return;
@@ -9333,7 +9334,8 @@ void Sema::CheckMaxUnsignedZero(const CallExpr *Call,
 
   SourceRange ZeroRange = IsFirstArgZero ? FirstRange : SecondRange;
 
-  Diag(Call->getExprLoc(), diag::warn_max_unsigned_zero)
+  SourceLocation Loc = Call->getExprLoc();
+  Diag(Loc, diag::warn_max_unsigned_zero)
       << IsFirstArgZero << Call->getCallee()->getSourceRange() << ZeroRange;
 
   // Deduce what parts to remove so that "std::max(0u, foo)" becomes "(foo)".
@@ -9346,7 +9348,7 @@ void Sema::CheckMaxUnsignedZero(const CallExpr *Call,
                                SecondRange.getEnd());
   }
 
-  Diag(Call->getExprLoc(), diag::note_remove_max_call)
+  Diag(Loc, diag::note_remove_max_call)
         << FixItHint::CreateRemoval(Call->getCallee()->getSourceRange())
         << FixItHint::CreateRemoval(RemovalRange);
 }
@@ -9591,7 +9593,7 @@ static void CheckMemaccessSize(Sema &S, unsigned BId, const CallExpr *Call) {
   if (isLiteralZero(SizeArg) &&
       !isArgumentExpandedFromMacro(SM, CallLoc, SizeArg->getExprLoc())) {
 
-    SourceLocation DiagLoc = SizeArg->getExprLoc();
+    LazyLoc DiagLoc(SizeArg);
 
     // Some platforms #define bzero to __builtin_memset. See if this is the
     // case, and if so, emit a better diagnostic.
@@ -9736,7 +9738,7 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
       if (SizeOfArgTy != QualType()) {
         if (PointeeTy->isRecordType() &&
             Context.typesAreCompatible(SizeOfArgTy, DestTy)) {
-          DiagRuntimeBehavior(LenExpr->getExprLoc(), Dest,
+          DiagRuntimeBehavior(LenExpr, Dest,
                               PDiag(diag::warn_sizeof_pointer_type_memaccess)
                                 << FnName << SizeOfArgTy << ArgIdx
                                 << PointeeTy << Dest->getSourceRange()
@@ -9769,7 +9771,7 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
           OperationType = 3;
       }
 
-      DiagRuntimeBehavior(Dest->getExprLoc(), Dest,
+      DiagRuntimeBehavior(Dest, Dest,
                           PDiag(diag::warn_dyn_class_memaccess)
                               << (IsCmp ? ArgIdx + 2 : ArgIdx) << FnName
                               << IsContained << ContainedRD << OperationType
@@ -9777,7 +9779,7 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
     } else if (PointeeTy.hasNonTrivialObjCLifetime() &&
              BId != Builtin::BImemset)
       DiagRuntimeBehavior(
-        Dest->getExprLoc(), Dest,
+        Dest, Dest,
         PDiag(diag::warn_arc_object_memaccess)
           << ArgIdx << FnName << PointeeTy
           << Call->getCallee()->getSourceRange());
@@ -9793,7 +9795,7 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
 
       if ((BId == Builtin::BImemset || BId == Builtin::BIbzero) &&
           RT->getDecl()->isNonTrivialToPrimitiveDefaultInitialize()) {
-        DiagRuntimeBehavior(Dest->getExprLoc(), Dest,
+        DiagRuntimeBehavior(Dest, Dest,
                             PDiag(diag::warn_cstruct_memaccess)
                                 << ArgIdx << FnName << PointeeTy << 0);
         SearchNonTrivialToInitializeField::diag(PointeeTy, Dest, *this);
@@ -9801,12 +9803,12 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
                  NonTriviallyCopyableCXXRecord && ArgIdx == 0) {
         // FIXME: Limiting this warning to dest argument until we decide
         // whether it's valid for source argument too.
-        DiagRuntimeBehavior(Dest->getExprLoc(), Dest,
+        DiagRuntimeBehavior(Dest, Dest,
                             PDiag(diag::warn_cxxstruct_memaccess)
                                 << FnName << PointeeTy);
       } else if ((BId == Builtin::BImemcpy || BId == Builtin::BImemmove) &&
                  RT->getDecl()->isNonTrivialToPrimitiveCopy()) {
-        DiagRuntimeBehavior(Dest->getExprLoc(), Dest,
+        DiagRuntimeBehavior(Dest, Dest,
                             PDiag(diag::warn_cstruct_memaccess)
                                 << ArgIdx << FnName << PointeeTy << 1);
         SearchNonTrivialToCopyField::diag(PointeeTy, Dest, *this);
@@ -9814,7 +9816,7 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
                  NonTriviallyCopyableCXXRecord && ArgIdx == 0) {
         // FIXME: Limiting this warning to dest argument until we decide
         // whether it's valid for source argument too.
-        DiagRuntimeBehavior(Dest->getExprLoc(), Dest,
+        DiagRuntimeBehavior(Dest, Dest,
                             PDiag(diag::warn_cxxstruct_memaccess)
                                 << FnName << PointeeTy);
       } else {
@@ -9824,7 +9826,7 @@ void Sema::CheckMemaccessArguments(const CallExpr *Call,
       continue;
 
     DiagRuntimeBehavior(
-      Dest->getExprLoc(), Dest,
+      Dest, Dest,
       PDiag(diag::note_bad_memaccess_silence)
         << FixItHint::CreateInsertion(ArgRange.getBegin(), "(void*)"));
     break;
@@ -11504,7 +11506,7 @@ static void AnalyzeAssignment(Sema &S, BinaryOperator *E) {
 
 /// Diagnose an implicit cast;  purely a helper for CheckImplicitConversion.
 static void DiagnoseImpCast(Sema &S, Expr *E, QualType SourceType, QualType T,
-                            SourceLocation CContext, unsigned diag,
+                            LazyLoc CContext, unsigned diag,
                             bool pruneControlFlow = false) {
   // For languages like HLSL and OpenCL, implicit conversion diagnostics listing
   // address space annotations isn't really useful. The warnings aren't because
@@ -11515,7 +11517,7 @@ static void DiagnoseImpCast(Sema &S, Expr *E, QualType SourceType, QualType T,
   if (T.hasAddressSpace())
     T = S.getASTContext().removeAddrSpaceQualType(T);
   if (pruneControlFlow) {
-    S.DiagRuntimeBehavior(E->getExprLoc(), E,
+    S.DiagRuntimeBehavior(E, E,
                           S.PDiag(diag)
                               << SourceType << T << E->getSourceRange()
                               << SourceRange(CContext));
@@ -11527,7 +11529,7 @@ static void DiagnoseImpCast(Sema &S, Expr *E, QualType SourceType, QualType T,
 
 /// Diagnose an implicit cast;  purely a helper for CheckImplicitConversion.
 static void DiagnoseImpCast(Sema &S, Expr *E, QualType T,
-                            SourceLocation CContext,
+                            LazyLoc CContext,
                             unsigned diag, bool pruneControlFlow = false) {
   DiagnoseImpCast(S, E, E->getType(), T, CContext, diag, pruneControlFlow);
 }
@@ -11634,7 +11636,7 @@ static void DiagnoseFloatingImpCast(Sema &S, Expr *E, QualType T,
     IntegerValue.toString(PrettyTargetValue);
 
   if (PruneWarnings) {
-    S.DiagRuntimeBehavior(E->getExprLoc(), E,
+    S.DiagRuntimeBehavior(E, E,
                           S.PDiag(DiagID)
                               << E->getType() << T.getUnqualifiedType()
                               << PrettySourceValue << PrettyTargetValue
@@ -11679,7 +11681,7 @@ static void AnalyzeCompoundAssignment(Sema &S, BinaryOperator *E) {
   // If source is floating point but target is an integer.
   if (ResultBT->isInteger())
     return DiagnoseImpCast(S, E, E->getRHS()->getType(), E->getLHS()->getType(),
-                           E->getExprLoc(), diag::warn_impcast_float_integer);
+                           E, diag::warn_impcast_float_integer);
 
   if (!ResultBT->isFloatingPoint())
     return;
@@ -11723,7 +11725,7 @@ static bool IsImplicitBoolFloatConversion(Sema &S, Expr *Ex, bool ToBool) {
 }
 
 static void CheckImplicitArgumentConversions(Sema &S, CallExpr *TheCall,
-                                             SourceLocation CC) {
+                                             LazyLoc CC) {
   unsigned NumArgs = TheCall->getNumArgs();
   for (unsigned i = 0; i < NumArgs; ++i) {
     Expr *CurrA = TheCall->getArg(i);
@@ -11831,7 +11833,6 @@ static const IntegerLiteral *getIntegerLiteral(Expr *E) {
 
 static void DiagnoseIntInBoolContext(Sema &S, Expr *E) {
   E = E->IgnoreParenImpCasts();
-  SourceLocation ExprLoc = E->getExprLoc();
 
   if (const auto *BO = dyn_cast<BinaryOperator>(E)) {
     BinaryOperator::Opcode Opc = BO->getOpcode();
@@ -11841,14 +11842,14 @@ static void DiagnoseIntInBoolContext(Sema &S, Expr *E) {
       const auto *LHS = getIntegerLiteral(BO->getLHS());
       const auto *RHS = getIntegerLiteral(BO->getRHS());
       if (LHS && LHS->getValue() == 0)
-        S.Diag(ExprLoc, diag::warn_left_shift_always) << 0;
+        S.Diag(E->getExprLoc(), diag::warn_left_shift_always) << 0;
       else if (!E->isValueDependent() && LHS && RHS &&
                RHS->getValue().isNonNegative() &&
                E->EvaluateAsInt(Result, S.Context, Expr::SE_AllowSideEffects))
-        S.Diag(ExprLoc, diag::warn_left_shift_always)
+        S.Diag(E->getExprLoc(), diag::warn_left_shift_always)
             << (Result.Val.getInt() != 0);
       else if (E->getType()->isSignedIntegerType())
-        S.Diag(ExprLoc, diag::warn_left_shift_in_bool_context)
+        S.Diag(E->getExprLoc(), diag::warn_left_shift_in_bool_context)
             << FixItHint::CreateInsertion(E->getBeginLoc(), "(")
             << FixItHint::CreateInsertion(S.getLocForEndOfToken(E->getEndLoc()),
                                           ") != 0");
@@ -11865,7 +11866,7 @@ static void DiagnoseIntInBoolContext(Sema &S, Expr *E) {
       // Do not diagnose common idioms.
       return;
     if (LHS->getValue() != 0 && RHS->getValue() != 0)
-      S.Diag(ExprLoc, diag::warn_integer_constants_in_conditional_always_true);
+      S.Diag(E->getExprLoc(), diag::warn_integer_constants_in_conditional_always_true);
   }
 }
 
@@ -12138,7 +12139,7 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
         llvm::APFixedPoint MaxVal = Context.getFixedPointMax(T);
         llvm::APFixedPoint MinVal = Context.getFixedPointMin(T);
         if (Value > MaxVal || Value < MinVal) {
-          DiagRuntimeBehavior(E->getExprLoc(), E,
+          DiagRuntimeBehavior(E, E,
                               PDiag(diag::warn_impcast_fixed_point_range)
                                   << Value.toString() << T
                                   << E->getSourceRange()
@@ -12158,7 +12159,7 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
             &Overflowed);
 
         if (Overflowed) {
-          DiagRuntimeBehavior(E->getExprLoc(), E,
+          DiagRuntimeBehavior(E, E,
                               PDiag(diag::warn_impcast_fixed_point_range)
                                   << FXResult.toString() << T
                                   << E->getSourceRange()
@@ -12179,7 +12180,7 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
             Value, Context.getFixedPointSemantics(T), &Overflowed);
 
         if (Overflowed) {
-          DiagRuntimeBehavior(E->getExprLoc(), E,
+          DiagRuntimeBehavior(E, E,
                               PDiag(diag::warn_impcast_fixed_point_range)
                                   << toString(Value, /*Radix=*/10) << T
                                   << E->getSourceRange()
@@ -12230,7 +12231,7 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
           TargetFloatValue.toString(PrettyTargetValue, TargetPrecision);
 
           DiagRuntimeBehavior(
-              E->getExprLoc(), E,
+              E, E,
               PDiag(diag::warn_impcast_integer_float_precision_constant)
                   << PrettySourceValue << PrettyTargetValue << E->getType() << T
                   << E->getSourceRange() << clang::SourceRange(CC));
@@ -12293,7 +12294,7 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
       std::string PrettySourceValue = toString(Value, 10);
       std::string PrettyTargetValue = PrettyPrintInRange(Value, TargetRange);
 
-      DiagRuntimeBehavior(E->getExprLoc(), E,
+      DiagRuntimeBehavior(E, E,
                           PDiag(diag::warn_impcast_integer_precision_constant)
                               << PrettySourceValue << PrettyTargetValue
                               << E->getType() << T << E->getSourceRange()
@@ -12459,7 +12460,7 @@ static void CheckConditionalOperator(Sema &S, AbstractConditionalOperator *E,
 
 /// Check conversion of given expression to boolean.
 /// Input argument E is a logical expression.
-static void CheckBoolLikeConversion(Sema &S, Expr *E, SourceLocation CC) {
+static void CheckBoolLikeConversion(Sema &S, Expr *E, LazyLoc CC) {
   // Run the bool-like conversion checks only for C since there bools are
   // still not used as the return type from "boolean" operators or as the input
   // type for conditional operators.
@@ -12658,11 +12659,11 @@ static void AnalyzeImplicitConversions(
   if (BO && BO->isLogicalOp()) {
     Expr *SubExpr = BO->getLHS()->IgnoreParenImpCasts();
     if (!IsLogicalAndOperator || !isa<StringLiteral>(SubExpr))
-      ::CheckBoolLikeConversion(S, SubExpr, BO->getExprLoc());
+      ::CheckBoolLikeConversion(S, SubExpr, BO);
 
     SubExpr = BO->getRHS()->IgnoreParenImpCasts();
     if (!IsLogicalAndOperator || !isa<StringLiteral>(SubExpr))
-      ::CheckBoolLikeConversion(S, SubExpr, BO->getExprLoc());
+      ::CheckBoolLikeConversion(S, SubExpr, BO);
   }
 
   if (const UnaryOperator *U = dyn_cast<UnaryOperator>(E)) {
@@ -12934,7 +12935,7 @@ void Sema::DiagnoseAlwaysNonNullPointer(Expr *E,
       << FixItHint::CreateInsertion(getLocForEndOfToken(E->getEndLoc()), "()");
 }
 
-void Sema::CheckImplicitConversions(Expr *E, SourceLocation CC) {
+void Sema::CheckImplicitConversions(Expr *E, LazyLoc CC) {
   // Don't diagnose in unevaluated contexts.
   if (isUnevaluatedContext())
     return;
@@ -12952,7 +12953,7 @@ void Sema::CheckImplicitConversions(Expr *E, SourceLocation CC) {
   AnalyzeImplicitConversions(*this, E, CC);
 }
 
-void Sema::CheckBoolLikeConversion(Expr *E, SourceLocation CC) {
+void Sema::CheckBoolLikeConversion(Expr *E, LazyLoc CC) {
   ::CheckBoolLikeConversion(*this, E, CC);
 }
 
@@ -13248,7 +13249,7 @@ class SequenceChecker : public ConstEvaluatedExprVisitor<SequenceChecker> {
       std::swap(Mod, ModOrUse);
 
     SemaRef.DiagRuntimeBehavior(
-        Mod->getExprLoc(), {Mod, ModOrUse},
+        Mod, {Mod, ModOrUse},
         SemaRef.PDiag(IsModMod ? diag::warn_unsequenced_mod_mod
                                : diag::warn_unsequenced_mod_use)
             << O << SourceRange(ModOrUse->getExprLoc()));
@@ -15535,7 +15536,7 @@ bool Sema::BuiltinVectorToScalarMath(CallExpr *TheCall) {
 }
 
 static bool checkBuiltinVectorMathMixedEnums(Sema &S, Expr *LHS, Expr *RHS,
-                                             SourceLocation Loc) {
+                                             LazyLoc Loc) {
   QualType L = LHS->getEnumCoercedType(S.Context),
            R = RHS->getEnumCoercedType(S.Context);
   if (L->isUnscopedEnumerationType() && R->isUnscopedEnumerationType() &&
@@ -15554,7 +15555,7 @@ Sema::BuiltinVectorMath(CallExpr *TheCall,
     return std::nullopt;
 
   if (checkBuiltinVectorMathMixedEnums(
-          *this, TheCall->getArg(0), TheCall->getArg(1), TheCall->getExprLoc()))
+          *this, TheCall->getArg(0), TheCall->getArg(1), TheCall))
     return std::nullopt;
 
   Expr *Args[2];
@@ -15588,11 +15589,10 @@ bool Sema::BuiltinElementwiseTernaryMath(
   if (checkArgCount(TheCall, 3))
     return true;
 
-  SourceLocation Loc = TheCall->getExprLoc();
   if (checkBuiltinVectorMathMixedEnums(*this, TheCall->getArg(0),
-                                       TheCall->getArg(1), Loc) ||
+                                       TheCall->getArg(1), TheCall) ||
       checkBuiltinVectorMathMixedEnums(*this, TheCall->getArg(1),
-                                       TheCall->getArg(2), Loc))
+                                       TheCall->getArg(2), TheCall))
     return true;
 
   Expr *Args[3];

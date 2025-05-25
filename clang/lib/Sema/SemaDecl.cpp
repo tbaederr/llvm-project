@@ -13113,7 +13113,7 @@ QualType Sema::deduceVarTypeFromInitializer(VarDecl *VDecl,
                                     Type.getQualifiers());
 
   QualType DeducedType;
-  TemplateDeductionInfo Info(DeduceInit->getExprLoc());
+  TemplateDeductionInfo Info(DeduceInit);
   TemplateDeductionResult Result =
       DeduceAutoType(TSI->getTypeLoc(), DeduceInit, DeducedType, Info);
   if (Result != TemplateDeductionResult::Success &&
@@ -13244,7 +13244,7 @@ struct DiagNonTrivalCUnionDefaultInitializeVisitor
                                     void>;
 
   DiagNonTrivalCUnionDefaultInitializeVisitor(
-      QualType OrigTy, SourceLocation OrigLoc,
+      QualType OrigTy, LazyLoc OrigLoc,
       NonTrivialCUnionContext UseContext, Sema &S)
       : OrigTy(OrigTy), OrigLoc(OrigLoc), UseContext(UseContext), S(S) {}
 
@@ -13298,7 +13298,7 @@ struct DiagNonTrivalCUnionDefaultInitializeVisitor
   // The non-trivial C union type or the struct/union type that contains a
   // non-trivial C union.
   QualType OrigTy;
-  SourceLocation OrigLoc;
+  LazyLoc OrigLoc;
   NonTrivialCUnionContext UseContext;
   Sema &S;
 };
@@ -13446,7 +13446,7 @@ struct DiagNonTrivalCUnionCopyVisitor
 
 } // namespace
 
-void Sema::checkNonTrivialCUnion(QualType QT, SourceLocation Loc,
+void Sema::checkNonTrivialCUnion(QualType QT, LazyLoc Loc,
                                  NonTrivialCUnionContext UseContext,
                                  unsigned NonTrivialKind) {
   assert((QT.hasNonTrivialToPrimitiveDefaultInitializeCUnion() ||
