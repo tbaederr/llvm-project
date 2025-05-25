@@ -655,7 +655,7 @@ void Sema::PrintStats() const {
 
 void Sema::diagnoseNullableToNonnullConversion(QualType DstType,
                                                QualType SrcType,
-                                               SourceLocation Loc) {
+                                               LazyLoc Loc) {
   std::optional<NullabilityKind> ExprNullability = SrcType->getNullability();
   if (!ExprNullability || (*ExprNullability != NullabilityKind::Nullable &&
                            *ExprNullability != NullabilityKind::NullableResult))

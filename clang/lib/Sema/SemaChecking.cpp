@@ -3636,7 +3636,7 @@ bool Sema::CheckFunctionCall(FunctionDecl *FDecl, CallExpr *TheCall,
 
   // Enforce TCB except for builtin calls, which are always allowed.
   if (FDecl->getBuiltinID() == 0)
-    CheckTCBEnforcement(TheCall->getExprLoc(), FDecl);
+    CheckTCBEnforcement(TheCall, FDecl);
 
   CheckAbsoluteValueFunction(TheCall, FDecl);
   CheckMaxUnsignedZero(TheCall, FDecl);
@@ -12473,7 +12473,7 @@ static void CheckBoolLikeConversion(Sema &S, Expr *E, SourceLocation CC) {
 namespace {
 struct AnalyzeImplicitConversionsWorkItem {
   Expr *E;
-  SourceLocation CC;
+  LazyLoc CC;
   bool IsListInit;
 };
 }
@@ -12484,7 +12484,7 @@ static void AnalyzeImplicitConversions(
     Sema &S, AnalyzeImplicitConversionsWorkItem Item,
     llvm::SmallVectorImpl<AnalyzeImplicitConversionsWorkItem> &WorkList) {
   Expr *OrigE = Item.E;
-  SourceLocation CC = Item.CC;
+  LazyLoc CC = Item.CC;
 
   QualType T = OrigE->getType();
   Expr *E = OrigE->IgnoreParenImpCasts();
@@ -12632,7 +12632,7 @@ static void AnalyzeImplicitConversions(
   if (isa<UnaryExprOrTypeTraitExpr>(E)) return;
 
   // Now just recurse over the expression's children.
-  CC = E->getExprLoc();
+  CC = LazyLoc(E);
   BinaryOperator *BO = dyn_cast<BinaryOperator>(E);
   bool IsLogicalAndOperator = BO && BO->getOpcode() == BO_LAnd;
   for (Stmt *SubStmt : E->children()) {
@@ -15921,7 +15921,7 @@ ExprResult Sema::BuiltinMatrixColumnMajorStore(CallExpr *TheCall,
   return CallResult;
 }
 
-void Sema::CheckTCBEnforcement(const SourceLocation CallExprLoc,
+void Sema::CheckTCBEnforcement(LazyLoc CallExprLoc,
                                const NamedDecl *Callee) {
   // This warning does not make sense in code that has no runtime behavior.
   if (isUnevaluatedContext())

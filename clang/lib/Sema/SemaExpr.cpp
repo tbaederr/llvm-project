@@ -6086,7 +6086,7 @@ Sema::ConvertArgumentsForCall(CallExpr *Call, Expr *Fn,
   SmallVector<Expr *, 8> AllArgs;
   VariadicCallType CallType = getVariadicCallType(FDecl, Proto, Fn);
 
-  Invalid = GatherArgumentsForCall(Call->getExprLoc(), FDecl, Proto, 0, Args,
+  Invalid = GatherArgumentsForCall(Call, FDecl, Proto, 0, Args,
                                    AllArgs, CallType);
   if (Invalid)
     return true;
@@ -6098,7 +6098,7 @@ Sema::ConvertArgumentsForCall(CallExpr *Call, Expr *Fn,
   return false;
 }
 
-bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
+bool Sema::GatherArgumentsForCall( LazyLoc CallLoc, FunctionDecl *FDecl,
                                   const FunctionProtoType *Proto,
                                   unsigned FirstParam, ArrayRef<Expr *> Args,
                                   SmallVectorImpl<Expr *> &AllArgs,
@@ -17478,7 +17478,7 @@ ExprResult
 Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
                                       VerifyICEDiagnoser &Diagnoser,
                                       AllowFoldKind CanFold) {
-  SourceLocation DiagLoc = E->getBeginLoc();
+  LazyLoc DiagLoc = LazyLoc(E);
 
   if (getLangOpts().CPlusPlus11) {
     // C++11 [expr.const]p5:

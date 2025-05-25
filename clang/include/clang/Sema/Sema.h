@@ -194,6 +194,25 @@ class UnresolvedSetImpl;
 class UnresolvedSetIterator;
 class VisibleDeclConsumer;
 
+
+class LazyLoc final {
+private:
+    const Expr *E = nullptr;
+
+public:
+  LazyLoc(const Expr *E) : E(E){}
+  LazyLoc(SourceLocation SL) {}
+
+  operator SourceLocation() {
+    if (!E)
+      return SourceLocation();
+    return E->getExprLoc();
+  }
+};
+
+
+
+
 namespace sema {
 class BlockScopeInfo;
 class Capture;
@@ -1146,7 +1165,7 @@ public:
   /// Warn if we're implicitly casting from a _Nullable pointer type to a
   /// _Nonnull one.
   void diagnoseNullableToNonnullConversion(QualType DstType, QualType SrcType,
-                                           SourceLocation Loc);
+                                           LazyLoc Loc);
 
   /// Warn when implicitly casting 0 to nullptr.
   void diagnoseZeroToNullptrConversion(CastKind Kind, const Expr *E);
@@ -2767,7 +2786,7 @@ public:
   /// CheckTCBEnforcement - Enforces that every function in a named TCB only
   /// directly calls other functions in the same TCB as marked by the
   /// enforce_tcb and enforce_tcb_leaf attributes.
-  void CheckTCBEnforcement(const SourceLocation CallExprLoc,
+  void CheckTCBEnforcement(LazyLoc CallExprLoc,
                            const NamedDecl *Callee);
 
   void CheckConstrainedAuto(const AutoType *AutoT, SourceLocation Loc);
@@ -7929,7 +7948,7 @@ public:
   /// GatherArgumentsForCall - Collector argument expressions for various
   /// form of call prototypes.
   bool GatherArgumentsForCall(
-      SourceLocation CallLoc, FunctionDecl *FDecl,
+      LazyLoc CallLoc, FunctionDecl *FDecl,
       const FunctionProtoType *Proto, unsigned FirstParam,
       ArrayRef<Expr *> Args, SmallVectorImpl<Expr *> &AllArgs,
       VariadicCallType CallType = VariadicCallType::DoesNotApply,
