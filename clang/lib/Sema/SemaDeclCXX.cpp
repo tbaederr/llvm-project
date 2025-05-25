@@ -1796,7 +1796,7 @@ void Sema::CheckCXXDefaultArguments(FunctionDecl *FD) {
 /// \return \c true if a problem has been found (and optionally diagnosed).
 template <typename... Ts>
 static bool CheckLiteralType(Sema &SemaRef, Sema::CheckConstexprKind Kind,
-                             SourceLocation Loc, QualType T, unsigned DiagID,
+                             LazyLoc Loc, QualType T, unsigned DiagID,
                              Ts &&...DiagArgs) {
   if (T->isDependentType())
     return false;
@@ -1860,7 +1860,7 @@ static bool CheckConstexprParameterTypes(Sema &SemaRef,
     const ParmVarDecl *PD = FD->getParamDecl(ArgIndex);
     assert(PD && "null in a parameter list");
     SourceLocation ParamLoc = PD->getLocation();
-    if (CheckLiteralType(SemaRef, Kind, ParamLoc, *i,
+    if (CheckLiteralType(SemaRef, Kind, PD, *i,
                          diag::err_constexpr_non_literal_param, ArgIndex + 1,
                          PD->getSourceRange(), isa<CXXConstructorDecl>(FD),
                          FD->isConsteval()))
@@ -1875,7 +1875,7 @@ static bool CheckConstexprReturnType(Sema &SemaRef, const FunctionDecl *FD,
                                      Sema::CheckConstexprKind Kind) {
   assert(!SemaRef.getLangOpts().CPlusPlus23 &&
          "this check is obsolete for C++23");
-  if (CheckLiteralType(SemaRef, Kind, FD->getLocation(), FD->getReturnType(),
+  if (CheckLiteralType(SemaRef, Kind, FD, FD->getReturnType(),
                        diag::err_constexpr_non_literal_return,
                        FD->isConsteval()))
     return false;
@@ -2073,11 +2073,11 @@ static bool CheckConstexprDeclStmt(Sema &SemaRef, const FunctionDecl *Dcl,
           }
         }
         if (SemaRef.LangOpts.CPlusPlus23) {
-          CheckLiteralType(SemaRef, Kind, VD->getLocation(), VD->getType(),
+          CheckLiteralType(SemaRef, Kind, VD, VD->getType(),
                            diag::warn_cxx20_compat_constexpr_var,
                            isa<CXXConstructorDecl>(Dcl));
         } else if (CheckLiteralType(
-                       SemaRef, Kind, VD->getLocation(), VD->getType(),
+                       SemaRef, Kind, VD, VD->getType(),
                        diag::err_constexpr_local_var_non_literal_type,
                        isa<CXXConstructorDecl>(Dcl))) {
           return false;

@@ -198,7 +198,7 @@ class VisibleDeclConsumer;
 class LazyLoc final {
 private:
   union {
-    llvm::PointerUnion<const Expr *, const Stmt *> Source;
+    llvm::PointerUnion<const Expr *, const Decl *> Source;
     SourceLocation Loc;
   };
   unsigned UsesLoc: 1;
@@ -206,7 +206,7 @@ private:
 public:
   LazyLoc() : Source(nullptr), UsesLoc(false) {}
   LazyLoc(const Expr *E) : Source(E) , UsesLoc(false) {}
-  LazyLoc(const Stmt *S) : Source(S) , UsesLoc(false) {}
+  LazyLoc(const Decl *D) : Source(D) , UsesLoc(false) {}
   LazyLoc(SourceLocation SL):  Loc(SL), UsesLoc(true) {}
 
   operator SourceLocation() const {
@@ -214,8 +214,8 @@ public:
       return Loc;
     if (!Source)
       return SourceLocation();
-    if (const auto *S = dyn_cast<const Stmt *>(Source))
-      return S->getBeginLoc();
+    if (const auto *S = dyn_cast<const Decl *>(Source))
+      return S->getLocation();
     return cast<const Expr *>(Source)->getExprLoc();
   }
 
@@ -228,8 +228,8 @@ public:
       return Loc.isInvalid();
     if (!Source)
       return true;
-    if (const auto *S = dyn_cast<const Stmt *>(Source))
-      return S->getBeginLoc().isInvalid();
+    if (const auto *S = dyn_cast<const Decl *>(Source))
+      return S->getLocation().isInvalid();
     return cast<const Expr *>(Source)->getExprLoc().isInvalid();
   }
 
@@ -238,12 +238,14 @@ public:
       return Loc.isValid();
     if (!Source)
       return false;
-    if (const auto *S = dyn_cast<const Stmt *>(Source))
-      return S->getBeginLoc().isValid();
+    if (const auto *S = dyn_cast<const Decl *>(Source))
+      return S->getLocation().isValid();
     return cast<const Expr *>(Source)->getExprLoc().isValid();
   }
 };
 
+// Sad but true.
+static_assert(sizeof(LazyLoc) == (sizeof(void*) * 2));
 
 
 
@@ -6967,7 +6969,7 @@ public:
   /// message-send is to a declaration with the sentinel attribute, and
   /// if so, it checks that the requirements of the sentinel are
   /// satisfied.
-  void DiagnoseSentinelCalls(const NamedDecl *D, SourceLocation Loc,
+  void DiagnoseSentinelCalls(const NamedDecl *D, LazyLoc Loc,
                              ArrayRef<Expr *> Args);
 
   void PushExpressionEvaluationContext(
@@ -15297,18 +15299,18 @@ public:
   ///
   /// @returns @c true if @p T is not a literal type and a diagnostic was
   /// emitted, @c false otherwise.
-  bool RequireLiteralType(SourceLocation Loc, QualType T,
+  bool RequireLiteralType(LazyLoc Loc, QualType T,
                           TypeDiagnoser &Diagnoser);
-  bool RequireLiteralType(SourceLocation Loc, QualType T, unsigned DiagID);
+  bool RequireLiteralType(LazyLoc Loc, QualType T, unsigned DiagID);
 
   template <typename... Ts>
-  bool RequireLiteralType(SourceLocation Loc, QualType T, unsigned DiagID,
+  bool RequireLiteralType(LazyLoc Loc, QualType T, unsigned DiagID,
                           const Ts &...Args) {
     BoundTypeDiagnoser<Ts...> Diagnoser(DiagID, Args...);
     return RequireLiteralType(Loc, T, Diagnoser);
   }
 
-  bool isCompleteType(SourceLocation Loc, QualType T,
+  bool isCompleteType(LazyLoc Loc, QualType T,
                       CompleteTypeKind Kind = CompleteTypeKind::Default) {
     return !RequireCompleteTypeImpl(Loc, T, Kind, nullptr);
   }
@@ -15408,7 +15410,7 @@ public:
 
 private:
   /// The implementation of RequireCompleteType
-  bool RequireCompleteTypeImpl(SourceLocation Loc, QualType T,
+  bool RequireCompleteTypeImpl(LazyLoc Loc, QualType T,
                                CompleteTypeKind Kind, TypeDiagnoser *Diagnoser);
 
   /// Nullability type specifiers.

@@ -105,7 +105,7 @@ bool Sema::CanUseDecl(NamedDecl *D, bool TreatUnavailableAsInvalid) {
   return true;
 }
 
-static void DiagnoseUnusedOfDecl(Sema &S, NamedDecl *D, SourceLocation Loc) {
+static void DiagnoseUnusedOfDecl(Sema &S, NamedDecl *D, LazyLoc Loc) {
   // Warn if this is used but marked unused.
   if (const auto *A = D->getAttr<UnusedAttr>()) {
     // [[maybe_unused]] should not diagnose uses, but __attribute__((unused))
@@ -161,7 +161,7 @@ static bool hasAnyExplicitStorageClass(const FunctionDecl *D) {
 /// prove that there are errors.
 static void diagnoseUseOfInternalDeclInInlineFunction(Sema &S,
                                                       const NamedDecl *D,
-                                                      SourceLocation Loc) {
+                                                      LazyLoc Loc) {
   // This is disabled under C++; there are too many ways for this to fire in
   // contexts where the warning is a false positive, or where it is technically
   // correct but benign.
@@ -412,7 +412,7 @@ bool Sema::DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<LazyLoc> Locs,
   return false;
 }
 
-void Sema::DiagnoseSentinelCalls(const NamedDecl *D, SourceLocation Loc,
+void Sema::DiagnoseSentinelCalls(const NamedDecl *D, LazyLoc Loc,
                                  ArrayRef<Expr *> Args) {
   const SentinelAttr *Attr = D->getAttr<SentinelAttr>();
   if (!Attr)

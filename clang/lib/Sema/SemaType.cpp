@@ -9309,7 +9309,7 @@ static void assignInheritanceModel(Sema &S, CXXRecordDecl *RD) {
   }
 }
 
-bool Sema::RequireCompleteTypeImpl(SourceLocation Loc, QualType T,
+bool Sema::RequireCompleteTypeImpl(LazyLoc Loc, QualType T,
                                    CompleteTypeKind Kind,
                                    TypeDiagnoser *Diagnoser) {
   // FIXME: Add this assertion to make sure we always get instantiation points.
@@ -9500,7 +9500,7 @@ static unsigned getLiteralDiagFromTagKind(TagTypeKind Tag) {
   }
 }
 
-bool Sema::RequireLiteralType(SourceLocation Loc, QualType T,
+bool Sema::RequireLiteralType(LazyLoc Loc, QualType T,
                               TypeDiagnoser &Diagnoser) {
   assert(!T->isDependentType() && "type should not be dependent");
 
@@ -9591,7 +9591,7 @@ bool Sema::RequireLiteralType(SourceLocation Loc, QualType T,
   return true;
 }
 
-bool Sema::RequireLiteralType(SourceLocation Loc, QualType T, unsigned DiagID) {
+bool Sema::RequireLiteralType(LazyLoc Loc, QualType T, unsigned DiagID) {
   BoundTypeDiagnoser<> Diagnoser(DiagID);
   return RequireLiteralType(Loc, T, Diagnoser);
 }

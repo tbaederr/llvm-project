@@ -1492,7 +1492,7 @@ class Sema;
     OverloadingResult
     BestViableFunctionImpl(Sema &S, SourceLocation Loc,
                            OverloadCandidateSet::iterator &Best);
-    void PerfectViableFunction(Sema &S, SourceLocation Loc,
+    void PerfectViableFunction(Sema &S,
                                OverloadCandidateSet::iterator &Best);
   };
 

@@ -11244,7 +11244,7 @@ OverloadingResult OverloadCandidateSet::BestViableFunction(Sema &S,
 
   if (TwoPhaseResolution) {
 
-    PerfectViableFunction(S, Loc, Best);
+    PerfectViableFunction(S, Best);
     if (Best != end())
       return ResultForBestCandidate(Best);
   }
@@ -11254,7 +11254,7 @@ OverloadingResult OverloadCandidateSet::BestViableFunction(Sema &S,
 }
 
 void OverloadCandidateSet::PerfectViableFunction(
-    Sema &S, SourceLocation Loc, OverloadCandidateSet::iterator &Best) {
+    Sema &S, OverloadCandidateSet::iterator &Best) {
 
   Best = end();
   for (auto It = Candidates.begin(); It != Candidates.end(); ++It) {
@@ -14694,7 +14694,7 @@ ExprResult Sema::BuildOverloadedCallExpr(Scope *S, Expr *Fn,
       CalleesAddressIsTaken ? OverloadCandidateSet::CSK_AddressOfOverloadSet
                             : OverloadCandidateSet::CSK_Normal;
 
-  OverloadCandidateSet CandidateSet(Fn->getExprLoc(), CSK);
+  OverloadCandidateSet CandidateSet(Fn, CSK);
   ExprResult result;
 
   if (buildOverloadedCallSet(S, Fn, ULE, Args, LParenLoc, &CandidateSet,
