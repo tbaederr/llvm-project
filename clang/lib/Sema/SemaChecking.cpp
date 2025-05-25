@@ -3561,7 +3561,7 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
     diagnoseArgDependentDiagnoseIfAttrs(FD, ThisArg, Args, Loc);
 }
 
-void Sema::CheckConstrainedAuto(const AutoType *AutoT, SourceLocation Loc) {
+void Sema::CheckConstrainedAuto(const AutoType *AutoT, LazyLoc Loc) {
   if (ConceptDecl *Decl = AutoT->getTypeConstraintConcept()) {
     DiagnoseUseOfDecl(Decl, Loc);
   }
@@ -11646,7 +11646,7 @@ static void DiagnoseFloatingImpCast(Sema &S, Expr *E, QualType T,
   }
 }
 
-static void CheckCommaOperand(Sema &S, Expr *E, QualType T, SourceLocation CC,
+static void CheckCommaOperand(Sema &S, Expr *E, QualType T, LazyLoc CC,
                               bool ExtraCheckForImplicitConversion) {
   E = E->IgnoreParenImpCasts();
   AnalyzeImplicitConversions(S, E, CC);
@@ -11744,7 +11744,7 @@ static void CheckImplicitArgumentConversions(Sema &S, CallExpr *TheCall,
 }
 
 static void DiagnoseNullConversion(Sema &S, Expr *E, QualType T,
-                                   SourceLocation CC) {
+                                   LazyLoc CC) {
   // Don't warn on functions which have return type nullptr_t.
   if (isa<CallExpr>(E))
     return;
@@ -11771,7 +11771,6 @@ static void DiagnoseNullConversion(Sema &S, Expr *E, QualType T,
   // The new location is a better location than the complete location that was
   // passed in.
   Loc = S.SourceMgr.getTopMacroCallerLoc(Loc);
-  CC = S.SourceMgr.getTopMacroCallerLoc(CC);
 
   // __null is usually wrapped in a macro.  Go up a macro if that is the case.
   if (IsGNUNullExpr && Loc.isMacroID()) {
@@ -11785,8 +11784,9 @@ static void DiagnoseNullConversion(Sema &S, Expr *E, QualType T,
   if (S.SourceMgr.getFileID(Loc) != S.SourceMgr.getFileID(CC))
     return;
 
+  SourceLocation SL = S.SourceMgr.getTopMacroCallerLoc(CC);
   S.Diag(Loc, diag::warn_impcast_null_pointer_to_integer)
-      << HasNullPtrType << T << SourceRange(CC)
+      << HasNullPtrType << T << SourceRange(SL)
       << FixItHint::CreateReplacement(Loc,
                                       S.getFixItZeroLiteralForType(T, Loc));
 }
@@ -11910,7 +11910,7 @@ static void DiagnoseMixedUnicodeImplicitConversion(Sema &S, const Type *Source,
   }
 }
 
-void Sema::CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
+void Sema::CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
                                    bool *ICContext, bool IsListInit) {
   if (E->isTypeDependent() || E->isValueDependent()) return;
 
@@ -13874,7 +13874,7 @@ void Sema::CheckUnsequencedOperations(const Expr *E) {
   }
 }
 
-void Sema::CheckCompletedExpr(Expr *E, SourceLocation CheckLoc,
+void Sema::CheckCompletedExpr(Expr *E, LazyLoc CheckLoc,
                               bool IsConstexpr) {
   llvm::SaveAndRestore ConstantContext(isConstantEvaluatedOverride,
                                        IsConstexpr || isa<ConstantExpr>(E));
@@ -13974,7 +13974,7 @@ bool Sema::CheckParmsForFunctionDef(ArrayRef<ParmVarDecl *> Parameters,
             ClassDecl->isParamDestroyedInCallee()) {
           CXXDestructorDecl *Destructor = LookupDestructor(ClassDecl);
           MarkFunctionReferenced(Param->getLocation(), Destructor);
-          DiagnoseUseOfDecl(Destructor, Param->getLocation());
+          DiagnoseUseOfDecl(Destructor, LazyLoc(Param->getLocation()));
         }
       }
     }

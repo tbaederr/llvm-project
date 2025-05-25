@@ -408,7 +408,7 @@ static void DoEmitAvailabilityWarning(Sema &S, AvailabilityResult K,
                                       Decl *Ctx, const NamedDecl *ReferringDecl,
                                       const NamedDecl *OffendingDecl,
                                       StringRef Message,
-                                      ArrayRef<SourceLocation> Locs,
+                                      ArrayRef<LazyLoc> Locs,
                                       const ObjCInterfaceDecl *UnknownObjCClass,
                                       const ObjCPropertyDecl *ObjCProperty,
                                       bool ObjCPropertyAccess) {
@@ -714,7 +714,7 @@ static void EmitAvailabilityWarning(Sema &S, AvailabilityResult AR,
                                     const NamedDecl *ReferringDecl,
                                     const NamedDecl *OffendingDecl,
                                     StringRef Message,
-                                    ArrayRef<SourceLocation> Locs,
+                                    ArrayRef<LazyLoc> Locs,
                                     const ObjCInterfaceDecl *UnknownObjCClass,
                                     const ObjCPropertyDecl *ObjCProperty,
                                     bool ObjCPropertyAccess) {
@@ -1110,7 +1110,7 @@ FunctionScopeInfo *Sema::getCurFunctionAvailabilityContext() {
 }
 
 void Sema::DiagnoseAvailabilityOfDecl(NamedDecl *D,
-                                      ArrayRef<SourceLocation> Locs,
+                                      ArrayRef<LazyLoc> Locs,
                                       const ObjCInterfaceDecl *UnknownObjCClass,
                                       bool ObjCPropertyAccess,
                                       bool AvoidPartialAvailabilityChecks,
@@ -1152,7 +1152,7 @@ void Sema::DiagnoseAvailabilityOfDecl(NamedDecl *D,
 }
 
 void Sema::DiagnoseAvailabilityOfDecl(NamedDecl *D,
-                                      ArrayRef<SourceLocation> Locs) {
+                                      ArrayRef<LazyLoc> Locs) {
   DiagnoseAvailabilityOfDecl(D, Locs, /*UnknownObjCClass=*/nullptr,
                              /*ObjCPropertyAccess=*/false,
                              /*AvoidPartialAvailabilityChecks=*/false,

@@ -1149,7 +1149,7 @@ Sema::BuildMemberReferenceExpr(Expr *BaseExpr, QualType BaseExprType,
   };
 
   // Check the use of this member.
-  if (DiagnoseUseOfDecl(MemberDecl, MemberLoc))
+  if (DiagnoseUseOfDecl(MemberDecl, LazyLoc(MemberLoc)))
     return ExprError();
 
   if (FieldDecl *FD = dyn_cast<FieldDecl>(MemberDecl)) {
@@ -1503,7 +1503,7 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
       return ExprError();
 
     // Check whether we can reference this field.
-    if (S.DiagnoseUseOfDecl(IV, MemberLoc))
+    if (S.DiagnoseUseOfDecl(IV, LazyLoc(MemberLoc)))
       return ExprError();
     if (IV->getAccessControl() != ObjCIvarDecl::Public &&
         IV->getAccessControl() != ObjCIvarDecl::Package) {
@@ -1601,7 +1601,7 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
               FindGetterSetterNameDecl(OPT, Member, Sel, S.Context)) {
         if (ObjCPropertyDecl *PD = dyn_cast<ObjCPropertyDecl>(PMDecl)) {
           // Check the use of this declaration
-          if (S.DiagnoseUseOfDecl(PD, MemberLoc))
+          if (S.DiagnoseUseOfDecl(PD, LazyLoc(MemberLoc)))
             return ExprError();
 
           return new (S.Context)
@@ -1656,7 +1656,7 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
       ObjCMethodDecl *Getter;
       if ((Getter = IFace->lookupClassMethod(Sel))) {
         // Check the use of this method.
-        if (S.DiagnoseUseOfDecl(Getter, MemberLoc))
+        if (S.DiagnoseUseOfDecl(Getter, LazyLoc(MemberLoc)))
           return ExprError();
       } else
         Getter = IFace->lookupPrivateMethod(Sel, false);
@@ -1673,7 +1673,7 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
         Setter = IFace->lookupPrivateMethod(SetterSel, false);
       }
 
-      if (Setter && S.DiagnoseUseOfDecl(Setter, MemberLoc))
+      if (Setter && S.DiagnoseUseOfDecl(Setter, LazyLoc(MemberLoc)))
         return ExprError();
 
       if (Getter || Setter) {

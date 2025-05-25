@@ -3546,7 +3546,7 @@ QualType Sema::CheckTemplateIdType(TemplateName Name,
         /*TemplateArgs=*/TemplateArgLists.getInnermost());
 
     // Diagnose uses of this alias.
-    (void)DiagnoseUseOfDecl(AliasTemplate, TemplateLoc);
+    (void)DiagnoseUseOfDecl(AliasTemplate, LazyLoc(TemplateLoc));
 
     if (Inst.isInvalid())
       return QualType();
@@ -3683,7 +3683,7 @@ QualType Sema::CheckTemplateIdType(TemplateName Name,
     }
 
     // Diagnose uses of this specialization.
-    (void)DiagnoseUseOfDecl(Decl, TemplateLoc);
+    (void)DiagnoseUseOfDecl(Decl, LazyLoc(TemplateLoc));
 
     CanonType = Context.getTypeDeclType(Decl);
     assert(isa<RecordType>(CanonType) &&
@@ -4669,7 +4669,7 @@ Sema::CheckConceptTemplateId(const CXXScopeSpec &SS,
           /*UpdateArgsWithConversions=*/false))
     return ExprError();
 
-  DiagnoseUseOfDecl(NamedConcept, ConceptNameInfo.getLoc());
+  DiagnoseUseOfDecl(NamedConcept, LazyLoc(ConceptNameInfo.getLoc()));
 
   auto *CSD = ImplicitConceptSpecializationDecl::Create(
       Context, NamedConcept->getDeclContext(), NamedConcept->getLocation(),
@@ -7380,7 +7380,7 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
       if (FunctionDecl *Fn = ResolveAddressOfOverloadedFunction(Arg, ParamType,
                                                                 true,
                                                                 FoundResult)) {
-        if (DiagnoseUseOfDecl(Fn, Arg->getBeginLoc()))
+        if (DiagnoseUseOfDecl(Fn, LazyLoc(Arg)))
           return ExprError();
 
         ExprResult Res = FixOverloadedFunctionReference(Arg, FoundResult, Fn);
@@ -7440,7 +7440,7 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
                                                  ParamRefType->getPointeeType(),
                                                                 true,
                                                                 FoundResult)) {
-        if (DiagnoseUseOfDecl(Fn, Arg->getBeginLoc()))
+        if (DiagnoseUseOfDecl(Fn, LazyLoc(Arg)))
           return ExprError();
         ExprResult Res = FixOverloadedFunctionReference(Arg, FoundResult, Fn);
         if (Res.isInvalid())

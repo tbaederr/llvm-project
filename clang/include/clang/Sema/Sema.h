@@ -197,16 +197,50 @@ class VisibleDeclConsumer;
 
 class LazyLoc final {
 private:
-    const Expr *E = nullptr;
+  union {
+    llvm::PointerUnion<const Expr *, const Stmt *> Source;
+    SourceLocation Loc;
+  };
+  unsigned UsesLoc: 1;
 
 public:
-  LazyLoc(const Expr *E) : E(E){}
-  LazyLoc(SourceLocation SL) {}
+  LazyLoc() : Source(nullptr), UsesLoc(false) {}
+  LazyLoc(const Expr *E) : Source(E) , UsesLoc(false) {}
+  LazyLoc(const Stmt *S) : Source(S) , UsesLoc(false) {}
+  LazyLoc(SourceLocation SL):  Loc(SL), UsesLoc(true) {}
 
-  operator SourceLocation() {
-    if (!E)
+  operator SourceLocation() const {
+    if (UsesLoc)
+      return Loc;
+    if (!Source)
       return SourceLocation();
-    return E->getExprLoc();
+    if (const auto *S = dyn_cast<const Stmt *>(Source))
+      return S->getBeginLoc();
+    return cast<const Expr *>(Source)->getExprLoc();
+  }
+
+  SourceLocation toSourceLocation() const {
+    return (SourceLocation) *this;
+  }
+
+  bool isInvalid() const {
+    if (UsesLoc)
+      return Loc.isInvalid();
+    if (!Source)
+      return true;
+    if (const auto *S = dyn_cast<const Stmt *>(Source))
+      return S->getBeginLoc().isInvalid();
+    return cast<const Expr *>(Source)->getExprLoc().isInvalid();
+  }
+
+  bool isValid() const {
+    if (UsesLoc)
+      return Loc.isValid();
+    if (!Source)
+      return false;
+    if (const auto *S = dyn_cast<const Stmt *>(Source))
+      return S->getBeginLoc().isValid();
+    return cast<const Expr *>(Source)->getExprLoc().isValid();
   }
 };
 
@@ -2404,13 +2438,13 @@ public:
   /// potential availability violations.
   sema::FunctionScopeInfo *getCurFunctionAvailabilityContext();
 
-  void DiagnoseAvailabilityOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs,
+  void DiagnoseAvailabilityOfDecl(NamedDecl *D, ArrayRef<LazyLoc> Locs,
                                   const ObjCInterfaceDecl *UnknownObjCClass,
                                   bool ObjCPropertyAccess,
                                   bool AvoidPartialAvailabilityChecks,
                                   ObjCInterfaceDecl *ClassReceiver);
 
-  void DiagnoseAvailabilityOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs);
+  void DiagnoseAvailabilityOfDecl(NamedDecl *D, ArrayRef<LazyLoc> Locs);
 
   std::pair<AvailabilityResult, const NamedDecl *>
   ShouldDiagnoseAvailabilityOfDecl(const NamedDecl *D, std::string *Message,
@@ -2789,7 +2823,7 @@ public:
   void CheckTCBEnforcement(LazyLoc CallExprLoc,
                            const NamedDecl *Callee);
 
-  void CheckConstrainedAuto(const AutoType *AutoT, SourceLocation Loc);
+  void CheckConstrainedAuto(const AutoType *AutoT, LazyLoc Loc);
 
   /// BuiltinConstantArg - Handle a check if argument ArgNum of CallExpr
   /// TheCall is a constant expression.
@@ -2849,7 +2883,7 @@ public:
   /// since all 1s are not contiguous.
   bool ValueIsRunOfOnes(CallExpr *TheCall, unsigned ArgNum);
 
-  void CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
+  void CheckImplicitConversion(Expr *E, QualType T, LazyLoc CC,
                                bool *ICContext = nullptr,
                                bool IsListInit = false);
 
@@ -3062,7 +3096,7 @@ private:
 
   /// Perform semantic checks on a completed expression. This will either
   /// be a full-expression or a default argument expression.
-  void CheckCompletedExpr(Expr *E, SourceLocation CheckLoc = SourceLocation(),
+  void CheckCompletedExpr(Expr *E, LazyLoc CheckLoc = LazyLoc(),
                           bool IsConstexpr = false);
 
   void CheckBitFieldInitialization(SourceLocation InitLoc, FieldDecl *Field,
@@ -3564,7 +3598,7 @@ public:
   /// as ASTContext::getTypeDeclType would, but
   /// performs the required semantic checks for name lookup of said entity.
   QualType getTypeDeclType(DeclContext *LookupCtx, DiagCtorKind DCK,
-                           TypeDecl *TD, SourceLocation NameLoc);
+                           TypeDecl *TD, LazyLoc NameLoc);
 
   /// If the identifier refers to a type name within this scope,
   /// return the declaration of that type.
@@ -3574,7 +3608,7 @@ public:
   /// determine whether the name refers to a type. If so, returns an
   /// opaque pointer (actually a QualType) corresponding to that
   /// type. Otherwise, returns NULL.
-  ParsedType getTypeName(const IdentifierInfo &II, SourceLocation NameLoc,
+  ParsedType getTypeName(const IdentifierInfo &II, LazyLoc NameLoc,
                          Scope *S, CXXScopeSpec *SS = nullptr,
                          bool isClassName = false, bool HasTrailingDot = false,
                          ParsedType ObjectType = nullptr,
@@ -3761,7 +3795,7 @@ public:
   ///
   /// \param CCC The correction callback, if typo correction is desired.
   NameClassification ClassifyName(Scope *S, CXXScopeSpec &SS,
-                                  IdentifierInfo *&Name, SourceLocation NameLoc,
+                                  IdentifierInfo *&Name, LazyLoc NameLoc,
                                   const Token &NextToken,
                                   CorrectionCandidateCallback *CCC = nullptr);
 
@@ -5222,17 +5256,17 @@ public:
   /// defined in [dcl.init.list]p2.
   bool isInitListConstructor(const FunctionDecl *Ctor);
 
-  Decl *ActOnUsingDirective(Scope *CurScope, SourceLocation UsingLoc,
-                            SourceLocation NamespcLoc, CXXScopeSpec &SS,
-                            SourceLocation IdentLoc,
+  Decl *ActOnUsingDirective(Scope *CurScope, LazyLoc UsingLoc,
+                            LazyLoc NamespcLoc, CXXScopeSpec &SS,
+                            LazyLoc IdentLoc,
                             IdentifierInfo *NamespcName,
                             const ParsedAttributesView &AttrList);
 
   void PushUsingDirective(Scope *S, UsingDirectiveDecl *UDir);
 
-  Decl *ActOnNamespaceAliasDef(Scope *CurScope, SourceLocation NamespaceLoc,
-                               SourceLocation AliasLoc, IdentifierInfo *Alias,
-                               CXXScopeSpec &SS, SourceLocation IdentLoc,
+  Decl *ActOnNamespaceAliasDef(Scope *CurScope, LazyLoc NamespaceLoc,
+                               LazyLoc AliasLoc, IdentifierInfo *Alias,
+                               CXXScopeSpec &SS, LazyLoc IdentLoc,
                                IdentifierInfo *Ident);
 
   /// Remove decls we can't actually see from a lookup being used to declare
@@ -5766,7 +5800,7 @@ public:
   /// MarkBaseAndMemberDestructorsReferenced - Given a record decl,
   /// mark all the non-trivial destructors of its members and bases as
   /// referenced.
-  void MarkBaseAndMemberDestructorsReferenced(SourceLocation Loc,
+  void MarkBaseAndMemberDestructorsReferenced(LazyLoc Loc,
                                               CXXRecordDecl *Record);
 
   /// Mark destructors of virtual bases of this class referenced. In the Itanium
@@ -5774,7 +5808,7 @@ public:
   /// class. In the Microsoft C++ ABI, this is done any time a class's
   /// destructor is referenced.
   void MarkVirtualBaseDestructorsReferenced(
-      SourceLocation Location, CXXRecordDecl *ClassDecl,
+      LazyLoc Location, CXXRecordDecl *ClassDecl,
       llvm::SmallPtrSetImpl<const CXXRecordDecl *> *DirectVirtualBases =
           nullptr);
 
@@ -6901,7 +6935,7 @@ public:
   // A version of DiagnoseUseOfDecl that should be used if overload resolution
   // has been used to find this declaration, which means we don't have to bother
   // checking the trailing requires clause.
-  bool DiagnoseUseOfOverloadedDecl(NamedDecl *D, SourceLocation Loc) {
+  bool DiagnoseUseOfOverloadedDecl(NamedDecl *D, LazyLoc Loc) {
     return DiagnoseUseOfDecl(
         D, Loc, /*UnknownObjCClass=*/nullptr, /*ObjCPropertyAccess=*/false,
         /*AvoidPartialAvailabilityChecks=*/false, /*ClassReceiver=*/nullptr,
@@ -6919,7 +6953,7 @@ public:
   ///
   /// \returns true if there was an error (this declaration cannot be
   /// referenced), false otherwise.
-  bool DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs,
+  bool DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<LazyLoc> Locs,
                          const ObjCInterfaceDecl *UnknownObjCClass = nullptr,
                          bool ObjCPropertyAccess = false,
                          bool AvoidPartialAvailabilityChecks = false,
@@ -8311,7 +8345,7 @@ public:
                                           const IdentifierInfo &Name);
 
   ParsedType getConstructorName(const IdentifierInfo &II,
-                                SourceLocation NameLoc, Scope *S,
+                                LazyLoc NameLoc, Scope *S,
                                 CXXScopeSpec &SS, bool EnteringContext);
   ParsedType getDestructorName(const IdentifierInfo &II, SourceLocation NameLoc,
                                Scope *S, CXXScopeSpec &SS,
@@ -8533,7 +8567,7 @@ public:
   /// @code ::delete ptr; @endcode
   /// or
   /// @code delete [] ptr; @endcode
-  ExprResult ActOnCXXDelete(SourceLocation StartLoc, bool UseGlobal,
+  ExprResult ActOnCXXDelete(LazyLoc StartLoc, bool UseGlobal,
                             bool ArrayForm, Expr *Operand);
   void CheckVirtualDtorCall(CXXDestructorDecl *dtor, SourceLocation Loc,
                             bool IsDelete, bool CallCanBeVirtual,
@@ -9008,7 +9042,7 @@ public:
   bool CanPerformCopyInitialization(const InitializedEntity &Entity,
                                     ExprResult Init);
   ExprResult PerformCopyInitialization(const InitializedEntity &Entity,
-                                       SourceLocation EqualLoc, ExprResult Init,
+                                       LazyLoc EqualLoc, ExprResult Init,
                                        bool TopLevelOfInitList = false,
                                        bool AllowExplicit = false);
 
@@ -10892,9 +10926,9 @@ public:
   /// overloaded function call operator (@c operator()) or performing a
   /// user-defined conversion on the object argument.
   ExprResult BuildCallToObjectOfClassType(Scope *S, Expr *Object,
-                                          SourceLocation LParenLoc,
+                                          LazyLoc LParenLoc,
                                           MultiExprArg Args,
-                                          SourceLocation RParenLoc);
+                                          LazyLoc RParenLoc);
 
   /// BuildOverloadedArrowExpr - Build a call to an overloaded @c operator->
   ///  (if one exists), where @c Base is an expression of class type and
@@ -13761,7 +13795,7 @@ public:
       SourceLocation Loc, ClassTemplateSpecializationDecl *ClassTemplateSpec);
 
   bool InstantiateClassTemplateSpecialization(
-      SourceLocation PointOfInstantiation,
+      LazyLoc PointOfInstantiation,
       ClassTemplateSpecializationDecl *ClassTemplateSpec,
       TemplateSpecializationKind TSK, bool Complain,
       bool PrimaryStrictPackMatch);

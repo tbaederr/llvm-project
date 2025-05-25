@@ -135,7 +135,7 @@ public:
   void Destroy();
 
   static DelayedDiagnostic makeAvailability(AvailabilityResult AR,
-                                            ArrayRef<SourceLocation> Locs,
+                                            ArrayRef<LazyLoc> Locs,
                                             const NamedDecl *ReferringDecl,
                                             const NamedDecl *OffendingDecl,
                                             const ObjCInterfaceDecl *UnknownObjCClass,
@@ -190,7 +190,7 @@ public:
     return StringRef(AvailabilityData.Message, AvailabilityData.MessageLen);
   }
 
-  ArrayRef<SourceLocation> getAvailabilitySelectorLocs() const {
+  ArrayRef<LazyLoc> getAvailabilitySelectorLocs() const {
     assert(Kind == Availability && "Not an availability diagnostic.");
     return llvm::ArrayRef(AvailabilityData.SelectorLocs,
                           AvailabilityData.NumSelectorLocs);
@@ -240,7 +240,7 @@ private:
     const ObjCPropertyDecl  *ObjCProperty;
     const char *Message;
     size_t MessageLen;
-    SourceLocation *SelectorLocs;
+    LazyLoc *SelectorLocs;
     size_t NumSelectorLocs;
     AvailabilityResult AR;
     bool ObjCPropertyAccess;

@@ -70,7 +70,7 @@ ParsedType Sema::getInheritingConstructorName(CXXScopeSpec &SS,
 }
 
 ParsedType Sema::getConstructorName(const IdentifierInfo &II,
-                                    SourceLocation NameLoc, Scope *S,
+                                    LazyLoc NameLoc, Scope *S,
                                     CXXScopeSpec &SS, bool EnteringContext) {
   CXXRecordDecl *CurClass = getCurrentClass(S, &SS);
   assert(CurClass && &II == CurClass->getIdentifier() &&
@@ -1021,7 +1021,7 @@ bool Sema::CheckCXXThrowOperand(SourceLocation ThrowLoc,
       MarkFunctionReferenced(E->getExprLoc(), Destructor);
       CheckDestructorAccess(E->getExprLoc(), Destructor,
                             PDiag(diag::err_access_dtor_exception) << Ty);
-      if (DiagnoseUseOfDecl(Destructor, E->getExprLoc()))
+      if (DiagnoseUseOfDecl(Destructor, LazyLoc(E)))
         return true;
     }
   }
@@ -2617,12 +2617,12 @@ ExprResult Sema::BuildCXXNew(SourceRange Range, bool UseGlobal,
 
   // Mark the new and delete operators as referenced.
   if (OperatorNew) {
-    if (DiagnoseUseOfDecl(OperatorNew, StartLoc))
+    if (DiagnoseUseOfDecl(OperatorNew, LazyLoc(StartLoc)))
       return ExprError();
     MarkFunctionReferenced(StartLoc, OperatorNew);
   }
   if (OperatorDelete) {
-    if (DiagnoseUseOfDecl(OperatorDelete, StartLoc))
+    if (DiagnoseUseOfDecl(OperatorDelete, LazyLoc(StartLoc)))
       return ExprError();
     MarkFunctionReferenced(StartLoc, OperatorDelete);
   }
@@ -3931,7 +3931,7 @@ void Sema::AnalyzeDeleteExprMismatch(FieldDecl *Field, SourceLocation DeleteLoc,
 }
 
 ExprResult
-Sema::ActOnCXXDelete(SourceLocation StartLoc, bool UseGlobal,
+Sema::ActOnCXXDelete(LazyLoc StartLoc, bool UseGlobal,
                      bool ArrayForm, Expr *ExE) {
   // C++ [expr.delete]p1:
   //   The operand shall have a pointer type, or a class type having a single
@@ -4291,7 +4291,7 @@ ExprResult Sema::BuiltinOperatorNewDeleteOverloaded(ExprResult TheCallResult,
     return ExprError();
   assert(OperatorNewOrDelete && "should be found");
 
-  DiagnoseUseOfDecl(OperatorNewOrDelete, TheCall->getExprLoc());
+  DiagnoseUseOfDecl(OperatorNewOrDelete, LazyLoc(TheCall));
   MarkFunctionReferenced(TheCall->getExprLoc(), OperatorNewOrDelete);
 
   TheCall->setType(OperatorNewOrDelete->getReturnType());
@@ -4474,7 +4474,7 @@ Sema::IsStringLiteralToNonConstPointerConversion(Expr *From, QualType ToType) {
 }
 
 static ExprResult BuildCXXCastArgument(Sema &S,
-                                       SourceLocation CastLoc,
+                                       LazyLoc CastLoc,
                                        QualType Ty,
                                        CastKind Kind,
                                        CXXMethodDecl *Method,
@@ -4590,7 +4590,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
       }
 
       ExprResult CastArg = BuildCXXCastArgument(
-          *this, From->getBeginLoc(), ToType.getNonReferenceType(), CastKind,
+          *this, From, ToType.getNonReferenceType(), CastKind,
           cast<CXXMethodDecl>(FD), ICS.UserDefined.FoundConversionFunction,
           ICS.UserDefined.HadMultipleCandidates, From);
 
@@ -4697,7 +4697,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     if (!Fn)
       return ExprError();
 
-    if (DiagnoseUseOfDecl(Fn, From->getBeginLoc()))
+    if (DiagnoseUseOfDecl(Fn, LazyLoc(From)))
       return ExprError();
 
     ExprResult Res = FixOverloadedFunctionReference(From, Found, Fn);
@@ -6637,7 +6637,7 @@ ExprResult Sema::MaybeBindToTemporary(Expr *E) {
     CheckDestructorAccess(E->getExprLoc(), Destructor,
                           PDiag(diag::err_access_dtor_temp)
                             << E->getType());
-    if (DiagnoseUseOfDecl(Destructor, E->getExprLoc()))
+    if (DiagnoseUseOfDecl(Destructor, LazyLoc(E)))
       return ExprError();
 
     // If destructor is trivial, we can avoid the extra copy.
@@ -6804,7 +6804,7 @@ ExprResult Sema::ActOnDecltypeExpression(Expr *E) {
     CheckDestructorAccess(Bind->getExprLoc(), Destructor,
                           PDiag(diag::err_access_dtor_temp)
                             << Bind->getType());
-    if (DiagnoseUseOfDecl(Destructor, Bind->getExprLoc()))
+    if (DiagnoseUseOfDecl(Destructor, LazyLoc(Bind)))
       return ExprError();
 
     // We need a cleanup, but we don't need to remember the temporary.

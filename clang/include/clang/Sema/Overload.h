@@ -25,6 +25,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Sema/SemaFixItUtils.h"
 #include "clang/Sema/TemplateDeduction.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1188,7 +1189,7 @@ class Sema;
     struct OperatorRewriteInfo {
       OperatorRewriteInfo()
           : OriginalOperator(OO_None), OpLoc(), AllowRewrittenCandidates(false) {}
-      OperatorRewriteInfo(OverloadedOperatorKind Op, SourceLocation OpLoc,
+      OperatorRewriteInfo(OverloadedOperatorKind Op, LazyLoc OpLoc,
                           bool AllowRewritten)
           : OriginalOperator(Op), OpLoc(OpLoc),
             AllowRewrittenCandidates(AllowRewritten) {}
@@ -1196,7 +1197,7 @@ class Sema;
       /// The original operator as written in the source.
       OverloadedOperatorKind OriginalOperator;
       /// The source location of the operator.
-      SourceLocation OpLoc;
+      LazyLoc OpLoc;
       /// Whether we should include rewritten candidates in the overload set.
       bool AllowRewrittenCandidates;
 
@@ -1267,7 +1268,7 @@ class Sema;
     // inline to avoid allocation for small sets.
     llvm::BumpPtrAllocator SlabAllocator;
 
-    SourceLocation Loc;
+    LazyLoc Loc;
     CandidateSetKind Kind;
     OperatorRewriteInfo RewriteInfo;
 
@@ -1328,7 +1329,7 @@ class Sema;
     void destroyCandidates();
 
   public:
-    OverloadCandidateSet(SourceLocation Loc, CandidateSetKind CSK,
+    OverloadCandidateSet(LazyLoc Loc, CandidateSetKind CSK,
                          OperatorRewriteInfo RewriteInfo = {})
         : FirstDeferredCandidate(nullptr), DeferredCandidatesCount(0),
           HasDeferredTemplateConstructors(false),

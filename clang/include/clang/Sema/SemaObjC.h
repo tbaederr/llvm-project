@@ -747,7 +747,7 @@ public:
                                   SourceLocation SuperLoc, Selector Sel,
                                   ObjCMethodDecl *Method,
                                   SourceLocation LBracLoc,
-                                  ArrayRef<SourceLocation> SelectorLocs,
+                                  ArrayRef<LazyLoc> SelectorLocs,
                                   SourceLocation RBracLoc, MultiExprArg Args,
                                   bool isImplicit = false);
 
@@ -883,7 +883,7 @@ public:
                                 IdentifierInfo *II,
                                 bool AllowBuiltinCreation = false);
 
-  ExprResult BuildIvarRefExpr(Scope *S, SourceLocation Loc, ObjCIvarDecl *IV);
+  ExprResult BuildIvarRefExpr(Scope *S, LazyLoc Loc, ObjCIvarDecl *IV);
 
   /// FindCompositeObjCPointerType - Helper method to find composite type of
   /// two objective-c pointer types of the two input expressions.

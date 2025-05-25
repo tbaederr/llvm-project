@@ -735,7 +735,7 @@ ExprResult SemaObjC::BuildObjCBoxedExpr(SourceRange SR, Expr *ValueExpr) {
     return ExprError();
   }
 
-  SemaRef.DiagnoseUseOfDecl(BoxingMethod, Loc);
+  SemaRef.DiagnoseUseOfDecl(BoxingMethod, LazyLoc(Loc));
 
   ExprResult ConvertedValueExpr;
   if (ValueType->isObjCBoxableRecordType()) {
@@ -2001,7 +2001,7 @@ ExprResult SemaObjC::HandleExprPropertyRefExpr(
   if (ObjCPropertyDecl *PD = IFace->FindPropertyDeclaration(
           Member, ObjCPropertyQueryKind::OBJC_PR_query_instance)) {
     // Check whether we can reference this property.
-    if (SemaRef.DiagnoseUseOfDecl(PD, MemberLoc))
+    if (SemaRef.DiagnoseUseOfDecl(PD, LazyLoc(MemberLoc)))
       return ExprError();
     if (Super)
       return new (Context)
@@ -2017,7 +2017,7 @@ ExprResult SemaObjC::HandleExprPropertyRefExpr(
     if (ObjCPropertyDecl *PD = I->FindPropertyDeclaration(
             Member, ObjCPropertyQueryKind::OBJC_PR_query_instance)) {
       // Check whether we can reference this property.
-      if (SemaRef.DiagnoseUseOfDecl(PD, MemberLoc))
+      if (SemaRef.DiagnoseUseOfDecl(PD, LazyLoc(MemberLoc)))
         return ExprError();
 
       if (Super)
@@ -2048,7 +2048,7 @@ ExprResult SemaObjC::HandleExprPropertyRefExpr(
 
   if (Getter) {
     // Check if we can reference this property.
-    if (SemaRef.DiagnoseUseOfDecl(Getter, MemberLoc))
+    if (SemaRef.DiagnoseUseOfDecl(Getter, LazyLoc(MemberLoc)))
       return ExprError();
   }
   // If we found a getter then this may be a valid dot-reference, we
@@ -2067,7 +2067,7 @@ ExprResult SemaObjC::HandleExprPropertyRefExpr(
     Setter = IFace->lookupPrivateMethod(SetterSel);
   }
 
-  if (Setter && SemaRef.DiagnoseUseOfDecl(Setter, MemberLoc))
+  if (Setter && SemaRef.DiagnoseUseOfDecl(Setter, LazyLoc(MemberLoc)))
     return ExprError();
 
   // Special warning if member name used in a property-dot for a setter accessor
@@ -2227,7 +2227,7 @@ ExprResult SemaObjC::ActOnClassPropertyRefExpr(
   if (Getter) {
     // FIXME: refactor/share with ActOnMemberReference().
     // Check if we can reference this property.
-    if (SemaRef.DiagnoseUseOfDecl(Getter, propertyNameLoc))
+    if (SemaRef.DiagnoseUseOfDecl(Getter, LazyLoc(propertyNameLoc)))
       return ExprError();
   }
 
@@ -2242,7 +2242,7 @@ ExprResult SemaObjC::ActOnClassPropertyRefExpr(
   if (!Setter)
     Setter = IFace->getCategoryClassMethod(SetterSel);
 
-  if (Setter && SemaRef.DiagnoseUseOfDecl(Setter, propertyNameLoc))
+  if (Setter && SemaRef.DiagnoseUseOfDecl(Setter, LazyLoc(propertyNameLoc)))
     return ExprError();
 
   if (Getter || Setter) {
@@ -2339,7 +2339,7 @@ SemaObjC::getObjCMessageKind(Scope *S, IdentifierInfo *Name,
       T = Context.getObjCInterfaceType(Class);
     else if (TypeDecl *Type = dyn_cast<TypeDecl>(ND)) {
       T = Context.getTypeDeclType(Type);
-      SemaRef.DiagnoseUseOfDecl(Type, NameLoc);
+      SemaRef.DiagnoseUseOfDecl(Type, LazyLoc(NameLoc));
     }
     else
       return ObjCInstanceMessage;
@@ -2407,6 +2407,10 @@ ExprResult SemaObjC::ActOnSuperMessage(Scope *S, SourceLocation SuperLoc,
     return ExprError();
   }
 
+  llvm::SmallVector<LazyLoc> SourceLocs;
+  for (SourceLocation LL : SelectorLocs)
+    SourceLocs.push_back(LazyLoc(LL));
+
   // We are in a method whose class has a superclass, so 'super'
   // is acting as a keyword.
   if (Method->getSelector() == Sel)
@@ -2418,7 +2422,7 @@ ExprResult SemaObjC::ActOnSuperMessage(Scope *S, SourceLocation SuperLoc,
     SuperTy = Context.getObjCObjectPointerType(SuperTy);
     return BuildInstanceMessage(nullptr, SuperTy, SuperLoc,
                                 Sel, /*Method=*/nullptr,
-                                LBracLoc, SelectorLocs, RBracLoc, Args);
+                                LBracLoc, SourceLocs, RBracLoc, Args);
   }
 
   // Since we are in a class method, this is a class message to
@@ -2610,6 +2614,12 @@ ExprResult SemaObjC::BuildClassMessage(
     SourceLocation SuperLoc, Selector Sel, ObjCMethodDecl *Method,
     SourceLocation LBracLoc, ArrayRef<SourceLocation> SelectorLocs,
     SourceLocation RBracLoc, MultiExprArg ArgsIn, bool isImplicit) {
+
+  llvm::SmallVector<LazyLoc> SourceLocs;
+  for (SourceLocation LL : SelectorLocs)
+    SourceLocs.push_back(LazyLoc(LL));
+
+
   ASTContext &Context = getASTContext();
   SourceLocation Loc = SuperLoc.isValid()? SuperLoc
     : ReceiverTypeInfo->getTypeLoc().getSourceRange().getBegin();
@@ -2648,7 +2658,7 @@ ExprResult SemaObjC::BuildClassMessage(
   assert(Class && "We don't know which class we're messaging?");
   // objc++ diagnoses during typename annotation.
   if (!getLangOpts().CPlusPlus)
-    (void)SemaRef.DiagnoseUseOfDecl(Class, SelectorSlotLocs);
+    (void)SemaRef.DiagnoseUseOfDecl(Class, SourceLocs);
   // Find the method we are messaging.
   if (!Method) {
     SourceRange TypeRange
@@ -2673,7 +2683,12 @@ ExprResult SemaObjC::BuildClassMessage(
     if (!Method)
       Method = Class->lookupPrivateClassMethod(Sel);
 
-    if (Method && SemaRef.DiagnoseUseOfDecl(Method, SelectorSlotLocs, nullptr,
+
+
+
+
+
+    if (Method && SemaRef.DiagnoseUseOfDecl(Method, SourceLocs, nullptr,
                                             false, false, Class))
       return ExprError();
   }
@@ -2778,8 +2793,8 @@ ExprResult SemaObjC::BuildInstanceMessageImplicit(
     Expr *Receiver, QualType ReceiverType, SourceLocation Loc, Selector Sel,
     ObjCMethodDecl *Method, MultiExprArg Args) {
   return BuildInstanceMessage(Receiver, ReceiverType,
-                              /*SuperLoc=*/!Receiver ? Loc : SourceLocation(),
-                              Sel, Method, Loc, Loc, Loc, Args,
+                              /*SuperLoc=*/!Receiver ? LazyLoc(Loc) : LazyLoc(),
+                              Sel, Method, Loc, LazyLoc(Loc), Loc, Args,
                               /*isImplicit=*/true);
 }
 
@@ -2833,7 +2848,7 @@ static bool isMethodDeclaredInRootProtocol(Sema &S, const ObjCMethodDecl *M) {
 ExprResult SemaObjC::BuildInstanceMessage(
     Expr *Receiver, QualType ReceiverType, SourceLocation SuperLoc,
     Selector Sel, ObjCMethodDecl *Method, SourceLocation LBracLoc,
-    ArrayRef<SourceLocation> SelectorLocs, SourceLocation RBracLoc,
+    ArrayRef<LazyLoc> SelectorLocs, SourceLocation RBracLoc,
     MultiExprArg ArgsIn, bool isImplicit) {
   assert((Receiver || SuperLoc.isValid()) && "If the Receiver is null, the "
                                              "SuperLoc must be valid so we can "
@@ -2844,12 +2859,12 @@ ExprResult SemaObjC::BuildInstanceMessage(
   SourceLocation Loc = SuperLoc.isValid() ? SuperLoc : Receiver->getBeginLoc();
   SourceRange RecRange =
       SuperLoc.isValid()? SuperLoc : Receiver->getSourceRange();
-  ArrayRef<SourceLocation> SelectorSlotLocs;
+  ArrayRef<LazyLoc> SelectorSlotLocs;
   if (!SelectorLocs.empty() && SelectorLocs.front().isValid())
     SelectorSlotLocs = SelectorLocs;
-  else
-    SelectorSlotLocs = Loc;
-  SourceLocation SelLoc = SelectorSlotLocs.front();
+  // else
+    // SelectorSlotLocs = LazyLoc(Loc);
+  LazyLoc SelLoc = SelectorSlotLocs.front();
 
   if (LBracLoc.isInvalid()) {
     Diag(Loc, diag::err_missing_open_square_message_send)
@@ -2877,9 +2892,14 @@ ExprResult SemaObjC::BuildInstanceMessage(
       unsigned NumArgs = ArgsIn.size();
       Expr **Args = ArgsIn.data();
       assert(SuperLoc.isInvalid() && "Message to super with dependent type");
+
+  llvm::SmallVector<SourceLocation> SourceLocs;
+  for (LazyLoc LL : SelectorLocs)
+    SourceLocs.push_back(LL.toSourceLocation());
+
       return ObjCMessageExpr::Create(
           Context, Context.DependentTy, VK_PRValue, LBracLoc, Receiver, Sel,
-          SelectorLocs, /*Method=*/nullptr, ArrayRef(Args, NumArgs), RBracLoc,
+          SourceLocs, /*Method=*/nullptr, ArrayRef(Args, NumArgs), RBracLoc,
           isImplicit);
     }
 
@@ -3227,8 +3247,13 @@ ExprResult SemaObjC::BuildInstanceMessage(
   ExprValueKind VK = VK_PRValue;
   bool ClassMessage = (ReceiverType->isObjCClassType() ||
                        ReceiverType->isObjCQualifiedClassType());
+
+  llvm::SmallVector<SourceLocation> SourceLocs;
+  for (LazyLoc LL : SelectorLocs)
+    SourceLocs.push_back(LL.toSourceLocation());
+
   if (CheckMessageArgumentTypes(Receiver, ReceiverType,
-                                MultiExprArg(Args, NumArgs), Sel, SelectorLocs,
+                                MultiExprArg(Args, NumArgs), Sel, SourceLocs,
                                 Method, ClassMessage, SuperLoc.isValid(),
                                 LBracLoc, RBracLoc, RecRange, ReturnType, VK))
     return ExprError();
@@ -3324,14 +3349,18 @@ ExprResult SemaObjC::BuildInstanceMessage(
 
   // Construct the appropriate ObjCMessageExpr instance.
   ObjCMessageExpr *Result;
-  if (SuperLoc.isValid())
+  // llvm::SmallVector<SourceLocation> SourceLocs;
+  // for (LazyLoc LL : SelectorLocs)
+    // SourceLocs.push_back(LL.toSourceLocation());
+
+  if (SuperLoc.isValid()) {
     Result = ObjCMessageExpr::Create(
         Context, ReturnType, VK, LBracLoc, SuperLoc, /*IsInstanceSuper=*/true,
-        ReceiverType, Sel, SelectorLocs, Method, ArrayRef(Args, NumArgs),
+        ReceiverType, Sel, SourceLocs, Method, ArrayRef(Args, NumArgs),
         RBracLoc, isImplicit);
-  else {
+  } else {
     Result = ObjCMessageExpr::Create(
-        Context, ReturnType, VK, LBracLoc, Receiver, Sel, SelectorLocs, Method,
+        Context, ReturnType, VK, LBracLoc, Receiver, Sel, SourceLocs, Method,
         ArrayRef(Args, NumArgs), RBracLoc, isImplicit);
     if (!isImplicit)
       checkCocoaAPI(SemaRef, Result);
@@ -3435,9 +3464,13 @@ ExprResult SemaObjC::ActOnInstanceMessage(Scope *S, Expr *Receiver,
   if (Sel == RespondsToSelectorSel)
     RemoveSelectorFromWarningCache(*this, Args[0]);
 
+  llvm::SmallVector<LazyLoc> SourceLocs;
+  for (SourceLocation LL : SelectorLocs)
+    SourceLocs.push_back(LazyLoc(LL));
+
   return BuildInstanceMessage(Receiver, Receiver->getType(),
                               /*SuperLoc=*/SourceLocation(), Sel,
-                              /*Method=*/nullptr, LBracLoc, SelectorLocs,
+                              /*Method=*/nullptr, LBracLoc, SourceLocs,
                               RBracLoc, Args);
 }
 
@@ -4859,7 +4892,7 @@ ExprResult SemaObjC::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
   return ExprResult(false);
 }
 
-ExprResult SemaObjC::BuildIvarRefExpr(Scope *S, SourceLocation Loc,
+ExprResult SemaObjC::BuildIvarRefExpr(Scope *S, LazyLoc Loc,
                                       ObjCIvarDecl *IV) {
   ASTContext &Context = getASTContext();
   ObjCMethodDecl *CurMethod = SemaRef.getCurMethodDecl();

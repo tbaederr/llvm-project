@@ -8469,8 +8469,9 @@ public:
     const FunctionDecl *Definition = nullptr;
     Stmt *Body = FD->getBody(Definition);
 
-    if (!CheckConstexprFunction(Info, E->getExprLoc(), FD, Definition, Body) ||
-        !HandleFunctionCall(E->getExprLoc(), Definition, This, E, Args, Call,
+    auto L = E->getExprLoc();
+    if (!CheckConstexprFunction(Info, L, FD, Definition, Body) ||
+        !HandleFunctionCall(L, Definition, This, E, Args, Call,
                             Body, Info, Result, ResultSlot))
       return false;
 

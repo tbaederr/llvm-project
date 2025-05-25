@@ -142,7 +142,7 @@ class TypeNameValidatorCCC final : public CorrectionCandidateCallback {
 } // end anonymous namespace
 
 QualType Sema::getTypeDeclType(DeclContext *LookupCtx, DiagCtorKind DCK,
-                               TypeDecl *TD, SourceLocation NameLoc) {
+                               TypeDecl *TD, LazyLoc NameLoc) {
   auto *LookupRD = dyn_cast_or_null<CXXRecordDecl>(LookupCtx);
   auto *FoundRD = dyn_cast<CXXRecordDecl>(TD);
   if (DCK != DiagCtorKind::None && LookupRD && FoundRD &&
@@ -309,7 +309,7 @@ static ParsedType buildNamedType(Sema &S, const CXXScopeSpec *SS, QualType T,
   return S.CreateParsedType(ElTy, Builder.getTypeSourceInfo(S.Context, ElTy));
 }
 
-ParsedType Sema::getTypeName(const IdentifierInfo &II, SourceLocation NameLoc,
+ParsedType Sema::getTypeName(const IdentifierInfo &II, LazyLoc NameLoc,
                              Scope *S, CXXScopeSpec *SS, bool isClassName,
                              bool HasTrailingDot, ParsedType ObjectTypePtr,
                              bool IsCtorOrDtorName,
@@ -875,7 +875,7 @@ static bool isTagTypeWithMissingTag(Sema &SemaRef, LookupResult &Result,
 
 Sema::NameClassification Sema::ClassifyName(Scope *S, CXXScopeSpec &SS,
                                             IdentifierInfo *&Name,
-                                            SourceLocation NameLoc,
+                                            LazyLoc NameLoc,
                                             const Token &NextToken,
                                             CorrectionCandidateCallback *CCC) {
   DeclarationNameInfo NameInfo(Name, NameLoc);

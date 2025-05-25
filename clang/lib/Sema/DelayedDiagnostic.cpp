@@ -22,7 +22,7 @@ using namespace sema;
 
 DelayedDiagnostic
 DelayedDiagnostic::makeAvailability(AvailabilityResult AR,
-                                    ArrayRef<SourceLocation> Locs,
+                                    ArrayRef<LazyLoc> Locs,
                                     const NamedDecl *ReferringDecl,
                                     const NamedDecl *OffendingDecl,
                                     const ObjCInterfaceDecl *UnknownObjCClass,
@@ -46,9 +46,9 @@ DelayedDiagnostic::makeAvailability(AvailabilityResult AR,
   DD.AvailabilityData.Message = MessageData;
   DD.AvailabilityData.MessageLen = Msg.size();
 
-  DD.AvailabilityData.SelectorLocs = new SourceLocation[Locs.size()];
+  DD.AvailabilityData.SelectorLocs = new LazyLoc[Locs.size()];
   memcpy(DD.AvailabilityData.SelectorLocs, Locs.data(),
-         sizeof(SourceLocation) * Locs.size());
+         sizeof(LazyLoc) * Locs.size());
   DD.AvailabilityData.NumSelectorLocs = Locs.size();
 
   DD.AvailabilityData.AR = AR;

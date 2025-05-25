@@ -62,7 +62,7 @@ static ExprResult CreateFunctionRefExpr(
     Sema &S, FunctionDecl *Fn, NamedDecl *FoundDecl, const Expr *Base,
     bool HadMultipleCandidates, SourceLocation Loc = SourceLocation(),
     const DeclarationNameLoc &LocInfo = DeclarationNameLoc()) {
-  if (S.DiagnoseUseOfDecl(FoundDecl, Loc))
+  if (S.DiagnoseUseOfDecl(FoundDecl, LazyLoc(Loc)))
     return ExprError();
   // If FoundDecl is different from Fn (such as if one is a template
   // and the other a specialization), make sure DiagnoseUseOfDecl is
@@ -70,7 +70,7 @@ static ExprResult CreateFunctionRefExpr(
   // FIXME: This would be more comprehensively addressed by modifying
   // DiagnoseUseOfDecl to accept both the FoundDecl and the decl
   // being used.
-  if (FoundDecl != Fn && S.DiagnoseUseOfDecl(Fn, Loc))
+  if (FoundDecl != Fn && S.DiagnoseUseOfDecl(Fn, LazyLoc(Loc)))
     return ExprError();
   DeclRefExpr *DRE = new (S.Context)
       DeclRefExpr(S.Context, Fn, false, Fn->getType(), VK_LValue, Loc, LocInfo);
@@ -13927,7 +13927,7 @@ bool Sema::resolveAndFixAddressOfSingleOverloadCandidate(
   // Emitting multiple diagnostics for a function that is both inaccessible and
   // unavailable is consistent with our behavior elsewhere. So, always check
   // for both.
-  DiagnoseUseOfDecl(Found, E->getExprLoc());
+  DiagnoseUseOfDecl(Found, LazyLoc(E));
   CheckAddressOfMemberAccess(E, DAP);
   ExprResult Res = FixOverloadedFunctionReference(E, DAP, Found);
   if (Res.isInvalid())
@@ -14034,7 +14034,7 @@ bool Sema::ResolveAndFixSingleFunctionTemplateSpecialization(
   ExprResult SingleFunctionExpression;
   if (FunctionDecl *fn = ResolveSingleFunctionTemplateSpecialization(
                            ovl.Expression, /*complain*/ false, &found)) {
-    if (DiagnoseUseOfDecl(fn, SrcExpr.get()->getBeginLoc())) {
+    if (DiagnoseUseOfDecl(fn, LazyLoc(SrcExpr.get()))) {
       SrcExpr = ExprError();
       return true;
     }
@@ -14563,9 +14563,9 @@ static QualType chooseRecoveryType(OverloadCandidateSet &CS,
 /// diagnostics and returns ExprError()
 static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
                                            UnresolvedLookupExpr *ULE,
-                                           SourceLocation LParenLoc,
+                                           LazyLoc LParenLoc,
                                            MultiExprArg Args,
-                                           SourceLocation RParenLoc,
+                                           LazyLoc RParenLoc,
                                            Expr *ExecConfig,
                                            OverloadCandidateSet *CandidateSet,
                                            OverloadCandidateSet::iterator *Best,
@@ -14575,7 +14575,7 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
   case OR_Success: {
     FunctionDecl *FDecl = (*Best)->Function;
     SemaRef.CheckUnresolvedLookupAccess(ULE, (*Best)->FoundDecl);
-    if (SemaRef.DiagnoseUseOfDecl(FDecl, ULE->getNameLoc()))
+    if (SemaRef.DiagnoseUseOfDecl(FDecl, LazyLoc(ULE)))
       return ExprError();
     ExprResult Res =
         SemaRef.FixOverloadedFunctionReference(Fn, (*Best)->FoundDecl, FDecl);
@@ -16234,9 +16234,9 @@ ExprResult Sema::BuildCallToMemberFunction(Scope *S, Expr *MemExprE,
 
 ExprResult
 Sema::BuildCallToObjectOfClassType(Scope *S, Expr *Obj,
-                                   SourceLocation LParenLoc,
+                                   LazyLoc LParenLoc,
                                    MultiExprArg Args,
-                                   SourceLocation RParenLoc) {
+                                   LazyLoc RParenLoc) {
   if (checkPlaceholderForOverload(*this, Obj))
     return ExprError();
   ExprResult Object = Obj;

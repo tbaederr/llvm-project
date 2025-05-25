@@ -1526,7 +1526,7 @@ void InitListChecker::CheckSubElementType(const InitializedEntity &Entity,
 
     // FIXME: Better EqualLoc?
     InitializationKind Kind =
-        InitializationKind::CreateCopy(expr->getBeginLoc(), SourceLocation());
+        InitializationKind::CreateCopy(expr, SourceLocation());
 
     // Vector elements can be initialized from other vectors in which case
     // we need initialization entity with a type of a vector (and not a vector
@@ -2058,7 +2058,7 @@ static bool checkDestructorReference(QualType ElementType, SourceLocation Loc,
                                 SemaRef.PDiag(diag::err_access_dtor_temp)
                                 << ElementType);
   SemaRef.MarkFunctionReferenced(Loc, Destructor);
-  return SemaRef.DiagnoseUseOfDecl(Destructor, Loc);
+  return SemaRef.DiagnoseUseOfDecl(Destructor, LazyLoc(Loc));
 }
 
 static bool
@@ -2527,7 +2527,7 @@ void InitListChecker::CheckStructUnionTypes(
       InvalidUse = !SemaRef.CanUseDecl(*Field, TreatUnavailableAsInvalid);
     else
       InvalidUse = SemaRef.DiagnoseUseOfDecl(
-          *Field, IList->getInit(Index)->getBeginLoc());
+          *Field, LazyLoc(IList->getInit(Index)));
     if (InvalidUse) {
       ++Index;
       ++Field;
@@ -3010,7 +3010,7 @@ InitListChecker::CheckDesignatedInitializer(const InitializedEntity &Entity,
     if (VerifyOnly)
       InvalidUse = !SemaRef.CanUseDecl(*Field, TreatUnavailableAsInvalid);
     else
-      InvalidUse = SemaRef.DiagnoseUseOfDecl(*Field, D->getFieldLoc());
+      InvalidUse = SemaRef.DiagnoseUseOfDecl(*Field, LazyLoc(D->getFieldLoc()));
     if (InvalidUse) {
       ++Index;
       return true;
@@ -7462,7 +7462,7 @@ PerformConstructorInitialization(Sema &S,
 
   if (isExplicitTemporary(Entity, Kind, NumArgs)) {
     // An explicitly-constructed temporary, e.g., X(1, 2).
-    if (S.DiagnoseUseOfDecl(Step.Function.FoundDecl, Loc))
+    if (S.DiagnoseUseOfDecl(Step.Function.FoundDecl, LazyLoc(Loc)))
       return ExprError();
 
     if (Kind.getKind() == InitializationKind::IK_Value &&
@@ -7553,7 +7553,7 @@ PerformConstructorInitialization(Sema &S,
 
   // Only check access if all of that succeeded.
   S.CheckConstructorAccess(Loc, Constructor, Step.Function.FoundDecl, Entity);
-  if (S.DiagnoseUseOfDecl(Step.Function.FoundDecl, Loc))
+  if (S.DiagnoseUseOfDecl(Step.Function.FoundDecl, LazyLoc(Loc)))
     return ExprError();
 
   if (const ArrayType *AT = S.Context.getAsArrayType(Entity.getType()))
@@ -8151,7 +8151,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
           S.CheckDestructorAccess(CurInit.get()->getBeginLoc(), Destructor,
                                   S.PDiag(diag::err_access_dtor_temp) << T);
           S.MarkFunctionReferenced(CurInit.get()->getBeginLoc(), Destructor);
-          if (S.DiagnoseUseOfDecl(Destructor, CurInit.get()->getBeginLoc()))
+          if (S.DiagnoseUseOfDecl(Destructor, LazyLoc(CurInit.get())))
             return ExprError();
         }
       }
@@ -9883,14 +9883,14 @@ Sema::CanPerformCopyInitialization(const InitializedEntity &Entity,
   assert(InitE && "No initialization expression");
 
   InitializationKind Kind =
-      InitializationKind::CreateCopy(InitE->getBeginLoc(), SourceLocation());
+      InitializationKind::CreateCopy(InitE, SourceLocation());
   InitializationSequence Seq(*this, Entity, Kind, InitE);
   return !Seq.Failed();
 }
 
 ExprResult
 Sema::PerformCopyInitialization(const InitializedEntity &Entity,
-                                SourceLocation EqualLoc,
+                                LazyLoc EqualLoc,
                                 ExprResult Init,
                                 bool TopLevelOfInitList,
                                 bool AllowExplicit) {
@@ -9901,10 +9901,10 @@ Sema::PerformCopyInitialization(const InitializedEntity &Entity,
   assert(InitE && "No initialization expression?");
 
   if (EqualLoc.isInvalid())
-    EqualLoc = InitE->getBeginLoc();
+    EqualLoc = InitE;
 
   InitializationKind Kind = InitializationKind::CreateCopy(
-      InitE->getBeginLoc(), EqualLoc, AllowExplicit);
+      InitE, EqualLoc, AllowExplicit);
   InitializationSequence Seq(*this, Entity, Kind, InitE, TopLevelOfInitList);
 
   // Prevent infinite recursion when performing parameter copy-initialization.

@@ -542,7 +542,7 @@ static void diagnoseUseOfProtocols(Sema &TheSema,
   // Diagnose availability in the context of the ObjC container.
   Sema::ContextRAII SavedContext(TheSema, CD);
   for (unsigned i = 0; i < NumProtoRefs; ++i) {
-    (void)TheSema.DiagnoseUseOfDecl(ProtoRefs[i], ProtoLocs[i],
+    (void)TheSema.DiagnoseUseOfDecl(ProtoRefs[i], LazyLoc(ProtoLocs[i]),
                                     /*UnknownObjCClass=*/nullptr,
                                     /*ObjCPropertyAccess=*/false,
                                     /*AvoidPartialAvailabilityChecks=*/true);
@@ -583,7 +583,7 @@ void SemaObjC::ActOnSuperClassOfClassInterface(
 
     // Diagnose classes that inherit from deprecated classes.
     if (SuperClassDecl) {
-      (void)SemaRef.DiagnoseUseOfDecl(SuperClassDecl, SuperLoc);
+      (void)SemaRef.DiagnoseUseOfDecl(SuperClassDecl, LazyLoc(SuperLoc));
       SuperClassType = Context.getObjCInterfaceType(SuperClassDecl);
     }
 
@@ -603,7 +603,7 @@ void SemaObjC::ActOnSuperClassOfClassInterface(
             // typedef NewI DeprI __attribute__((deprecated("blah")))
             // @interface SI : DeprI /* warn here */ @end
             (void)SemaRef.DiagnoseUseOfDecl(
-                const_cast<TypedefNameDecl *>(TDecl), SuperLoc);
+                const_cast<TypedefNameDecl *>(TDecl), LazyLoc(SuperLoc));
           }
         }
       }
@@ -1339,7 +1339,7 @@ void SemaObjC::FindProtocolDeclaration(bool WarnOnDeclarations,
     // For an objc container, delay protocol reference checking until after we
     // can set the objc decl as the availability context, otherwise check now.
     if (!ForObjCContainer) {
-      (void)SemaRef.DiagnoseUseOfDecl(PDecl, Pair.getLoc());
+      (void)SemaRef.DiagnoseUseOfDecl(PDecl, LazyLoc(Pair.getLoc()));
     }
 
     // If this is a forward declaration and we are supposed to warn in this
@@ -1468,7 +1468,7 @@ void SemaObjC::actOnObjCTypeArgsOrProtocolQualifiers(
       // For an objc container, delay protocol reference checking until after we
       // can set the objc decl as the availability context, otherwise check now.
       if (!warnOnIncompleteProtocols) {
-        (void)SemaRef.DiagnoseUseOfDecl(proto, identifierLocs[i]);
+        (void)SemaRef.DiagnoseUseOfDecl(proto, LazyLoc(identifierLocs[i]));
       }
 
       // If this is a forward protocol declaration, get its definition.

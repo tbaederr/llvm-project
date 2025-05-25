@@ -1280,7 +1280,7 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
         continue;
       } else
         Var = R.getAsSingle<VarDecl>();
-      if (Var && DiagnoseUseOfDecl(Var, C->Loc))
+      if (Var && DiagnoseUseOfDecl(Var, LazyLoc(C->Loc)))
         continue;
     }
 

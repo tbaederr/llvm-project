@@ -628,7 +628,7 @@ bool Sema::BuildCXXNestedNameSpecifier(Scope *S, NestedNameSpecInfo &IdInfo,
       return false;
 
     // The use of a nested name specifier may trigger deprecation warnings.
-    DiagnoseUseOfDecl(SD, IdInfo.CCLoc);
+    DiagnoseUseOfDecl(SD, LazyLoc(IdInfo.CCLoc));
 
     if (NamespaceDecl *Namespace = dyn_cast<NamespaceDecl>(SD)) {
       SS.Extend(Context, Namespace, IdInfo.IdentifierLoc, IdInfo.CCLoc);

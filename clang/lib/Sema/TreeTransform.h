@@ -1016,7 +1016,7 @@ public:
 
   /// Rebuild an unresolved typename type, given the decl that
   /// the UnresolvedUsingTypenameDecl was transformed to.
-  QualType RebuildUnresolvedUsingType(SourceLocation NameLoc, Decl *D);
+  QualType RebuildUnresolvedUsingType(LazyLoc NameLoc, Decl *D);
 
   /// Build a new type found via an alias.
   QualType RebuildUsingType(UsingShadowDecl *Found, QualType Underlying) {
@@ -3844,10 +3844,15 @@ public:
                                           SourceLocation LBracLoc,
                                           MultiExprArg Args,
                                           SourceLocation RBracLoc) {
+  llvm::SmallVector<LazyLoc> SourceLocs;
+  for (SourceLocation LL : SelectorLocs)
+    SourceLocs.push_back(LazyLoc(LL));
+
+
     return SemaRef.ObjC().BuildInstanceMessage(Receiver, Receiver->getType(),
                                                /*SuperLoc=*/SourceLocation(),
                                                Sel, Method, LBracLoc,
-                                               SelectorLocs, RBracLoc, Args);
+                                               SourceLocs, RBracLoc, Args);
   }
 
   /// Build a new Objective-C instance/class message to 'super'.
@@ -3859,10 +3864,14 @@ public:
                                     SourceLocation LBracLoc,
                                     MultiExprArg Args,
                                     SourceLocation RBracLoc) {
+  llvm::SmallVector<LazyLoc> SourceLocs;
+  for (SourceLocation LL : SelectorLocs)
+    SourceLocs.push_back(LazyLoc(LL));
+
     return Method->isInstanceMethod()
                ? SemaRef.ObjC().BuildInstanceMessage(
                      nullptr, SuperType, SuperLoc, Sel, Method, LBracLoc,
-                     SelectorLocs, RBracLoc, Args)
+                     SourceLocs, RBracLoc, Args)
                : SemaRef.ObjC().BuildClassMessage(nullptr, SuperType, SuperLoc,
                                                   Sel, Method, LBracLoc,
                                                   SelectorLocs, RBracLoc, Args);
@@ -17294,7 +17303,7 @@ QualType TreeTransform<Derived>::RebuildFunctionNoProtoType(QualType T) {
 }
 
 template<typename Derived>
-QualType TreeTransform<Derived>::RebuildUnresolvedUsingType(SourceLocation Loc,
+QualType TreeTransform<Derived>::RebuildUnresolvedUsingType(LazyLoc Loc,
                                                             Decl *D) {
   assert(D && "no decl found");
   if (D->isInvalidDecl()) return QualType();

@@ -736,7 +736,7 @@ ExprResult ObjCPropertyOpBuilder::buildGet() {
 
   QualType receiverType = RefExpr->getReceiverType(S.Context);
   if (!Getter->isImplicit())
-    S.DiagnoseUseOfDecl(Getter, GenericLoc, nullptr, true);
+    S.DiagnoseUseOfDecl(Getter, LazyLoc(GenericLoc), nullptr, true);
   // Build a message-send.
   ExprResult msg;
   if ((Getter->isInstanceMethod() && !RefExpr->isClassReceiver()) ||
@@ -799,7 +799,7 @@ ExprResult ObjCPropertyOpBuilder::buildSet(Expr *op, SourceLocation opcLoc,
   // Build a message-send.
   ExprResult msg;
   if (!Setter->isImplicit())
-    S.DiagnoseUseOfDecl(Setter, GenericLoc, nullptr, true);
+    S.DiagnoseUseOfDecl(Setter, LazyLoc(GenericLoc), nullptr, true);
   if ((Setter->isInstanceMethod() && !RefExpr->isClassReceiver()) ||
       RefExpr->isObjectReceiver()) {
     msg = S.ObjC().BuildInstanceMessageImplicit(InstanceReceiver, receiverType,
@@ -1309,7 +1309,7 @@ ExprResult ObjCSubscriptOpBuilder::buildGet() {
   Expr *args[] = { Index };
   assert(InstanceBase);
   if (AtIndexGetter)
-    S.DiagnoseUseOfDecl(AtIndexGetter, GenericLoc);
+    S.DiagnoseUseOfDecl(AtIndexGetter, LazyLoc(GenericLoc));
   msg = S.ObjC().BuildInstanceMessageImplicit(
       InstanceBase, receiverType, GenericLoc, AtIndexGetterSelector,
       AtIndexGetter, MultiExprArg(args, 1));
@@ -1326,7 +1326,7 @@ ExprResult ObjCSubscriptOpBuilder::buildSet(Expr *op, SourceLocation opcLoc,
   if (!findAtIndexSetter())
     return ExprError();
   if (AtIndexSetter)
-    S.DiagnoseUseOfDecl(AtIndexSetter, GenericLoc);
+    S.DiagnoseUseOfDecl(AtIndexSetter, LazyLoc(GenericLoc));
   QualType receiverType = InstanceBase->getType();
   Expr *Index = InstanceKey;
 

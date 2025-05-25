@@ -1203,7 +1203,7 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     }
 
     // If the type is deprecated or unavailable, diagnose it.
-    S.DiagnoseUseOfDecl(D, DS.getTypeSpecTypeNameLoc());
+    S.DiagnoseUseOfDecl(D, LazyLoc(DS.getTypeSpecTypeNameLoc()));
 
     assert(DS.getTypeSpecWidth() == TypeSpecifierWidth::Unspecified &&
            DS.getTypeSpecComplex() == 0 &&
@@ -1240,7 +1240,7 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     assert(!Result.isNull() && "Didn't get a type for typeof?");
     if (!Result->isDependentType())
       if (const TagType *TT = Result->getAs<TagType>())
-        S.DiagnoseUseOfDecl(TT->getDecl(), DS.getTypeSpecTypeLoc());
+        S.DiagnoseUseOfDecl(TT->getDecl(), LazyLoc(DS.getTypeSpecTypeLoc()));
     // TypeQuals handled by caller.
     Result = Context.getTypeOfType(
         Result, DS.getTypeSpecType() == DeclSpec::TST_typeof_unqualType
@@ -9615,7 +9615,7 @@ QualType Sema::BuildTypeofExprType(Expr *E, TypeOfKind Kind) {
   if (!E->isTypeDependent()) {
     QualType T = E->getType();
     if (const TagType *TT = T->getAs<TagType>())
-      DiagnoseUseOfDecl(TT->getDecl(), E->getExprLoc());
+      DiagnoseUseOfDecl(TT->getDecl(), LazyLoc(E));
   }
   return Context.getTypeOfExprType(E, Kind);
 }
@@ -9779,7 +9779,7 @@ QualType Sema::BuildPackIndexingType(QualType Pattern, Expr *IndexExpr,
 }
 
 static QualType GetEnumUnderlyingType(Sema &S, QualType BaseType,
-                                      SourceLocation Loc) {
+                                      LazyLoc Loc) {
   assert(BaseType->isEnumeralType());
   EnumDecl *ED = BaseType->castAs<EnumType>()->getDecl();
   assert(ED && "EnumType has no EnumDecl");
@@ -9902,7 +9902,7 @@ QualType Sema::BuiltinChangeCVRQualifiers(QualType BaseType, UTTKind UKind,
 
 static QualType ChangeIntegralSignedness(Sema &S, QualType BaseType,
                                          bool IsMakeSigned,
-                                         SourceLocation Loc) {
+                                         LazyLoc Loc) {
   if (BaseType->isEnumeralType()) {
     QualType Underlying = GetEnumUnderlyingType(S, BaseType, Loc);
     if (auto *BitInt = dyn_cast<BitIntType>(Underlying)) {

@@ -5316,7 +5316,7 @@ Sema::SetDelegatingInitializer(CXXConstructorDecl *Constructor,
 
   if (CXXDestructorDecl *Dtor = LookupDestructor(Constructor->getParent())) {
     MarkFunctionReferenced(Initializer->getSourceLocation(), Dtor);
-    DiagnoseUseOfDecl(Dtor, Initializer->getSourceLocation());
+    DiagnoseUseOfDecl(Dtor, LazyLoc(Initializer->getSourceLocation()));
   }
 
   DelegatingCtorDecls.push_back(Constructor);
@@ -5337,7 +5337,7 @@ static CXXDestructorDecl *LookupDestructorIfRelevant(Sema &S,
   return S.LookupDestructor(Class);
 }
 
-static void MarkFieldDestructorReferenced(Sema &S, SourceLocation Location,
+static void MarkFieldDestructorReferenced(Sema &S, LazyLoc Location,
                                           FieldDecl *Field) {
   if (Field->isInvalidDecl())
     return;
@@ -5368,7 +5368,7 @@ static void MarkFieldDestructorReferenced(Sema &S, SourceLocation Location,
   S.DiagnoseUseOfDecl(Dtor, Location);
 }
 
-static void MarkBaseDestructorsReferenced(Sema &S, SourceLocation Location,
+static void MarkBaseDestructorsReferenced(Sema &S, LazyLoc Location,
                                           CXXRecordDecl *ClassDecl) {
   if (ClassDecl->isDependentContext())
     return;
@@ -5909,7 +5909,7 @@ void Sema::ActOnMemInitializers(Decl *ConstructorDecl,
   DiagnoseUninitializedFields(*this, Constructor);
 }
 
-void Sema::MarkBaseAndMemberDestructorsReferenced(SourceLocation Location,
+void Sema::MarkBaseAndMemberDestructorsReferenced(LazyLoc Location,
                                                   CXXRecordDecl *ClassDecl) {
   // Ignore dependent contexts. Also ignore unions, since their members never
   // have destructors implicitly called.
@@ -5930,7 +5930,7 @@ void Sema::MarkBaseAndMemberDestructorsReferenced(SourceLocation Location,
 }
 
 void Sema::MarkVirtualBaseDestructorsReferenced(
-    SourceLocation Location, CXXRecordDecl *ClassDecl,
+    LazyLoc Location, CXXRecordDecl *ClassDecl,
     llvm::SmallPtrSetImpl<const CXXRecordDecl *> *DirectVirtualBases) {
   // Virtual bases.
   for (const auto &VBase : ClassDecl->vbases()) {
@@ -11135,7 +11135,7 @@ bool Sema::CheckDestructor(CXXDestructorDecl *Destructor) {
         }
       }
 
-      DiagnoseUseOfDecl(OperatorDelete, Loc);
+      DiagnoseUseOfDecl(OperatorDelete, LazyLoc(Loc));
       MarkFunctionReferenced(Loc, OperatorDelete);
       Destructor->setOperatorDelete(OperatorDelete, ThisArg);
     }
@@ -12440,9 +12440,9 @@ static bool TryNamespaceTypoCorrection(Sema &S, LookupResult &R, Scope *Sc,
   return false;
 }
 
-Decl *Sema::ActOnUsingDirective(Scope *S, SourceLocation UsingLoc,
-                                SourceLocation NamespcLoc, CXXScopeSpec &SS,
-                                SourceLocation IdentLoc,
+Decl *Sema::ActOnUsingDirective(Scope *S, LazyLoc UsingLoc,
+                                LazyLoc NamespcLoc, CXXScopeSpec &SS,
+                                LazyLoc IdentLoc,
                                 IdentifierInfo *NamespcName,
                                 const ParsedAttributesView &AttrList) {
   assert(!SS.isInvalid() && "Invalid CXXScopeSpec.");
@@ -13867,10 +13867,10 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
-Decl *Sema::ActOnNamespaceAliasDef(Scope *S, SourceLocation NamespaceLoc,
-                                   SourceLocation AliasLoc,
+Decl *Sema::ActOnNamespaceAliasDef(Scope *S, LazyLoc NamespaceLoc,
+                                   LazyLoc AliasLoc,
                                    IdentifierInfo *Alias, CXXScopeSpec &SS,
-                                   SourceLocation IdentLoc,
+                                   LazyLoc IdentLoc,
                                    IdentifierInfo *Ident) {
 
   // Lookup the namespace name.
@@ -16377,7 +16377,7 @@ void Sema::FinalizeVarWithDestructor(VarDecl *VD, const RecordType *Record) {
     CheckDestructorAccess(VD->getLocation(), Destructor,
                           PDiag(diag::err_access_dtor_var)
                               << VD->getDeclName() << VD->getType());
-    DiagnoseUseOfDecl(Destructor, VD->getLocation());
+    DiagnoseUseOfDecl(Destructor, LazyLoc(VD->getLocation()));
   }
 
   if (Destructor->isTrivial()) return;

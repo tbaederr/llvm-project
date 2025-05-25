@@ -27,6 +27,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/Overload.h"
 #include "clang/Sema/Ownership.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -626,10 +627,10 @@ private:
   InitContext Context : 8;
 
   /// The source locations involved in the initialization.
-  SourceLocation Locations[3];
+  LazyLoc  Locations[3];
 
-  InitializationKind(InitKind Kind, InitContext Context, SourceLocation Loc1,
-                     SourceLocation Loc2, SourceLocation Loc3)
+  InitializationKind(InitKind Kind, InitContext Context, LazyLoc Loc1,
+                     LazyLoc Loc2, LazyLoc Loc3)
       : Kind(Kind), Context(Context) {
     Locations[0] = Loc1;
     Locations[1] = Loc2;
@@ -638,21 +639,21 @@ private:
 
 public:
   /// Create a direct initialization.
-  static InitializationKind CreateDirect(SourceLocation InitLoc,
-                                         SourceLocation LParenLoc,
-                                         SourceLocation RParenLoc) {
+  static InitializationKind CreateDirect(LazyLoc InitLoc,
+                                         LazyLoc LParenLoc,
+                                         LazyLoc RParenLoc) {
     return InitializationKind(IK_Direct, IC_Normal,
                               InitLoc, LParenLoc, RParenLoc);
   }
 
-  static InitializationKind CreateDirectList(SourceLocation InitLoc) {
+  static InitializationKind CreateDirectList(LazyLoc InitLoc) {
     return InitializationKind(IK_DirectList, IC_Normal, InitLoc, InitLoc,
                               InitLoc);
   }
 
-  static InitializationKind CreateDirectList(SourceLocation InitLoc,
-                                             SourceLocation LBraceLoc,
-                                             SourceLocation RBraceLoc) {
+  static InitializationKind CreateDirectList(LazyLoc InitLoc,
+                                             LazyLoc LBraceLoc,
+                                             LazyLoc RBraceLoc) {
     return InitializationKind(IK_DirectList, IC_Normal, InitLoc, LBraceLoc,
                               RBraceLoc);
   }
@@ -665,7 +666,7 @@ public:
   }
 
   /// Create a direct initialization for a C-style cast.
-  static InitializationKind CreateCStyleCast(SourceLocation StartLoc,
+  static InitializationKind CreateCStyleCast(LazyLoc StartLoc,
                                              SourceRange TypeRange,
                                              bool InitList) {
     // C++ cast syntax doesn't permit init lists, but C compound literals are
@@ -684,8 +685,8 @@ public:
   }
 
   /// Create a copy initialization.
-  static InitializationKind CreateCopy(SourceLocation InitLoc,
-                                       SourceLocation EqualLoc,
+  static InitializationKind CreateCopy(LazyLoc InitLoc,
+                                       LazyLoc EqualLoc,
                                        bool AllowExplicitConvs = false) {
     return InitializationKind(IK_Copy,
                               AllowExplicitConvs? IC_ExplicitConvs : IC_Normal,
@@ -693,14 +694,14 @@ public:
   }
 
   /// Create a default initialization.
-  static InitializationKind CreateDefault(SourceLocation InitLoc) {
+  static InitializationKind CreateDefault(LazyLoc InitLoc) {
     return InitializationKind(IK_Default, IC_Normal, InitLoc, InitLoc, InitLoc);
   }
 
   /// Create a value initialization.
-  static InitializationKind CreateValue(SourceLocation InitLoc,
-                                        SourceLocation LParenLoc,
-                                        SourceLocation RParenLoc,
+  static InitializationKind CreateValue(LazyLoc InitLoc,
+                                        LazyLoc LParenLoc,
+                                        LazyLoc RParenLoc,
                                         bool isImplicit = false) {
     return InitializationKind(IK_Value, isImplicit ? IC_Implicit : IC_Normal,
                               InitLoc, LParenLoc, RParenLoc);
@@ -708,7 +709,7 @@ public:
 
   /// Create an initialization from an initializer (which, for direct
   /// initialization from a parenthesized list, will be a ParenListExpr).
-  static InitializationKind CreateForInit(SourceLocation Loc, bool DirectInit,
+  static InitializationKind CreateForInit(LazyLoc Loc, bool DirectInit,
                                           Expr *Init) {
     if (!Init) return CreateDefault(Loc);
     if (!DirectInit)
@@ -752,7 +753,7 @@ public:
   bool isImplicitValueInit() const { return Context == IC_Implicit; }
 
   /// Retrieve the location at which initialization is occurring.
-  SourceLocation getLocation() const { return Locations[0]; }
+  LazyLoc getLocation() const { return Locations[0]; }
 
   /// Retrieve the source range that covers the initialization.
   SourceRange getRange() const {
@@ -761,7 +762,7 @@ public:
 
   /// Retrieve the location of the equal sign for copy initialization
   /// (if present).
-  SourceLocation getEqualLoc() const {
+  LazyLoc getEqualLoc() const {
     assert(Kind == IK_Copy && "Only copy initialization has an '='");
     return Locations[1];
   }

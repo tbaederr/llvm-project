@@ -4087,7 +4087,7 @@ static ActionResult<CXXRecordDecl *> getPatternForClassTemplateSpecialization(
 }
 
 bool Sema::InstantiateClassTemplateSpecialization(
-    SourceLocation PointOfInstantiation,
+    LazyLoc PointOfInstantiation,
     ClassTemplateSpecializationDecl *ClassTemplateSpec,
     TemplateSpecializationKind TSK, bool Complain,
     bool PrimaryStrictPackMatch) {
@@ -4220,7 +4220,7 @@ Sema::InstantiateClassMembers(SourceLocation PointOfInstantiation,
           if (!Var->getInstantiatedFromStaticDataMember()->getDefinition())
             continue;
 
-          Var->setTemplateSpecializationKind(TSK, PointOfInstantiation);
+          Var->setTemplateSpecializationKind(TSK, LazyLoc(PointOfInstantiation));
           InstantiateVariableDefinition(PointOfInstantiation, Var);
         } else {
           Var->setTemplateSpecializationKind(TSK, PointOfInstantiation);
