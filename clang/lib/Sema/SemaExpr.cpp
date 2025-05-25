@@ -220,7 +220,7 @@ bool Sema::DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<LazyLoc> Locs,
                              bool AvoidPartialAvailabilityChecks,
                              ObjCInterfaceDecl *ClassReceiver,
                              bool SkipTrailingRequiresClause) {
-  LazyLoc Loc = Locs.front();
+  const LazyLoc &Loc = Locs.front();
   if (getLangOpts().CPlusPlus && isa<FunctionDecl>(D)) {
     // If there were any diagnostics suppressed by template argument deduction,
     // emit them now.

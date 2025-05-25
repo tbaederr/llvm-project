@@ -1164,7 +1164,7 @@ public:
   }
 
   /// Check if the type is allowed to be used for the current target.
-  void checkTypeSupport(QualType Ty, SourceLocation Loc,
+  void checkTypeSupport(QualType Ty, const LazyLoc &Loc,
                         ValueDecl *D = nullptr);
 
   /// ImpCastExprToType - If Expr is not of type 'Type', insert an implicit
@@ -8511,7 +8511,7 @@ public:
   /// Produce diagnostics if \p FD is an aligned allocation or deallocation
   /// function that is unavailable.
   void diagnoseUnavailableAlignedAllocation(const FunctionDecl &FD,
-                                            SourceLocation Loc);
+                                            LazyLoc Loc);
 
   /// Checks that a type is suitable as the allocated type
   /// in a new-expression.
@@ -9687,7 +9687,7 @@ public:
   /// namespaces searched by argument-dependent lookup
   /// (C++ [basic.lookup.argdep]) for a given set of arguments.
   void FindAssociatedClassesAndNamespaces(
-      SourceLocation InstantiationLoc, ArrayRef<Expr *> Args,
+      LazyLoc InstantiationLoc, ArrayRef<Expr *> Args,
       AssociatedNamespaceSet &AssociatedNamespaces,
       AssociatedClassSet &AssociatedClasses);
 
@@ -9710,7 +9710,7 @@ public:
                         bool AllowStringTemplate, bool DiagnoseMissing,
                         StringLiteral *StringLit = nullptr);
 
-  void ArgumentDependentLookup(DeclarationName Name, SourceLocation Loc,
+  void ArgumentDependentLookup(DeclarationName Name, LazyLoc Loc,
                                ArrayRef<Expr *> Args, ADLResult &Functions);
 
   void LookupVisibleDecls(Scope *S, LookupNameKind Kind,
@@ -10651,13 +10651,13 @@ public:
   /// all of the overload candidates found by ADL to the overload
   /// candidate set (C++ [basic.lookup.argdep]).
   void AddArgumentDependentLookupCandidates(
-      DeclarationName Name, SourceLocation Loc, ArrayRef<Expr *> Args,
+      DeclarationName Name, LazyLoc Loc, ArrayRef<Expr *> Args,
       TemplateArgumentListInfo *ExplicitTemplateArgs,
       OverloadCandidateSet &CandidateSet, bool PartialOverloading = false);
 
   /// Check the enable_if expressions on the given function. Returns the first
   /// failing attribute, or NULL if they were all successful.
-  EnableIfAttr *CheckEnableIf(FunctionDecl *Function, SourceLocation CallLoc,
+  EnableIfAttr *CheckEnableIf(FunctionDecl *Function, LazyLoc CallLoc,
                               ArrayRef<Expr *> Args,
                               bool MissingImplicitThis = false);
 
@@ -10671,7 +10671,7 @@ public:
   bool diagnoseArgDependentDiagnoseIfAttrs(const FunctionDecl *Function,
                                            const Expr *ThisArg,
                                            ArrayRef<const Expr *> Args,
-                                           SourceLocation Loc);
+                                           const LazyLoc &Loc);
 
   /// Emit diagnostics for the diagnose_if attributes on Function, ignoring any
   /// ArgDependent DiagnoseIfAttrs.
@@ -10681,7 +10681,7 @@ public:
   ///
   /// Returns true if any errors were emitted.
   bool diagnoseArgIndependentDiagnoseIfAttrs(const NamedDecl *ND,
-                                             SourceLocation Loc);
+                                             LazyLoc Loc);
 
   /// Determine if \p A and \p B are equivalent internal linkage declarations
   /// from different modules, and thus an ambiguity error can be downgraded to

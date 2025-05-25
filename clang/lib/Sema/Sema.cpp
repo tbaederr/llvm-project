@@ -2091,7 +2091,7 @@ Sema::targetDiag(SourceLocation Loc, unsigned DiagID, const FunctionDecl *FD) {
                                FD, *this);
 }
 
-void Sema::checkTypeSupport(QualType Ty, SourceLocation Loc, ValueDecl *D) {
+void Sema::checkTypeSupport(QualType Ty, const LazyLoc &Loc, ValueDecl *D) {
   if (isUnevaluatedContext() || Ty.isNull())
     return;
 

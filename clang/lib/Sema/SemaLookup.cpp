@@ -2865,7 +2865,7 @@ void Sema::DiagnoseAmbiguousLookup(LookupResult &Result) {
 
 namespace {
   struct AssociatedLookup {
-    AssociatedLookup(Sema &S, SourceLocation InstantiationLoc,
+    AssociatedLookup(Sema &S, LazyLoc InstantiationLoc,
                      Sema::AssociatedNamespaceSet &Namespaces,
                      Sema::AssociatedClassSet &Classes)
       : S(S), Namespaces(Namespaces), Classes(Classes),
@@ -2880,7 +2880,7 @@ namespace {
     Sema &S;
     Sema::AssociatedNamespaceSet &Namespaces;
     Sema::AssociatedClassSet &Classes;
-    SourceLocation InstantiationLoc;
+    LazyLoc InstantiationLoc;
 
   private:
     Sema::AssociatedClassSet ClassesTransitive;
@@ -3279,7 +3279,7 @@ addAssociatedClassesAndNamespaces(AssociatedLookup &Result, QualType Ty) {
 }
 
 void Sema::FindAssociatedClassesAndNamespaces(
-    SourceLocation InstantiationLoc, ArrayRef<Expr *> Args,
+    LazyLoc InstantiationLoc, ArrayRef<Expr *> Args,
     AssociatedNamespaceSet &AssociatedNamespaces,
     AssociatedClassSet &AssociatedClasses) {
   AssociatedNamespaces.clear();
@@ -3836,7 +3836,7 @@ void ADLResult::insert(NamedDecl *New) {
   Old = New;
 }
 
-void Sema::ArgumentDependentLookup(DeclarationName Name, SourceLocation Loc,
+void Sema::ArgumentDependentLookup(DeclarationName Name, LazyLoc Loc,
                                    ArrayRef<Expr *> Args, ADLResult &Result) {
   // Find all of the associated namespaces and classes based on the
   // arguments we have.

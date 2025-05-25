@@ -2120,7 +2120,7 @@ Sema::isUnavailableAlignedAllocationFunction(const FunctionDecl &FD) const {
 // Emit a diagnostic if an aligned allocation/deallocation function that is not
 // implemented in the standard library is selected.
 void Sema::diagnoseUnavailableAlignedAllocation(const FunctionDecl &FD,
-                                                SourceLocation Loc) {
+                                                LazyLoc Loc) {
   if (isUnavailableAlignedAllocationFunction(FD)) {
     const llvm::Triple &T = getASTContext().getTargetInfo().getTriple();
     StringRef OSName = AvailabilityAttr::getPlatformNameSourceSpelling(

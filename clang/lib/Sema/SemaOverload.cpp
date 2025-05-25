@@ -7358,7 +7358,7 @@ Sema::SelectBestMethod(Selector Sel, MultiExprArg Args, bool IsInstance,
 }
 
 static bool convertArgsForAvailabilityChecks(
-    Sema &S, FunctionDecl *Function, Expr *ThisArg, SourceLocation CallLoc,
+    Sema &S, FunctionDecl *Function, Expr *ThisArg, LazyLoc CallLoc,
     ArrayRef<Expr *> Args, Sema::SFINAETrap &Trap, bool MissingImplicitThis,
     Expr *&ConvertedThis, SmallVectorImpl<Expr *> &ConvertedArgs) {
   if (ThisArg) {
@@ -7403,11 +7403,12 @@ static bool convertArgsForAvailabilityChecks(
 
   // Push default arguments if needed.
   if (!Function->isVariadic() && Args.size() < Function->getNumParams()) {
+    SourceLocation Loc = CallLoc.toSourceLocation();
     for (unsigned i = Args.size(), e = Function->getNumParams(); i != e; ++i) {
       ParmVarDecl *P = Function->getParamDecl(i);
       if (!P->hasDefaultArg())
         return false;
-      ExprResult R = S.BuildCXXDefaultArgExpr(CallLoc, Function, P);
+      ExprResult R = S.BuildCXXDefaultArgExpr(Loc, Function, P);
       if (R.isInvalid())
         return false;
       ConvertedArgs.push_back(R.get());
@@ -7420,7 +7421,7 @@ static bool convertArgsForAvailabilityChecks(
 }
 
 EnableIfAttr *Sema::CheckEnableIf(FunctionDecl *Function,
-                                  SourceLocation CallLoc,
+                                  LazyLoc CallLoc,
                                   ArrayRef<Expr *> Args,
                                   bool MissingImplicitThis) {
   auto EnableIfAttrs = Function->specific_attrs<EnableIfAttr>();
@@ -7453,7 +7454,7 @@ EnableIfAttr *Sema::CheckEnableIf(FunctionDecl *Function,
 
 template <typename CheckFn>
 static bool diagnoseDiagnoseIfAttrsWith(Sema &S, const NamedDecl *ND,
-                                        bool ArgDependent, SourceLocation Loc,
+                                        bool ArgDependent, const LazyLoc &Loc,
                                         CheckFn &&IsSuccessful) {
   SmallVector<const DiagnoseIfAttr *, 8> Attrs;
   for (const auto *DIA : ND->specific_attrs<DiagnoseIfAttr>()) {
@@ -7517,7 +7518,7 @@ static bool diagnoseDiagnoseIfAttrsWith(Sema &S, const NamedDecl *ND,
 bool Sema::diagnoseArgDependentDiagnoseIfAttrs(const FunctionDecl *Function,
                                                const Expr *ThisArg,
                                                ArrayRef<const Expr *> Args,
-                                               SourceLocation Loc) {
+                                               const LazyLoc &Loc) {
   return diagnoseDiagnoseIfAttrsWith(
       *this, Function, /*ArgDependent=*/true, Loc,
       [&](const DiagnoseIfAttr *DIA) {
@@ -7533,7 +7534,7 @@ bool Sema::diagnoseArgDependentDiagnoseIfAttrs(const FunctionDecl *Function,
 }
 
 bool Sema::diagnoseArgIndependentDiagnoseIfAttrs(const NamedDecl *ND,
-                                                 SourceLocation Loc) {
+                                                 LazyLoc Loc) {
   return diagnoseDiagnoseIfAttrsWith(
       *this, ND, /*ArgDependent=*/false, Loc,
       [&](const DiagnoseIfAttr *DIA) {
@@ -10304,7 +10305,7 @@ void Sema::AddBuiltinOperatorCandidates(OverloadedOperatorKind Op,
 
 void
 Sema::AddArgumentDependentLookupCandidates(DeclarationName Name,
-                                           SourceLocation Loc,
+                                           LazyLoc Loc,
                                            ArrayRef<Expr *> Args,
                                  TemplateArgumentListInfo *ExplicitTemplateArgs,
                                            OverloadCandidateSet& CandidateSet,
@@ -14184,7 +14185,7 @@ void Sema::AddOverloadedCallCandidates(UnresolvedLookupExpr *ULE,
                                /*KnownValid*/ true);
 
   if (ULE->requiresADL())
-    AddArgumentDependentLookupCandidates(ULE->getName(), ULE->getExprLoc(),
+    AddArgumentDependentLookupCandidates(ULE->getName(), ULE,
                                          Args, ExplicitTemplateArgs,
                                          CandidateSet, PartialOverloading);
 }

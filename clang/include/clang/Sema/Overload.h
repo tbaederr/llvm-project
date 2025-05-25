@@ -1339,7 +1339,7 @@ class Sema;
     OverloadCandidateSet &operator=(const OverloadCandidateSet &) = delete;
     ~OverloadCandidateSet() { destroyCandidates(); }
 
-    SourceLocation getLocation() const { return Loc; }
+    LazyLoc getLocation() const { return Loc; }
     CandidateSetKind getKind() const { return Kind; }
     OperatorRewriteInfo getRewriteInfo() const { return RewriteInfo; }
 
