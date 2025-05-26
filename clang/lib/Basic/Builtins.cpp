@@ -139,11 +139,14 @@ bool Builtin::Context::isBuiltinFunc(llvm::StringRef FuncName) {
 static bool builtinIsSupported(const llvm::StringTable &Strings,
                                const Builtin::Info &BuiltinInfo,
                                const LangOptions &LangOpts) {
-  auto AttributesStr = Strings[BuiltinInfo.Offsets.Attributes];
+  // auto AttributesStr = Strings[BuiltinInfo.Offsets.Attributes];
 
   /* Builtins Unsupported */
-  if (LangOpts.NoBuiltin && strchr(AttributesStr.data(), 'f') != nullptr)
-    return false;
+  if (LangOpts.NoBuiltin) {
+    auto AttributesStr = Strings[BuiltinInfo.Offsets.Attributes];
+    if (strchr(AttributesStr.data(), 'f') != nullptr)
+      return false;
+  }
   /* CorBuiltins Unsupported */
   if (!LangOpts.Coroutines && (BuiltinInfo.Langs & COR_LANG))
     return false;
@@ -189,8 +192,11 @@ static bool builtinIsSupported(const llvm::StringTable &Strings,
   if (!LangOpts.CPlusPlus && BuiltinInfo.Langs == CXX_LANG)
     return false;
   /* consteval Unsupported */
-  if (!LangOpts.CPlusPlus20 && strchr(AttributesStr.data(), 'G') != nullptr)
+  if (!LangOpts.CPlusPlus20) {
+    auto AttributesStr = Strings[BuiltinInfo.Offsets.Attributes];
+    if (strchr(AttributesStr.data(), 'G') != nullptr)
     return false;
+  }
   /* C23 unsupported */
   if (!LangOpts.C23 && BuiltinInfo.Langs == C23_LANG)
     return false;
