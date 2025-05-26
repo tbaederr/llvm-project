@@ -175,7 +175,7 @@ static bool isLanguageDefinedBuiltin(const SourceManager &SourceMgr,
   return false;
 }
 
-static bool isReservedCXXAttributeName(Preprocessor &PP, IdentifierInfo *II) {
+static bool isReservedCXXAttributeName(Preprocessor &PP, const IdentifierInfo *II) {
   const LangOptions &Lang = PP.getLangOpts();
   if (Lang.CPlusPlus &&
       hasAttribute(AttributeCommonInfo::AS_CXX11, /* Scope*/ nullptr, II,
@@ -191,7 +191,7 @@ static bool isReservedCXXAttributeName(Preprocessor &PP, IdentifierInfo *II) {
   return false;
 }
 
-static MacroDiag shouldWarnOnMacroDef(Preprocessor &PP, IdentifierInfo *II) {
+static MacroDiag shouldWarnOnMacroDef(Preprocessor &PP, const IdentifierInfo *II) {
   const LangOptions &Lang = PP.getLangOpts();
   StringRef Text = II->getName();
   if (isReservedInAllContexts(II->isReserved(Lang)))
@@ -205,7 +205,7 @@ static MacroDiag shouldWarnOnMacroDef(Preprocessor &PP, IdentifierInfo *II) {
   return MD_NoWarn;
 }
 
-static MacroDiag shouldWarnOnMacroUndef(Preprocessor &PP, IdentifierInfo *II) {
+static MacroDiag shouldWarnOnMacroUndef(Preprocessor &PP, const IdentifierInfo *II) {
   const LangOptions &Lang = PP.getLangOpts();
   // Do not warn on keyword undef.  It is generally harmless and widely used.
   if (isReservedInAllContexts(II->isReserved(Lang)))
@@ -345,7 +345,7 @@ bool Preprocessor::CheckMacroName(Token &MacroNameTok, MacroUse isDefineUndef,
   if (MacroNameTok.is(tok::eod))
     return Diag(MacroNameTok, diag::err_pp_missing_macro_name);
 
-  IdentifierInfo *II = MacroNameTok.getIdentifierInfo();
+  const IdentifierInfo *II = MacroNameTok.getIdentifierInfo();
   if (!II)
     return Diag(MacroNameTok, diag::err_pp_macro_not_identifier);
 
@@ -373,8 +373,8 @@ bool Preprocessor::CheckMacroName(Token &MacroNameTok, MacroUse isDefineUndef,
   // Macro names with reserved identifiers are accepted if built-in or passed
   // through the command line (the later may be present if -dD was used to
   // generate the preprocessed file).
-  if (!SourceMgr.isInPredefinedFile(MacroNameLoc) &&
-      !SourceMgr.isInSystemHeader(MacroNameLoc)) {
+  if (!SourceMgr.isInSystemHeader(MacroNameLoc) &&
+      !SourceMgr.isInPredefinedFile(MacroNameLoc)) {
     MacroDiag D = MD_NoWarn;
     if (isDefineUndef == MU_Define) {
       D = shouldWarnOnMacroDef(*this, II);
