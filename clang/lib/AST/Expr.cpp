@@ -4009,7 +4009,7 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
   }
 
   // Strip off a cast to void*, if it exists. Except in C++.
-  if (const ExplicitCastExpr *CE = dyn_cast<ExplicitCastExpr>(this)) {
+  if (const auto *CE = dyn_cast<ExplicitCastExpr>(this)) {
     if (!Ctx.getLangOpts().CPlusPlus) {
       // Check that it is a cast to void*.
       if (const PointerType *PT = CE->getType()->getAs<PointerType>()) {
@@ -4028,37 +4028,37 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
           return CE->getSubExpr()->isNullPointerConstant(Ctx, NPC);
       }
     }
-  } else if (const ImplicitCastExpr *ICE = dyn_cast<ImplicitCastExpr>(this)) {
+  } else if (const auto *ICE = dyn_cast<ImplicitCastExpr>(this)) {
     // Ignore the ImplicitCastExpr type entirely.
     return ICE->getSubExpr()->isNullPointerConstant(Ctx, NPC);
-  } else if (const ParenExpr *PE = dyn_cast<ParenExpr>(this)) {
+  } else if (const auto  *PE = dyn_cast<ParenExpr>(this)) {
     // Accept ((void*)0) as a null pointer constant, as many other
     // implementations do.
     return PE->getSubExpr()->isNullPointerConstant(Ctx, NPC);
-  } else if (const GenericSelectionExpr *GE =
+  } else if (const auto *GE =
                dyn_cast<GenericSelectionExpr>(this)) {
     if (GE->isResultDependent())
       return NPCK_NotNull;
     return GE->getResultExpr()->isNullPointerConstant(Ctx, NPC);
-  } else if (const ChooseExpr *CE = dyn_cast<ChooseExpr>(this)) {
+  } else if (const auto *CE = dyn_cast<ChooseExpr>(this)) {
     if (CE->isConditionDependent())
       return NPCK_NotNull;
     return CE->getChosenSubExpr()->isNullPointerConstant(Ctx, NPC);
-  } else if (const CXXDefaultArgExpr *DefaultArg
+  } else if (const auto *DefaultArg
                = dyn_cast<CXXDefaultArgExpr>(this)) {
     // See through default argument expressions.
     return DefaultArg->getExpr()->isNullPointerConstant(Ctx, NPC);
-  } else if (const CXXDefaultInitExpr *DefaultInit
+  } else if (const auto *DefaultInit
                = dyn_cast<CXXDefaultInitExpr>(this)) {
     // See through default initializer expressions.
     return DefaultInit->getExpr()->isNullPointerConstant(Ctx, NPC);
   } else if (isa<GNUNullExpr>(this)) {
     // The GNU __null extension is always a null pointer constant.
     return NPCK_GNUNull;
-  } else if (const MaterializeTemporaryExpr *M
+  } else if (const auto *M
                                    = dyn_cast<MaterializeTemporaryExpr>(this)) {
     return M->getSubExpr()->isNullPointerConstant(Ctx, NPC);
-  } else if (const OpaqueValueExpr *OVE = dyn_cast<OpaqueValueExpr>(this)) {
+  } else if (const auto *OVE = dyn_cast<OpaqueValueExpr>(this)) {
     if (const Expr *Source = OVE->getSourceExpr())
       return Source->isNullPointerConstant(Ctx, NPC);
   }
@@ -4075,9 +4075,9 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
   if (const RecordType *UT = getType()->getAsUnionType())
     if (!Ctx.getLangOpts().CPlusPlus11 &&
         UT && UT->getDecl()->hasAttr<TransparentUnionAttr>())
-      if (const CompoundLiteralExpr *CLE = dyn_cast<CompoundLiteralExpr>(this)){
+      if (const auto *CLE = dyn_cast<CompoundLiteralExpr>(this)){
         const Expr *InitExpr = CLE->getInitializer();
-        if (const InitListExpr *ILE = dyn_cast<InitListExpr>(InitExpr))
+        if (const auto *ILE = dyn_cast<InitListExpr>(InitExpr))
           return ILE->getInit(0)->isNullPointerConstant(Ctx, NPC);
       }
   // This expression must be an integer type.
@@ -4085,27 +4085,22 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
       (Ctx.getLangOpts().CPlusPlus && getType()->isEnumeralType()))
     return NPCK_NotNull;
 
+  if (const auto *Lit = dyn_cast<IntegerLiteral>(this))
+    return Lit->getValue().isZero() ? NPCK_ZeroLiteral : NPCK_NotNull;
+
   if (Ctx.getLangOpts().CPlusPlus11) {
     // C++11 [conv.ptr]p1: A null pointer constant is an integer literal with
     // value zero or a prvalue of type std::nullptr_t.
     // Microsoft mode permits C++98 rules reflecting MSVC behavior.
-    const IntegerLiteral *Lit = dyn_cast<IntegerLiteral>(this);
-    if (Lit && !Lit->getValue())
-      return NPCK_ZeroLiteral;
     if (!Ctx.getLangOpts().MSVCCompat || !isCXX98IntegralConstantExpr(Ctx))
-      return NPCK_NotNull;
-  } else {
-    // If we have an integer constant expression, we need to *evaluate* it and
-    // test for the value 0.
-    if (!isIntegerConstantExpr(Ctx))
       return NPCK_NotNull;
   }
 
-  if (EvaluateKnownConstInt(Ctx) != 0)
+  // If we have an integer constant expression, we need to *evaluate* it and
+  // test for the value 0.
+  std::optional<llvm::APSInt> Value = getIntegerConstantExpr(Ctx);
+  if (!Value || !Value->isZero())
     return NPCK_NotNull;
-
-  if (isa<IntegerLiteral>(this))
-    return NPCK_ZeroLiteral;
   return NPCK_ZeroExpression;
 }
 
