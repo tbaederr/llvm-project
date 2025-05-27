@@ -17565,9 +17565,8 @@ Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
     SmallVector<PartialDiagnosticAt, 8> Notes;
     if (Result)
       *Result = E->EvaluateKnownConstIntCheckOverflow(Context, &Notes);
-    if (!isa<ConstantExpr>(E))
-      E = Result ? ConstantExpr::Create(Context, E, APValue(*Result))
-                 : ConstantExpr::Create(Context, E);
+    if (!isa<ConstantExpr>(E) && Result)
+      E = ConstantExpr::Create(Context, E, APValue(*Result));
 
     if (Notes.empty())
       return E;
@@ -17608,7 +17607,7 @@ Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
       EvalResult.Val.isInt() && !EvalResult.HasSideEffects &&
       (!getLangOpts().CPlusPlus || !EvalResult.HasUndefinedBehavior);
 
-  if (!isa<ConstantExpr>(E))
+  if (!isa<ConstantExpr>(E) && EvalResult.Val.hasValue())
     E = ConstantExpr::Create(Context, E, EvalResult.Val);
 
   // In C++11, we can rely on diagnostics being produced for any expression
