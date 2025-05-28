@@ -2329,9 +2329,6 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
       D && D->getFunctionTypeLoc().isNull() && isLambdaCallOperator(D))
     Context = D->getParent()->getParent();
 
-  PresumedLoc PLoc = Ctx.getSourceManager().getPresumedLoc(
-      Ctx.getSourceManager().getExpansionRange(Loc).getEnd());
-
   auto MakeStringLiteral = [&](StringRef Tmp) {
     using LValuePathEntry = APValue::LValuePathEntry;
     StringLiteral *Res = Ctx.getPredefinedStringLiteralFromCache(Tmp);
@@ -2342,6 +2339,8 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
 
   switch (getIdentKind()) {
   case SourceLocIdentKind::FileName: {
+    PresumedLoc PLoc = Ctx.getSourceManager().getPresumedLoc(
+      Ctx.getSourceManager().getExpansionRange(Loc).getEnd());
     // __builtin_FILE_NAME() is a Clang-specific extension that expands to the
     // the last part of __builtin_FILE().
     SmallString<256> FileName;
@@ -2350,6 +2349,8 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
     return MakeStringLiteral(FileName);
   }
   case SourceLocIdentKind::File: {
+  PresumedLoc PLoc = Ctx.getSourceManager().getPresumedLoc(
+      Ctx.getSourceManager().getExpansionRange(Loc).getEnd());
     SmallString<256> Path(PLoc.getFilename());
     clang::Preprocessor::processPathForFileMacro(Path, Ctx.getLangOpts(),
                                                  Ctx.getTargetInfo());
@@ -2364,16 +2365,25 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
     return MakeStringLiteral(
         CurDecl ? PredefinedExpr::ComputeName(Kind, CurDecl) : std::string(""));
   }
-  case SourceLocIdentKind::Line:
+  case SourceLocIdentKind::Line: {
+  PresumedLoc PLoc = Ctx.getSourceManager().getPresumedLoc(
+      Ctx.getSourceManager().getExpansionRange(Loc).getEnd());
     return APValue(Ctx.MakeIntValue(PLoc.getLine(), Ctx.UnsignedIntTy));
-  case SourceLocIdentKind::Column:
+                                 }
+  case SourceLocIdentKind::Column: {
+  PresumedLoc PLoc = Ctx.getSourceManager().getPresumedLoc(
+      Ctx.getSourceManager().getExpansionRange(Loc).getEnd());
     return APValue(Ctx.MakeIntValue(PLoc.getColumn(), Ctx.UnsignedIntTy));
+                                   }
   case SourceLocIdentKind::SourceLocStruct: {
     // Fill in a std::source_location::__impl structure, by creating an
     // artificial file-scoped CompoundLiteralExpr, and returning a pointer to
     // that.
     const CXXRecordDecl *ImplDecl = getType()->getPointeeCXXRecordDecl();
     assert(ImplDecl);
+
+  PresumedLoc PLoc = Ctx.getSourceManager().getPresumedLoc(
+      Ctx.getSourceManager().getExpansionRange(Loc).getEnd());
 
     // Construct an APValue for the __impl struct, and get or create a Decl
     // corresponding to that. Note that we've already verified that the shape of
