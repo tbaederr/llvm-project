@@ -137,6 +137,9 @@ static void diagnoseNonConstVariable(InterpState &S, CodePtr OpPC,
 static bool diagnoseUnknownDecl(InterpState &S, CodePtr OpPC,
                                 const ValueDecl *D) {
 
+  if (!S.diagnosing())
+    return false;
+
   if (isa<ParmVarDecl>(D)) {
     if (D->getType()->isReferenceType())
       return false;
