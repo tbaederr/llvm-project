@@ -1735,6 +1735,7 @@ static bool interp__builtin_elementwise_popcount(InterpState &S, CodePtr OpPC,
 static bool interp__builtin_memcpy(InterpState &S, CodePtr OpPC,
                                    const InterpFrame *Frame,
                                    const CallExpr *Call, unsigned ID) {
+  llvm::errs() << __PRETTY_FUNCTION__ << ". Diagnosing: " << S.diagnosing() << '\n';
   assert(Call->getNumArgs() == 3);
   const ASTContext &ASTCtx = S.getASTContext();
   PrimType SizeT = *S.getContext().classify(Call->getArg(2));

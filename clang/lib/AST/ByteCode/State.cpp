@@ -39,6 +39,15 @@ OptionalDiagnostic State::FFDiag(const SourceInfo &SI, diag::kind DiagId,
   return OptionalDiagnostic();
 }
 
+void State::FFDiag(DiagCB CB, unsigned ExtraNotes) {
+  if (getEvalStatus().Diag) {
+    CB();
+    return;
+  }
+  setActiveDiagnostic(false);
+}
+
+
 OptionalDiagnostic State::CCEDiag(SourceLocation Loc, diag::kind DiagId,
                                   unsigned ExtraNotes) {
   // Don't override a previous diagnostic. Don't bother collecting
@@ -58,6 +67,14 @@ OptionalDiagnostic State::CCEDiag(const Expr *E, diag::kind DiagId,
 OptionalDiagnostic State::CCEDiag(const SourceInfo &SI, diag::kind DiagId,
                                   unsigned ExtraNotes) {
   return CCEDiag(SI.getLoc(), DiagId, ExtraNotes);
+}
+
+void State::CCEDiag(DiagCB CB, unsigned ExtraNotes) {
+  if (getEvalStatus().Diag) {
+    CB();
+    return;
+  }
+  setActiveDiagnostic(false);
 }
 
 OptionalDiagnostic State::Note(SourceLocation Loc, diag::kind DiagId) {

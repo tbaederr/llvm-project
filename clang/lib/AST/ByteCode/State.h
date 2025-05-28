@@ -53,6 +53,8 @@ namespace interp {
 class Frame;
 class SourceInfo;
 
+using DiagCB = llvm::function_ref<void()>;
+
 /// Interface for the VM to interact with the AST walker's context.
 class State {
 public:
@@ -92,6 +94,9 @@ public:
          diag::kind DiagId = diag::note_invalid_subexpr_in_const_expr,
          unsigned ExtraNotes = 0);
 
+  void
+  FFDiag(DiagCB CB, unsigned ExtraNotes = 0);
+
   /// Diagnose that the evaluation does not produce a C++11 core constant
   /// expression.
   ///
@@ -111,6 +116,9 @@ public:
   CCEDiag(const SourceInfo &SI,
           diag::kind DiagId = diag::note_invalid_subexpr_in_const_expr,
           unsigned ExtraNotes = 0);
+
+  void
+  CCEDiag(DiagCB CB, unsigned ExtraNotes = 0);
 
   /// Add a note to a prior diagnostic.
   OptionalDiagnostic Note(SourceLocation Loc, diag::kind DiagId);
