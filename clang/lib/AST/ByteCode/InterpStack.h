@@ -35,14 +35,14 @@ public:
   /// Constructs a value in place on the top of the stack.
   template <typename T, typename... Tys> void push(Tys &&...Args) {
     new (grow(aligned_size<T>())) T(std::forward<Tys>(Args)...);
-#ifndef NDEBUG
+#ifdef EXPENSIVE_CHECKS
     ItemTypes.push_back(toPrimType<T>());
 #endif
   }
 
   /// Returns the value from the top of the stack and removes it.
   template <typename T> T pop() {
-#ifndef NDEBUG
+#ifdef EXPENSIVE_CHECKS
     assert(!ItemTypes.empty());
     assert(ItemTypes.back() == toPrimType<T>());
     ItemTypes.pop_back();
@@ -55,7 +55,7 @@ public:
 
   /// Discards the top value from the stack.
   template <typename T> void discard() {
-#ifndef NDEBUG
+#ifdef EXPENSIVE_CHECKS
     assert(!ItemTypes.empty());
     assert(ItemTypes.back() == toPrimType<T>());
     ItemTypes.pop_back();
@@ -67,7 +67,7 @@ public:
 
   /// Returns a reference to the value on the top of the stack.
   template <typename T> T &peek() const {
-#ifndef NDEBUG
+#ifdef EXPENSIVE_CHECKS
     assert(!ItemTypes.empty());
     assert(ItemTypes.back() == toPrimType<T>());
 #endif
@@ -148,7 +148,7 @@ private:
   /// Total size of the stack.
   size_t StackSize = 0;
 
-#ifndef NDEBUG
+#ifdef EXPENSIVE_CHECKS
   /// vector recording the type of data we pushed into the stack.
   std::vector<PrimType> ItemTypes;
 
