@@ -4766,7 +4766,7 @@ QualType ASTContext::getDependentSizedMatrixType(QualType ElementTy,
     Canon = new (*this, alignof(DependentSizedMatrixType))
         DependentSizedMatrixType(CanonElementTy, QualType(), RowExpr,
                                  ColumnExpr, AttrLoc);
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     DependentSizedMatrixType *CanonCheck =
         DependentSizedMatrixTypes.FindNodeOrInsertPos(ID, InsertPos);
     assert(!CanonCheck && "Dependent-sized matrix canonical type broken");
@@ -5136,7 +5136,7 @@ QualType ASTContext::getDependentBitIntType(bool IsUnsigned,
   return QualType(New, 0);
 }
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
 static bool NeedsInjectedClassNameType(const RecordDecl *D) {
   if (!isa<CXXRecordDecl>(D)) return false;
   const auto *RD = cast<CXXRecordDecl>(D);
@@ -5517,7 +5517,7 @@ QualType
 ASTContext::getSubstTemplateTypeParmPackType(Decl *AssociatedDecl,
                                              unsigned Index, bool Final,
                                              const TemplateArgument &ArgPack) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   for (const auto &P : ArgPack.pack_elements())
     assert(P.getKind() == TemplateArgument::Type && "Pack contains a non-type");
 #endif
@@ -5629,7 +5629,7 @@ QualType ASTContext::getCanonicalTemplateSpecializationType(
   assert(Template ==
          getCanonicalTemplateName(Template, /*IgnoreDeduced=*/true));
   assert(!Args.empty());
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   for (const auto &Arg : Args)
     assert(Arg.structurallyEquals(getCanonicalTemplateArgument(Arg)));
 #endif
@@ -5870,7 +5870,7 @@ QualType ASTContext::getDependentTemplateSpecializationType(
     assert(Keyword == getCanonicalElaboratedTypeKeyword(Keyword));
     assert(Name.hasTemplateKeyword());
     assert(NNS == getCanonicalNestedNameSpecifier(NNS));
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     for (const auto &Arg : Args)
       assert(Arg.structurallyEquals(getCanonicalTemplateArgument(Arg)));
 #endif
@@ -6547,7 +6547,7 @@ QualType ASTContext::getAutoTypeInternal(
                    : TypeDependence::None) |
           (IsPack ? TypeDependence::UnexpandedPack : TypeDependence::None),
       Canon, TypeConstraintConcept, TypeConstraintArgs);
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   llvm::FoldingSetNodeID InsertedID;
   AT->Profile(InsertedID, *this);
   assert(InsertedID == ID && "ID does not match");
@@ -6609,7 +6609,7 @@ QualType ASTContext::getDeducedTemplateSpecializationTypeInternal(
       DeducedTemplateSpecializationType(Template, DeducedType, IsDependent,
                                         Canon);
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   llvm::FoldingSetNodeID TempID;
   DTST->Profile(TempID);
   assert(ID == TempID && "ID does not match");
@@ -9530,7 +9530,7 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
     size = layout.getSize();
   }
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   uint64_t CurOffs = 0;
 #endif
   std::multimap<uint64_t, NamedDecl *>::iterator
@@ -9546,7 +9546,7 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
       S += '"';
     }
     S += "^^?";
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     CurOffs += getTypeSize(VoidPtrTy);
 #endif
   }
@@ -9559,7 +9559,7 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
   }
 
   for (; CurLayObj != FieldOrBaseOffsets.end(); ++CurLayObj) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     assert(CurOffs <= CurLayObj->first);
     if (CurOffs < CurLayObj->first) {
       uint64_t padding = CurLayObj->first - CurOffs;
@@ -9586,7 +9586,7 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
       getObjCEncodingForStructureImpl(base, S, FD, /*includeVBases*/false,
                                       NotEncodedT);
       assert(!base->isEmpty());
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
       CurOffs += toBits(getASTRecordLayout(base).getNonVirtualSize());
 #endif
     } else {
@@ -9599,7 +9599,7 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
 
       if (field->isBitField()) {
         EncodeBitField(this, S, field->getType(), field);
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
         CurOffs += field->getBitWidthValue();
 #endif
       } else {
@@ -9608,7 +9608,7 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
         getObjCEncodingForTypeImpl(
             qt, S, ObjCEncOptions().setExpandStructures().setIsStructField(),
             FD, NotEncodedT);
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
         CurOffs += getTypeSize(field->getType());
 #endif
       }
@@ -10324,7 +10324,7 @@ Qualifiers::GC ASTContext::getObjCGCAttrKind(QualType Ty) const {
   } else {
     // It's not valid to set GC attributes on anything that isn't a
     // pointer.
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     QualType CT = Ty->getCanonicalTypeInternal();
     while (const auto *AT = dyn_cast<ArrayType>(CT))
       CT = AT->getElementType();
@@ -12230,7 +12230,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
 
   // Read the prefixed modifiers first.
   bool Done = false;
-  #ifndef NDEBUG
+  #ifdef LLVM_ENABLE_ASSERTIONS
   bool IsSpecial = false;
   #endif
   while (!Done) {
@@ -12258,7 +12258,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
       // 'N' behaves like 'L' for all non LP64 targets and 'int' otherwise.
       assert(!IsSpecial && "Can't use two 'N', 'W', 'Z' or 'O' modifiers!");
       assert(HowLong == 0 && "Can't use both 'L' and 'N' modifiers!");
-      #ifndef NDEBUG
+      #ifdef LLVM_ENABLE_ASSERTIONS
       IsSpecial = true;
       #endif
       if (Context.getTargetInfo().getLongWidth() == 32)
@@ -12268,7 +12268,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
       // This modifier represents int64 type.
       assert(!IsSpecial && "Can't use two 'N', 'W', 'Z' or 'O' modifiers!");
       assert(HowLong == 0 && "Can't use both 'L' and 'W' modifiers!");
-      #ifndef NDEBUG
+      #ifdef LLVM_ENABLE_ASSERTIONS
       IsSpecial = true;
       #endif
       switch (Context.getTargetInfo().getInt64Type()) {
@@ -12286,7 +12286,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
       // This modifier represents int32 type.
       assert(!IsSpecial && "Can't use two 'N', 'W', 'Z' or 'O' modifiers!");
       assert(HowLong == 0 && "Can't use both 'L' and 'Z' modifiers!");
-      #ifndef NDEBUG
+      #ifdef LLVM_ENABLE_ASSERTIONS
       IsSpecial = true;
       #endif
       switch (Context.getTargetInfo().getIntTypeByWidth(32, true)) {
@@ -12306,7 +12306,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
     case 'O':
       assert(!IsSpecial && "Can't use two 'N', 'W', 'Z' or 'O' modifiers!");
       assert(HowLong == 0 && "Can't use both 'L' and 'O' modifiers!");
-      #ifndef NDEBUG
+      #ifdef LLVM_ENABLE_ASSERTIONS
       IsSpecial = true;
       #endif
       if (Context.getLangOpts().OpenCL)

@@ -75,7 +75,7 @@ ASTRecordLayout::ASTRecordLayout(
   CXXInfo->EndsWithZeroSizedObject = EndsWithZeroSizedObject;
   CXXInfo->LeadsWithZeroSizedBase = LeadsWithZeroSizedBase;
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     if (const CXXRecordDecl *PrimaryBase = getPrimaryBase()) {
       if (isPrimaryBaseVirtual()) {
         if (Ctx.getTargetInfo().getCXXABI().hasPrimaryVBases()) {

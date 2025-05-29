@@ -3746,7 +3746,7 @@ void CodeGenFunction::EmitCheck(
 
   CheckRecoverableKind RecoverKind = getRecoverableKind(Checked[0].second);
   assert(SanOpts.has(Checked[0].second));
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   for (int i = 1, n = Checked.size(); i < n; ++i) {
     assert(RecoverKind == getRecoverableKind(Checked[i].second) &&
            "All recoverable kinds in a single check must be same!");
@@ -4256,7 +4256,7 @@ static Address emitArraySubscriptGEP(CodeGenFunction &CGF, Address addr,
                                      const Expr *Base = nullptr,
                                      const llvm::Twine &name = "arrayidx") {
   // All the indices except that last must be zero.
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   for (auto *idx : indices.drop_back())
     assert(isa<llvm::ConstantInt>(idx) &&
            cast<llvm::ConstantInt>(idx)->isZero());

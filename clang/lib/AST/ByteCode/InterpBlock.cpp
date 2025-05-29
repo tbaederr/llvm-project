@@ -23,7 +23,7 @@ void Block::addPointer(Pointer *P) {
     return;
   }
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   assert(!hasPointer(P));
 #endif
   if (Pointers)
@@ -31,7 +31,7 @@ void Block::addPointer(Pointer *P) {
   P->Next = Pointers;
   P->Prev = nullptr;
   Pointers = P;
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   assert(hasPointer(P));
 #endif
 }
@@ -44,7 +44,7 @@ void Block::removePointer(Pointer *P) {
     return;
   }
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   assert(hasPointer(P));
 #endif
 
@@ -56,7 +56,7 @@ void Block::removePointer(Pointer *P) {
   if (P->Next)
     P->Next->Prev = P->Prev;
   P->PointeeStorage.BS.Pointee = nullptr;
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   assert(!hasPointer(P));
 #endif
 }
@@ -74,7 +74,7 @@ void Block::replacePointer(Pointer *Old, Pointer *New) {
     return;
   }
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   assert(hasPointer(Old));
 #endif
 
@@ -83,13 +83,13 @@ void Block::replacePointer(Pointer *Old, Pointer *New) {
 
   Old->PointeeStorage.BS.Pointee = nullptr;
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   assert(!hasPointer(Old));
   assert(hasPointer(New));
 #endif
 }
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
 bool Block::hasPointer(const Pointer *P) const {
   for (const Pointer *C = Pointers; C; C = C->Next) {
     if (C == P)

@@ -151,7 +151,7 @@ private:
   void addPointer(Pointer *P);
   void removePointer(Pointer *P);
   void replacePointer(Pointer *Old, Pointer *New);
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   bool hasPointer(const Pointer *P) const;
 #endif
 

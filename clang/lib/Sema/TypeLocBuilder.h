@@ -32,7 +32,7 @@ class TypeLocBuilder {
   /// The index of the first occupied byte in the buffer.
   size_t Index;
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   /// The last type pushed on this builder.
   QualType LastTy;
 #endif
@@ -81,7 +81,7 @@ public:
 
   /// Resets this builder to the newly-initialized state.
   void clear() {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     LastTy = QualType();
 #endif
     Index = Capacity;
@@ -92,7 +92,7 @@ public:
   /// Tell the TypeLocBuilder that the type it is storing has been
   /// modified in some safe way that doesn't affect type-location information.
   void TypeWasModifiedSafely(QualType T) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     LastTy = T;
 #endif
   }
@@ -108,7 +108,7 @@ public:
 
   /// Creates a TypeSourceInfo for the given type.
   TypeSourceInfo *getTypeSourceInfo(ASTContext& Context, QualType T) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     assert(T == LastTy && "type doesn't match last type pushed!");
 #endif
 
@@ -121,7 +121,7 @@ public:
   /// Copies the type-location information to the given AST context and
   /// returns a \c TypeLoc referring into the AST context.
   TypeLoc getTypeLocInContext(ASTContext &Context, QualType T) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     assert(T == LastTy && "type doesn't match last type pushed!");
 #endif
 
@@ -145,7 +145,7 @@ private:
   /// \c TypeLocBuilder is active and has not had more type information
   /// pushed into it.
   TypeLoc getTemporaryTypeLoc(QualType T) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     assert(LastTy == T && "type doesn't match last type pushed!");
 #endif
     return TypeLoc(T, &Buffer[Index]);

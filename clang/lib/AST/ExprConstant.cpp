@@ -1670,7 +1670,7 @@ namespace {
     }
 
     void set(APValue::LValueBase B, bool BInvalid = false) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
       // We only allow a few types of invalid bases. Enforce that here.
       if (BInvalid) {
         const auto *E = B.get<const Expr *>();
@@ -6756,7 +6756,7 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
 
   bool Success = true;
   unsigned BasesSeen = 0;
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   CXXRecordDecl::base_class_const_iterator BaseIt = RD->bases_begin();
 #endif
   CXXRecordDecl::field_iterator FieldIt = RD->field_begin();
@@ -6788,7 +6788,7 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
     FieldDecl *FD = nullptr;
     if (I->isBaseInitializer()) {
       QualType BaseType(I->getBaseClass(), 0);
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
       // Non-virtual base classes are initialized in the order in the class
       // definition. We have already checked for virtual base classes.
       assert(!BaseIt->isVirtual() && "virtual base for literal type");
@@ -17814,7 +17814,7 @@ bool Expr::EvaluateWithSubstitution(APValue &Value, ASTContext &Ctx,
   LValue ThisVal;
   const LValue *ThisPtr = nullptr;
   if (This) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     auto *MD = dyn_cast<CXXMethodDecl>(Callee);
     assert(MD && "Don't provide `this` for non-methods.");
     assert(MD->isImplicitObjectMemberFunction() &&

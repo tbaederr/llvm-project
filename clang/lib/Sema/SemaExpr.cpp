@@ -12306,7 +12306,7 @@ static void diagnoseTautologicalComparison(Sema &S, SourceLocation Loc,
 static ImplicitConversionKind castKindToImplicitConversionKind(CastKind CK) {
   switch (CK) {
   default: {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     llvm::errs() << "unhandled cast kind: " << CastExpr::getCastKindName(CK)
                  << "\n";
 #endif

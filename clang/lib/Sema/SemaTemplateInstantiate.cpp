@@ -4562,7 +4562,7 @@ void LocalInstantiationScope::InstantiatedLocal(const Decl *D, Decl *Inst) {
   D = getCanonicalParmVarDecl(D);
   llvm::PointerUnion<Decl *, DeclArgumentPack *> &Stored = LocalDecls[D];
   if (Stored.isNull()) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
     // It should not be present in any surrounding scope either.
     LocalInstantiationScope *Current = this;
     while (Current->CombineWithOuterScope && Current->Outer) {
@@ -4587,7 +4587,7 @@ void LocalInstantiationScope::InstantiatedLocalPackArg(const Decl *D,
 }
 
 void LocalInstantiationScope::MakeInstantiatedLocalArgPack(const Decl *D) {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   // This should be the first time we've been told about this decl.
   for (LocalInstantiationScope *Current = this;
        Current && Current->CombineWithOuterScope; Current = Current->Outer)
