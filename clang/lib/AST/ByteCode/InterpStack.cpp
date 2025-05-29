@@ -28,7 +28,7 @@ void InterpStack::clear() {
     std::free(Chunk);
   Chunk = nullptr;
   StackSize = 0;
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   ItemTypes.clear();
 #endif
 }
@@ -93,7 +93,7 @@ void InterpStack::shrink(size_t Size) {
   Chunk->End -= Size;
   StackSize -= Size;
 
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   size_t TypesSize = 0;
   for (PrimType T : ItemTypes)
     TYPE_SWITCH(T, { TypesSize += aligned_size<T>(); });
@@ -110,7 +110,7 @@ void InterpStack::shrink(size_t Size) {
 }
 
 void InterpStack::dump() const {
-#ifndef NDEBUG
+#ifdef LLVM_ENABLE_ASSERTIONS
   llvm::errs() << "Items: " << ItemTypes.size() << ". Size: " << size() << '\n';
   if (ItemTypes.empty())
     return;
