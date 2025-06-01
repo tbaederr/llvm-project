@@ -274,16 +274,17 @@ QualType Expr::getEnumCoercedType(const ASTContext &Ctx) const {
 }
 
 SourceLocation Expr::getExprLoc() const {
-  switch (getStmtClass()) {
-  case Stmt::NoStmtClass: llvm_unreachable("statement without class");
+  auto C = getStmtClass();
+
+  if (C == Stmt::NoStmtClass)
+    llvm_unreachable("?");
 #define ABSTRACT_STMT(type)
 #define STMT(type, base) \
-  case Stmt::type##Class: break;
+  else if (C == Stmt::type##Class) llvm_unreachable("?");
 #define EXPR(type, base) \
-  case Stmt::type##Class: return getExprLocImpl<type>(this, &type::getExprLoc);
+  else if (C == Stmt::type##Class) return getExprLocImpl<type>(this, &type::getExprLoc);
 #include "clang/AST/StmtNodes.inc"
-  }
-  llvm_unreachable("unknown expression kind");
+    llvm_unreachable("?");
 }
 
 //===----------------------------------------------------------------------===//
