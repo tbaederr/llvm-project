@@ -11373,12 +11373,34 @@ static void AnalyzeComparison(Sema &S, BinaryOperator *E) {
     std::optional<llvm::APSInt> LHSValue =
         LHS->getIntegerConstantExpr(S.Context);
 
+    // E->dumpColor();
+
     // We don't care about expressions whose result is a constant.
-    if (RHSValue && LHSValue)
+    if (RHSValue && LHSValue) {
+      auto *LHSCE = ConstantExpr::Create(S.Context, LHS, APValue(*LHSValue));
+      auto *RHSCE = ConstantExpr::Create(S.Context, RHS, APValue(*RHSValue));
+      E->setLHS(LHSCE);
+      E->setRHS(RHSCE);
+
+      // llvm::errs() << "Both are set!\n";
       return AnalyzeImpConvsInComparison(S, E);
+    }
 
     // We only care about expressions where just one side is literal
     if ((bool)RHSValue ^ (bool)LHSValue) {
+
+      if (LHSValue) {
+        auto *LHSCE = ConstantExpr::Create(S.Context, LHS, APValue(*LHSValue));
+        E->setLHS(LHSCE);
+        LHS = LHSCE;
+      } else if (RHSValue) {
+        auto *RHSCE = ConstantExpr::Create(S.Context, RHS, APValue(*RHSValue));
+        E->setRHS(RHSCE);
+        RHS = RHSCE;
+      }
+
+      // llvm::errs() << "Only one side is constant\n";
+      // llvm::errs() << (bool)RHSValue << " / " << (bool)LHSValue << '\n';
       // Is the constant on the RHS or LHS?
       const bool RhsConstant = (bool)RHSValue;
       Expr *Const = RhsConstant ? RHS : LHS;
