@@ -1743,7 +1743,7 @@ private:
   unsigned NumReturnExprs = 0;
 
   /// Count the number of simple (constant) return expressions in the function.
-  unsigned NumSimpleReturnExprs = 0;
+  bool AllReturnExprsAreSimple = true;
 
   /// The last regular (non-return) debug location (breakpoint) in the function.
   SourceLocation LastStopPoint;

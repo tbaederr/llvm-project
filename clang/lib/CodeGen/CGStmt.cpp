@@ -1715,8 +1715,8 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   }
 
   ++NumReturnExprs;
-  if (!RV || RV->isEvaluatable(getContext()))
-    ++NumSimpleReturnExprs;
+  if (AllReturnExprsAreSimple && (RV && !RV->isEvaluatable(getContext())))
+      AllReturnExprsAreSimple = false;
 
   cleanupScope.ForceCleanup();
   EmitBranchThroughCleanup(ReturnBlock);

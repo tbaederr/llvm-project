@@ -379,9 +379,10 @@ void CodeGenFunction::FinishFunction(SourceLocation EndLoc) {
            "mismatched push/pop in convergence stack!");
   }
 
-  bool OnlySimpleReturnStmts = NumSimpleReturnExprs > 0
-    && NumSimpleReturnExprs == NumReturnExprs
-    && ReturnBlock.getBlock()->use_empty();
+  bool OnlySimpleReturnStmts = AllReturnExprsAreSimple &&
+    // NumSimpleReturnExprs > 0
+    // && NumSimpleReturnExprs == NumReturnExprs
+    ReturnBlock.getBlock()->use_empty();
   // Usually the return expression is evaluated before the cleanup
   // code.  If the function contains only a simple return statement,
   // such as a constant, the location before the cleanup code becomes
