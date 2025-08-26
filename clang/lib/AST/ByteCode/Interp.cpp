@@ -2218,6 +2218,7 @@ static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
 
     if (D->isPrimitiveArray()) {
       PrimType PT = D->getPrimType();
+
       if (!needsAlloc(PT))
         return;
       assert(NumElems >= 1);
@@ -2250,7 +2251,7 @@ bool FinishInitGlobal(InterpState &S, CodePtr OpPC) {
 
   finishGlobalRecurse(S, Ptr);
   if (Ptr.canBeInitialized()) {
-    Ptr.initialize();
+    Ptr.initialize(S);
     Ptr.activate();
   }
 

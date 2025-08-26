@@ -52,8 +52,6 @@ static void dtorTy(Block *, std::byte *Ptr, const Descriptor *) {
 template <typename T>
 static void ctorArrayTy(Block *, std::byte *Ptr, bool, bool, bool, bool, bool,
                         const Descriptor *D) {
-  new (Ptr) InitMapPtr(std::nullopt);
-
   if constexpr (needsCtor<T>()) {
     Ptr += sizeof(InitMapPtr);
     for (unsigned I = 0, NE = D->getNumElems(); I < NE; ++I) {
@@ -64,11 +62,6 @@ static void ctorArrayTy(Block *, std::byte *Ptr, bool, bool, bool, bool, bool,
 
 template <typename T>
 static void dtorArrayTy(Block *, std::byte *Ptr, const Descriptor *D) {
-  InitMapPtr &IMP = *reinterpret_cast<InitMapPtr *>(Ptr);
-
-  if (IMP)
-    IMP = std::nullopt;
-
   if constexpr (needsCtor<T>()) {
     Ptr += sizeof(InitMapPtr);
     for (unsigned I = 0, NE = D->getNumElems(); I < NE; ++I) {
@@ -273,14 +266,22 @@ static BlockDtorFn getDtorPrim(PrimType T) {
   llvm_unreachable("Unhandled PrimType");
 }
 
-static BlockCtorFn getCtorArrayPrim(PrimType Type) {
-  TYPE_SWITCH(Type, return ctorArrayTy<T>);
-  llvm_unreachable("unknown Expr");
-}
-
-static BlockDtorFn getDtorArrayPrim(PrimType Type) {
-  TYPE_SWITCH(Type, return dtorArrayTy<T>);
-  llvm_unreachable("unknown Expr");
+static BlockDtorFn getDtorArrayPrim(PrimType T) {
+  switch (T) {
+  case PT_Float:
+    return dtorArrayTy<PrimConv<PT_Float>::T>;
+  case PT_IntAP:
+    return dtorArrayTy<PrimConv<PT_IntAP>::T>;
+  case PT_IntAPS:
+    return dtorArrayTy<PrimConv<PT_IntAPS>::T>;
+  case PT_Ptr:
+    return dtorArrayTy<PrimConv<PT_Ptr>::T>;
+  case PT_MemberPtr:
+    return dtorArrayTy<PrimConv<PT_MemberPtr>::T>;
+  default:
+    return nullptr;
+  }
+  llvm_unreachable("Unhandled PrimType");
 }
 
 /// Primitives.
@@ -304,8 +305,7 @@ Descriptor::Descriptor(const DeclTy &D, PrimType Type, MetadataSize MD,
       MDSize(MD.value_or(0)),
       AllocSize(align(MDSize) + align(Size) + sizeof(InitMapPtr)), PrimT(Type),
       IsConst(IsConst), IsMutable(IsMutable), IsTemporary(IsTemporary),
-      IsArray(true), CtorFn(getCtorArrayPrim(Type)),
-      DtorFn(getDtorArrayPrim(Type)) {
+      IsArray(true), CtorFn(nullptr), DtorFn(getDtorArrayPrim(Type)) {
   assert(Source && "Missing source");
   assert(NumElems <= (MaxArrayElemBytes / ElemSize));
 }
@@ -317,8 +317,7 @@ Descriptor::Descriptor(const DeclTy &D, PrimType Type, MetadataSize MD,
       MDSize(MD.value_or(0)),
       AllocSize(MDSize + sizeof(InitMapPtr) + alignof(void *)), PrimT(Type),
       IsConst(IsConst), IsMutable(false), IsTemporary(IsTemporary),
-      IsArray(true), CtorFn(getCtorArrayPrim(Type)),
-      DtorFn(getDtorArrayPrim(Type)) {
+      IsArray(true), CtorFn(nullptr), DtorFn(getDtorArrayPrim(Type)) {
   assert(Source && "Missing source");
 }
 
@@ -468,15 +467,16 @@ bool Descriptor::hasTrivialDtor() const {
 
 bool Descriptor::isUnion() const { return isRecord() && ElemRecord->isUnion(); }
 
-InitMap::InitMap(unsigned N)
-    : UninitFields(N), Data(std::make_unique<T[]>(numFields(N))) {}
+InitMap::InitMap(unsigned N) : UninitFields(N) {
+  std::memset(data(), 0, numFields(N) * sizeof(T));
+}
 
 bool InitMap::initializeElement(unsigned I) {
   unsigned Bucket = I / PER_FIELD;
   T Mask = T(1) << (I % PER_FIELD);
   if (!(data()[Bucket] & Mask)) {
     data()[Bucket] |= Mask;
-    UninitFields -= 1;
+    --UninitFields;
   }
   return UninitFields == 0;
 }

@@ -92,6 +92,7 @@ class Pointer {
 private:
   static constexpr unsigned PastEndMark = ~0u;
   static constexpr unsigned RootPtrMark = ~0u;
+  static constexpr unsigned InitMapPtrSize = sizeof(void *);
 
 public:
   Pointer() : StorageKind(Storage::Int), Int{nullptr, 0} {}
@@ -164,8 +165,10 @@ public:
     uint64_t Off = Idx * elemSize();
     if (getFieldDesc()->ElemDesc)
       Off += sizeof(InlineDescriptor);
-    else
-      Off += sizeof(InitMapPtr);
+    else {
+      Off += InitMapPtrSize;
+      // llvm::errs() << "+= " << InitMapPtrSize << '\n';
+    }
     return Pointer(BS.Pointee, BS.Base, BS.Base + Off);
   }
 
@@ -226,7 +229,7 @@ public:
       // Revert to an outer one-past-end pointer.
       unsigned Adjust;
       if (inPrimitiveArray())
-        Adjust = sizeof(InitMapPtr);
+        Adjust = InitMapPtrSize;
       else
         Adjust = sizeof(InlineDescriptor);
       return Pointer(Pointee, BS.Base, BS.Base + getSize() + Adjust);
@@ -381,7 +384,7 @@ public:
       if (getFieldDesc()->ElemDesc)
         Adjust = sizeof(InlineDescriptor);
       else
-        Adjust = sizeof(InitMapPtr);
+        Adjust = InitMapPtrSize;
     }
     return Offset - BS.Base - Adjust;
   }
@@ -666,7 +669,7 @@ public:
 
     if (isArrayRoot())
       return *reinterpret_cast<T *>(BS.Pointee->rawData() + BS.Base +
-                                    sizeof(InitMapPtr));
+                                    InitMapPtrSize);
 
     return *reinterpret_cast<T *>(BS.Pointee->rawData() + Offset);
   }
@@ -682,7 +685,7 @@ public:
     assert(I < getFieldDesc()->getNumElems());
 
     unsigned ElemByteOffset = I * getFieldDesc()->getElemSize();
-    unsigned ReadOffset = BS.Base + sizeof(InitMapPtr) + ElemByteOffset;
+    unsigned ReadOffset = BS.Base + InitMapPtrSize + ElemByteOffset;
     assert(ReadOffset + sizeof(T) <=
            BS.Pointee->getDescriptor()->getAllocSize());
 
@@ -701,7 +704,7 @@ public:
   }
 
   /// Initializes a field.
-  void initialize() const;
+  void initialize(InterpState &S) const;
   /// Initialize all elements of a primitive array at once. This can be
   /// used in situations where we *know* we have initialized *all* elements
   /// of a primtive array.
@@ -804,11 +807,12 @@ private:
            1;
   }
 
+private:
   /// Returns a reference to the InitMapPtr which stores the initialization map.
-  InitMapPtr &getInitMap() const {
+  InitMap **getInitMap() const {
     assert(isBlockPointer());
     assert(!isZero());
-    return *reinterpret_cast<InitMapPtr *>(BS.Pointee->rawData() + BS.Base);
+    return reinterpret_cast<InitMap **>(BS.Pointee->rawData() + BS.Base);
   }
 
   /// Offset into the storage.

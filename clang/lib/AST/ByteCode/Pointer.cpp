@@ -13,6 +13,7 @@
 #include "Function.h"
 #include "Integral.h"
 #include "InterpBlock.h"
+#include "InterpState.h"
 #include "MemberPointer.h"
 #include "PrimType.h"
 #include "Record.h"
@@ -455,9 +456,6 @@ bool Pointer::isElementInitialized(unsigned Index) const {
   if (!isBlockPointer())
     return true;
 
-  const Descriptor *Desc = getFieldDesc();
-  assert(Desc);
-
   if (isStatic() && BS.Base == 0)
     return true;
 
@@ -467,24 +465,30 @@ bool Pointer::isElementInitialized(unsigned Index) const {
     return GD.InitState == GlobalInitState::Initialized;
   }
 
+  const Descriptor *Desc = getFieldDesc();
+  assert(Desc);
   if (Desc->isPrimitiveArray()) {
-    InitMapPtr &IM = getInitMap();
+    InitMap **IMPtr = getInitMap();
+    InitMap *IM = *IMPtr;
+
     if (!IM)
       return false;
 
-    if (IM->first)
+    if (InitMap::allInitialized(IM))
       return true;
-
-    return IM->second->isElementInitialized(Index);
+    return IM->isElementInitialized(getIndex());
   }
   return isInitialized();
 }
 
-void Pointer::initialize() const {
+void Pointer::initialize(InterpState &S) const {
   if (!isBlockPointer())
     return;
 
   assert(BS.Pointee && "Cannot initialize null pointer");
+
+  if (isStatic() && BS.Base == 0)
+    return;
 
   if (isRoot() && BS.Base == sizeof(GlobalInlineDescriptor)) {
     GlobalInlineDescriptor &GD = *reinterpret_cast<GlobalInlineDescriptor *>(
@@ -496,29 +500,34 @@ void Pointer::initialize() const {
   const Descriptor *Desc = getFieldDesc();
   assert(Desc);
   if (Desc->isPrimitiveArray()) {
-    // Primitive global arrays don't have an initmap.
-    if (isStatic() && BS.Base == 0)
-      return;
-
     // Nothing to do for these.
     if (Desc->getNumElems() == 0)
       return;
 
-    InitMapPtr &IM = getInitMap();
-    if (!IM)
-      IM =
-          std::make_pair(false, std::make_shared<InitMap>(Desc->getNumElems()));
+    InitMap **IMPtr = getInitMap();
+    InitMap *IM = *IMPtr;
 
-    assert(IM);
-
-    // All initialized.
-    if (IM->first)
+    if (InitMap::allInitialized(IM))
       return;
 
-    if (IM->second->initializeElement(getIndex())) {
-      IM->first = true;
-      IM->second.reset();
+    // nullptr means no initmap yet.
+    if (!IM) {
+      unsigned NumElems = Desc->getNumElems();
+      if (block()->isStatic()) {
+        IM = (InitMap *)S.P.Allocate(InitMap::allocBytes(NumElems),
+                                     alignof(InitMap));
+      } else {
+        IM = (InitMap *)S.allocate(InitMap::allocBytes(NumElems),
+                                   alignof(InitMap));
+      }
+      new (IM) InitMap(NumElems);
+      *IMPtr = IM;
     }
+
+    assert(IM);
+    if (IM->initializeElement(getIndex()))
+      InitMap::markAllInitialized(IMPtr);
+
     return;
   }
 
@@ -531,13 +540,8 @@ void Pointer::initializeAllElements() const {
   assert(getFieldDesc()->isPrimitiveArray());
   assert(isArrayRoot());
 
-  InitMapPtr &IM = getInitMap();
-  if (!IM) {
-    IM = std::make_pair(true, nullptr);
-  } else {
-    IM->first = true;
-    IM->second.reset();
-  }
+  InitMap **IMPtr = getInitMap();
+  InitMap::markAllInitialized(IMPtr);
 }
 
 bool Pointer::allElementsInitialized() const {
@@ -553,8 +557,9 @@ bool Pointer::allElementsInitialized() const {
     return GD.InitState == GlobalInitState::Initialized;
   }
 
-  InitMapPtr &IM = getInitMap();
-  return IM && IM->first;
+  InitMap **IMPtr = getInitMap();
+  InitMap *IM = *IMPtr;
+  return InitMap::allInitialized(IM);
 }
 
 void Pointer::activate() const {
