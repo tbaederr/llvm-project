@@ -280,6 +280,11 @@ public:
 };
 
 /// Bitfield tracking the initialisation status of elements of primitive arrays.
+///
+/// InitMaps are saved for primitive arrays, so we don't have to have a
+/// per-element InlineDescriptor.
+///
+///
 struct alignas(alignof(uint64_t)) InitMap final {
 private:
   /// Type packing bits.
@@ -290,6 +295,39 @@ private:
 public:
   /// Initializes the map with no fields set.
   explicit InitMap(unsigned N);
+
+
+  static bool isInline(size_t N) {
+    return N < 64;
+  }
+
+  // FIXME.
+  static_assert(sizeof(uintptr_t) == sizeof(T));
+  static bool isInlineElementInitialized(uintptr_t BucketValue, unsigned I) {
+    // llvm::errs() << "BucketValue: " << BucketValue << '\n';
+    return BucketValue & (T(1) << I);
+  }
+
+  static bool initializeInlineElement(InitMap **IMPtr, size_t NumElems, unsigned I) {
+    assert(isInline(NumElems));
+    assert(I < NumElems);
+    uintptr_t BucketValue = reinterpret_cast<uintptr_t>(*IMPtr);
+    // llvm::errs()<< "BucketValue before: " << BucketValue << '\n';
+    T Mask = T(1) << I;
+    if (!(BucketValue & Mask)) {
+      // llvm::errs() << "Mask: " << Mask << '\n';
+      BucketValue |= Mask;
+
+      std::memcpy(IMPtr, &BucketValue, sizeof(BucketValue));
+
+      // std::memset(IMPtr, static_cast<unsigned >(BucketValue | Mask),
+                // sizeof(BucketValue));
+    }
+    // llvm::errs() << "BucketValue Now: " << reinterpret_cast<uintptr_t>(*IMPtr) << '\n';
+    // llvm::errs() << "BucketValue Now: " << std::bitset<64>(reinterpret_cast<uintptr_t>(*IMPtr)).to_string() << '\n';
+
+    return BucketValue == ((T(1) << NumElems) - 1u);
+  }
 
   /// Checks if all elements have been initialized.
   static bool allInitialized(const InitMap *IM) {

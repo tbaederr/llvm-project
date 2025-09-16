@@ -446,7 +446,7 @@ bool Pointer::isInitialized() const {
   if (Desc->isPrimitiveArray())
     return isElementInitialized(getIndex());
 
-  if (asBlockPointer().Base == 0)
+  if (BS.Base == 0)
     return true;
   // Field has its bit in an inline descriptor.
   return getInlineDesc()->IsInitialized;
@@ -468,15 +468,26 @@ bool Pointer::isElementInitialized(unsigned Index) const {
   const Descriptor *Desc = getFieldDesc();
   assert(Desc);
   if (Desc->isPrimitiveArray()) {
+    unsigned NumElems = Desc->getNumElems();
+    assert(NumElems != 0);
+
+
     InitMap **IMPtr = getInitMap();
     InitMap *IM = *IMPtr;
+
+    if (InitMap::isInline(NumElems)) {
+      // llvm::errs() << "AHA: " << NumElems << "\n";
+      // llvm::errs() << "IM: " << IM << '\n';
+      return InitMap::allInitialized(IM) || InitMap::isInlineElementInitialized(reinterpret_cast<uintptr_t>(IM), Index);
+    }
+
 
     if (!IM)
       return false;
 
     if (InitMap::allInitialized(IM))
       return true;
-    return IM->isElementInitialized(getIndex());
+    return IM->isElementInitialized(Index);
   }
   return isInitialized();
 }
@@ -500,8 +511,9 @@ void Pointer::initialize(InterpState &S) const {
   const Descriptor *Desc = getFieldDesc();
   assert(Desc);
   if (Desc->isPrimitiveArray()) {
+    unsigned NumElems = Desc->getNumElems();
     // Nothing to do for these.
-    if (Desc->getNumElems() == 0)
+    if (NumElems == 0)
       return;
 
     InitMap **IMPtr = getInitMap();
@@ -510,9 +522,16 @@ void Pointer::initialize(InterpState &S) const {
     if (InitMap::allInitialized(IM))
       return;
 
+    // Inline InitMap.
+    if (InitMap::isInline(NumElems)) {
+      // llvm::errs() << "Initializing element " << getIndex() << " in inline init map\n";
+      if (InitMap::initializeInlineElement(IMPtr, NumElems, getIndex()))
+        InitMap::markAllInitialized(IMPtr);
+      return;
+    }
+
     // nullptr means no initmap yet.
     if (!IM) {
-      unsigned NumElems = Desc->getNumElems();
       if (block()->isStatic()) {
         IM = (InitMap *)S.P.Allocate(InitMap::allocBytes(NumElems),
                                      alignof(InitMap));
