@@ -31,7 +31,7 @@ public:
 
   /// Constructs a value in place on the top of the stack.
   template <typename T, typename... Tys> void push(Tys &&...Args) {
-    new (grow(aligned_size<T>())) T(std::forward<Tys>(Args)...);
+    new (grow<aligned_size<T>()>()) T(std::forward<Tys>(Args)...);
     ItemTypes.push_back(toPrimType<T>());
   }
 
@@ -89,7 +89,7 @@ public:
 private:
   /// All stack slots are aligned to the native pointer alignment for storage.
   /// The size of an object is rounded up to a pointer alignment multiple.
-  template <typename T> constexpr size_t aligned_size() const {
+  template <typename T> static constexpr size_t aligned_size() {
     constexpr size_t PtrAlign = alignof(void *);
     return ((sizeof(T) + PtrAlign - 1) / PtrAlign) * PtrAlign;
   }
@@ -100,7 +100,32 @@ private:
   }
 
   /// Grows the stack to accommodate a value and returns a pointer to it.
-  void *grow(size_t Size);
+  template<size_t Size>
+  void *grow() {
+    assert(Size < ChunkSize - sizeof(StackChunk) && "Object too large");
+
+    // Allocate a new stack chunk if necessary.
+    if (LLVM_UNLIKELY(!Chunk)) {
+      Chunk = new (std::malloc(ChunkSize)) StackChunk(Chunk);
+    } else if (LLVM_UNLIKELY(Chunk->size() > ChunkSize - sizeof(StackChunk) - Size)) {
+      if (Chunk->Next) {
+        Chunk = Chunk->Next;
+      } else {
+        StackChunk *Next = new (std::malloc(ChunkSize)) StackChunk(Chunk);
+        Chunk->Next = Next;
+        Chunk = Next;
+      }
+    }
+
+  auto *Object = reinterpret_cast<void *>(Chunk->start() + Chunk->Size);
+  Chunk->Size += Size;
+  StackSize += Size;
+  return Object;
+}
+
+
+
+
   /// Returns a pointer from the top of the stack.
   void *peekData(size_t Size) const;
   /// Shrinks the stack.

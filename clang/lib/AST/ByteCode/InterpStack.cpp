@@ -53,28 +53,6 @@ void InterpStack::clearTo(size_t NewSize) {
   assert(size() == NewSize);
 }
 
-void *InterpStack::grow(size_t Size) {
-  assert(Size < ChunkSize - sizeof(StackChunk) && "Object too large");
-
-  // Allocate a new stack chunk if necessary.
-  if (LLVM_UNLIKELY(!Chunk)) {
-    Chunk = new (std::malloc(ChunkSize)) StackChunk(Chunk);
-  } else if (LLVM_UNLIKELY(Chunk->size() + Size > ChunkSize - sizeof(StackChunk))) {
-    if (Chunk->Next) {
-      Chunk = Chunk->Next;
-    } else {
-      StackChunk *Next = new (std::malloc(ChunkSize)) StackChunk(Chunk);
-      Chunk->Next = Next;
-      Chunk = Next;
-    }
-  }
-
-  auto *Object = reinterpret_cast<void *>(Chunk->start() + Chunk->Size);
-  Chunk->Size += Size;
-  StackSize += Size;
-  return Object;
-}
-
 void *InterpStack::peekData(size_t Size) const {
   assert(Chunk && "Stack is empty!");
 
