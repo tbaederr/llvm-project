@@ -24,7 +24,7 @@ namespace interp {
 /// Stack frame storing temporaries and parameters.
 class InterpStack final {
 public:
-  InterpStack() {}
+  InterpStack() = default;
 
   /// Destroys the stack, freeing up storage.
   ~InterpStack();
@@ -118,13 +118,13 @@ private:
   struct StackChunk {
     StackChunk *Next;
     StackChunk *Prev;
-    char *End;
+    uint32_t Size;
 
     StackChunk(StackChunk *Prev = nullptr)
-        : Next(nullptr), Prev(Prev), End(reinterpret_cast<char *>(this + 1)) {}
+        : Next(nullptr), Prev(Prev), Size(0) {}
 
     /// Returns the size of the chunk, minus the header.
-    size_t size() const { return End - start(); }
+    size_t size() const { return Size; }
 
     /// Returns a pointer to the start of the data region.
     char *start() { return reinterpret_cast<char *>(this + 1); }
