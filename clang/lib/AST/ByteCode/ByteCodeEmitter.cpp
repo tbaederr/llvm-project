@@ -208,7 +208,7 @@ void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
 
 template <typename... Tys>
 bool ByteCodeEmitter::emitOp(Opcode Op, const Tys &...Args,
-                             const SourceInfo &SI) {
+                  SourceInfo SI) {
   bool Success = true;
 
   // The opcode is followed by arguments. The source info is
@@ -216,8 +216,9 @@ bool ByteCodeEmitter::emitOp(Opcode Op, const Tys &...Args,
   emit(P, Code, Op, Success);
   if (LocOverride)
     SrcMap.emplace_back(Code.size(), *LocOverride);
-  else if (SI)
+  else if (SI) {
     SrcMap.emplace_back(Code.size(), SI);
+  }
 
   (..., emit(P, Code, Args, Success));
   return Success;

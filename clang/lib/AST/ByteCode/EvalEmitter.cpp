@@ -180,7 +180,7 @@ bool EvalEmitter::speculate(const CallExpr *E, const LabelTy &EndLabel) {
   return this->emitBool(true, E);
 }
 
-template <PrimType OpType> bool EvalEmitter::emitRet(const SourceInfo &Info) {
+template <PrimType OpType> bool EvalEmitter::emitRet(SourceInfo Info) {
   if (!isActive())
     return true;
 
@@ -189,7 +189,7 @@ template <PrimType OpType> bool EvalEmitter::emitRet(const SourceInfo &Info) {
   return true;
 }
 
-template <> bool EvalEmitter::emitRet<PT_Ptr>(const SourceInfo &Info) {
+template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
   if (!isActive())
     return true;
 
@@ -250,12 +250,12 @@ template <> bool EvalEmitter::emitRet<PT_Ptr>(const SourceInfo &Info) {
   return true;
 }
 
-bool EvalEmitter::emitRetVoid(const SourceInfo &Info) {
+bool EvalEmitter::emitRetVoid(SourceInfo Info) {
   EvalResult.setValid();
   return true;
 }
 
-bool EvalEmitter::emitRetValue(const SourceInfo &Info) {
+bool EvalEmitter::emitRetValue(SourceInfo Info) {
   const auto &Ptr = S.Stk.pop<Pointer>();
 
   if (!EvalResult.checkReturnValue(S, Ctx, Ptr, Info))
@@ -273,7 +273,7 @@ bool EvalEmitter::emitRetValue(const SourceInfo &Info) {
   return false;
 }
 
-bool EvalEmitter::emitGetPtrLocal(uint32_t I, const SourceInfo &Info) {
+bool EvalEmitter::emitGetPtrLocal(uint32_t I, SourceInfo Info) {
   if (!isActive())
     return true;
 
@@ -283,7 +283,7 @@ bool EvalEmitter::emitGetPtrLocal(uint32_t I, const SourceInfo &Info) {
 }
 
 template <PrimType OpType>
-bool EvalEmitter::emitGetLocal(uint32_t I, const SourceInfo &Info) {
+bool EvalEmitter::emitGetLocal(uint32_t I, SourceInfo Info) {
   if (!isActive())
     return true;
 
@@ -299,7 +299,7 @@ bool EvalEmitter::emitGetLocal(uint32_t I, const SourceInfo &Info) {
 }
 
 template <PrimType OpType>
-bool EvalEmitter::emitSetLocal(uint32_t I, const SourceInfo &Info) {
+bool EvalEmitter::emitSetLocal(uint32_t I, SourceInfo Info) {
   if (!isActive())
     return true;
 
@@ -313,7 +313,7 @@ bool EvalEmitter::emitSetLocal(uint32_t I, const SourceInfo &Info) {
   return true;
 }
 
-bool EvalEmitter::emitDestroy(uint32_t I, const SourceInfo &Info) {
+bool EvalEmitter::emitDestroy(uint32_t I, SourceInfo Info) {
   if (!isActive())
     return true;
 
