@@ -57,7 +57,13 @@ struct TypeidPointer {
   const Type *TypeInfoType;
 };
 
-enum class Storage { Int, Block, Fn, Typeid };
+/// A pointer that points to valid memory, but the offset is degenerate in that
+/// it doesn't point to anything we can read from, e.g. before the object.
+struct DegenPointer {
+  const Block *Pointee;
+};
+
+enum class Storage { Int, Block, Fn, Typeid, Degen };
 
 /// A pointer to a memory block, live or dead.
 ///
@@ -111,6 +117,8 @@ public:
     Typeid.TypePtr = TypePtr;
     Typeid.TypeInfoType = TypeInfoType;
   }
+  Pointer(DegenPointer DP, uint64_t Offset = 0)
+      : Offset(Offset), StorageKind(Storage::Degen), DP(DP) {}
   Pointer(Block *Pointee, unsigned Base, uint64_t Offset);
   ~Pointer();
 
@@ -146,7 +154,11 @@ public:
       return Int.Value + (Offset * elemSize());
     if (isFunctionPointer())
       return Fn.getIntegerRepresentation() + Offset;
-    return reinterpret_cast<uint64_t>(BS.Pointee) + Offset;
+    if (isDegenPointer())
+      return reinterpret_cast<uint64_t>(DP.Pointee) + Offset;
+    assert(isBlockPointer());
+    return reinterpret_cast<uint64_t>(BS.Pointee) +
+           (Offset - BS.Pointee->getDescriptor()->getMetadataSize());
   }
 
   /// Converts the pointer to an APValue that is an rvalue.
@@ -266,6 +278,8 @@ public:
       return Fn.isZero();
     case Storage::Typeid:
       return false;
+    case Storage::Degen:
+      return DP.Pointee == nullptr;
     }
     llvm_unreachable("Unknown clang::interp::Storage enum");
   }
@@ -287,6 +301,11 @@ public:
   const Descriptor *getDeclDesc() const {
     if (isIntegralPointer())
       return Int.Desc;
+    if (isDegenPointer()) {
+      if (DP.Pointee)
+        return DP.Pointee->Desc;
+      return nullptr;
+    }
     if (isFunctionPointer() || isTypeidPointer())
       return nullptr;
 
@@ -331,6 +350,11 @@ public:
   const Descriptor *getFieldDesc() const {
     if (isIntegralPointer())
       return Int.Desc;
+    if (isDegenPointer()) {
+      if (DP.Pointee)
+        return DP.Pointee->Desc;
+      return nullptr;
+    }
 
     if (isRoot())
       return getDeclDesc();
@@ -471,10 +495,11 @@ public:
     return Typeid;
   }
 
-  bool isBlockPointer() const { return StorageKind == Storage::Block; }
   bool isIntegralPointer() const { return StorageKind == Storage::Int; }
+  bool isBlockPointer() const { return StorageKind == Storage::Block; }
   bool isFunctionPointer() const { return StorageKind == Storage::Fn; }
   bool isTypeidPointer() const { return StorageKind == Storage::Typeid; }
+  bool isDegenPointer() const { return StorageKind == Storage::Degen; }
 
   /// Returns the record descriptor of a class.
   const Record *getRecord() const { return getFieldDesc()->ElemRecord; }
@@ -831,6 +856,7 @@ private:
     BlockPointer BS;
     FunctionPointer Fn;
     TypeidPointer Typeid;
+    DegenPointer DP;
   };
 };
 
