@@ -33,6 +33,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include <type_traits>
+#include "InterpHelpers.h"
 
 namespace clang {
 namespace interp {
@@ -1010,6 +1011,7 @@ bool CmpHelper(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   using BoolT = PrimConv<PT_Bool>::T;
   const T &RHS = S.Stk.pop<T>();
   const T &LHS = S.Stk.pop<T>();
+  // llvm::errs() << LHS << " == " << RHS << '\n';
   S.Stk.push<BoolT>(BoolT::from(Fn(LHS.compare(RHS))));
   return true;
 }
@@ -1725,6 +1727,7 @@ bool InitBitFieldActivate(InterpState &S, CodePtr OpPC,
 //===----------------------------------------------------------------------===//
 
 inline bool GetPtrLocal(InterpState &S, CodePtr OpPC, uint32_t I) {
+  // llvm::errs() << "GET PTR LOCAL(" << I << ") : " << S.Current->getLocalPointer(I) << '\n';
   S.Stk.push<Pointer>(S.Current->getLocalPointer(I));
   return true;
 }
@@ -1937,8 +1940,10 @@ inline bool GetPtrThisVirtBase(InterpState &S, CodePtr OpPC,
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool Load(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.peek<Pointer>();
-  if (!CheckLoad(S, OpPC, Ptr))
+  if (!CheckLoad(S, OpPC, Ptr)) {
+    // llvm::errs()<< "CheckLoad failed 1\n";
     return false;
+  }
   if (!Ptr.isBlockPointer())
     return false;
   S.Stk.push<T>(Ptr.deref<T>());
@@ -1948,8 +1953,10 @@ bool Load(InterpState &S, CodePtr OpPC) {
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool LoadPop(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-  if (!CheckLoad(S, OpPC, Ptr))
+  if (!CheckLoad(S, OpPC, Ptr)) {
+    // llvm::errs()<< "CheckLoad failed 2\n";
     return false;
+  }
   if (!Ptr.isBlockPointer())
     return false;
   S.Stk.push<T>(Ptr.deref<T>());
@@ -1960,6 +1967,9 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool Store(InterpState &S, CodePtr OpPC) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << " = " << Value << '\n';
   if (!CheckStore(S, OpPC, Ptr))
     return false;
   if (Ptr.canBeInitialized())
@@ -1972,6 +1982,11 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool StorePop(InterpState &S, CodePtr OpPC) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
+
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << " = " << Value << '\n';
+
   if (!CheckStore(S, OpPC, Ptr))
     return false;
   if (Ptr.canBeInitialized())
@@ -2122,8 +2137,10 @@ bool InitPop(InterpState &S, CodePtr OpPC) {
 /// 3) Sets the value on the pointer, leaving the pointer on the stack.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
+  //llvm::errs() << __PRETTY_FUNCTION__ << ": " << Idx << '\n';
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
+  // llvm::errs() << Ptr << " = " << Value << '\n';
 
   const Descriptor *Desc = Ptr.getFieldDesc();
   if (Desc->isUnknownSizeArray())
@@ -2139,7 +2156,13 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
 
   if (!CheckLive(S, OpPC, Ptr, AK_Assign))
     return false;
-  if (Idx >= Desc->getNumElems()) {
+
+  ensureArraySize(S.P, Ptr, Idx);
+
+  bool Init =  true;//Idx < Desc->getNumElems();
+  // if (Idx >= (Desc->getNumElemsWithoutFiller())) {
+  if (Idx >= (Desc->getNumElems())) {
+    // llvm::errs() << "CheckRange failure!\n";
     // CheckRange.
     if (S.getLangOpts().CPlusPlus) {
       const SourceInfo &Loc = S.Current->getSource(OpPC);
@@ -2148,14 +2171,17 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
     }
     return false;
   }
-  Ptr.initializeElement(Idx);
+  if (Init)
+    Ptr.initializeElement(Idx);
   new (&Ptr.elem<T>(Idx)) T(Value);
+  // llvm::errs() << "true\n";
   return true;
 }
 
 /// The same as InitElem, but pops the pointer as well.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << ": " << Idx << '\n';
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
@@ -2171,9 +2197,11 @@ bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
     return true;
   }
 
+  ensureArraySize(S.P, Ptr, Idx);
+
   if (!CheckLive(S, OpPC, Ptr, AK_Assign))
     return false;
-  if (Idx >= Desc->getNumElems()) {
+  if (Idx >= Desc->getNumElemsWithoutFiller()) {
     // CheckRange.
     if (S.getLangOpts().CPlusPlus) {
       const SourceInfo &Loc = S.Current->getSource(OpPC);
@@ -2223,6 +2251,7 @@ template <class T, ArithOp Op>
 std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
                                     const T &Offset, const Pointer &Ptr,
                                     bool IsPointerArith = false) {
+                                      // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   // A zero offset does not change the pointer.
   if (Offset.isZero())
     return Ptr;
@@ -2264,7 +2293,7 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
 
   assert(Ptr.isBlockPointer());
 
-  uint64_t MaxIndex = static_cast<uint64_t>(Ptr.getNumElems());
+  uint64_t MaxIndex = static_cast<uint64_t>(Ptr.getCapacity());
   uint64_t Index;
   if (Ptr.isOnePastEnd())
     Index = MaxIndex;
@@ -2289,6 +2318,10 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
     uint64_t IOffset = static_cast<uint64_t>(Offset);
     uint64_t MaxOffset = MaxIndex - Index;
 
+    // llvm::errs() << "IOffset: " << IOffset << '\n';
+    // llvm::errs() << "MaxOffset: " << MaxOffset << '\n';
+    // llvm::errs() << MaxIndex << " / " << Index << '\n';
+
     if constexpr (Op == ArithOp::Add) {
       // If the new offset would be negative, bail out.
       if (Offset.isNegative() && (Offset.isMin() || -IOffset > Index))
@@ -2308,8 +2341,9 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
     }
   }
 
-  if (Invalid && S.getLangOpts().CPlusPlus)
+  if (Invalid && S.getLangOpts().CPlusPlus) {
     return std::nullopt;
+  }
 
   // Offset is valid - compute it on unsigned.
   int64_t WideIndex = static_cast<int64_t>(Index);
@@ -2320,6 +2354,9 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
   else
     Result = WideIndex - WideOffset;
 
+  // Ptr.block()->dump();
+  ensureArraySize(S.P, Ptr, Result);
+
   // When the pointer is one-past-end, going back to index 0 is the only
   // useful thing we can do. Any other index has been diagnosed before and
   // we don't get here.
@@ -2329,11 +2366,15 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
     return Pointer(Ptr.asBlockPointer().Pointee, Ptr.asBlockPointer().Base);
   }
 
+
+
+
   return Ptr.atIndex(static_cast<uint64_t>(Result));
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool AddOffset(InterpState &S, CodePtr OpPC) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   const T &Offset = S.Stk.pop<T>();
   Pointer Ptr = S.Stk.pop<Pointer>();
   if (Ptr.isBlockPointer())
@@ -3089,6 +3130,7 @@ inline bool ExpandPtr(InterpState &S, CodePtr OpPC) {
 // with the offset applied and narrowed.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElemPtr(InterpState &S, CodePtr OpPC) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   const T &Offset = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
 
@@ -3098,6 +3140,7 @@ inline bool ArrayElemPtr(InterpState &S, CodePtr OpPC) {
   }
 
   if (Offset.isZero()) {
+    ensureArraySize(S.P, Ptr, 0);
     if (const Descriptor *Desc = Ptr.getFieldDesc();
         Desc && Desc->isArray() && Ptr.getIndex() == 0) {
       S.Stk.push<Pointer>(Ptr.atIndex(0).narrow());
@@ -3120,6 +3163,7 @@ inline bool ArrayElemPtr(InterpState &S, CodePtr OpPC) {
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElemPtrPop(InterpState &S, CodePtr OpPC) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   const T &Offset = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
@@ -3129,6 +3173,7 @@ inline bool ArrayElemPtrPop(InterpState &S, CodePtr OpPC) {
   }
 
   if (Offset.isZero()) {
+    ensureArraySize(S.P, Ptr, 0);
     if (const Descriptor *Desc = Ptr.getFieldDesc();
         Desc && Desc->isArray() && Ptr.getIndex() == 0) {
       S.Stk.push<Pointer>(Ptr.atIndex(0).narrow());
@@ -3164,6 +3209,13 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElemPop(InterpState &S, CodePtr OpPC, uint32_t Index) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
+  // if (Index == Ptr.getFieldDesc()->getNumElemsWithoutFiller() &&
+      // Index < Ptr.getFieldDesc()->Capacity &&
+      // Ptr.getFieldDesc()->hasArrayFiller()) {
+    // S.Stk.push<T>(Ptr.elem<T>(Ptr.getNumElems()));
+    // return true;
+  // }
+
   if (!CheckLoad(S, OpPC, Ptr))
     return false;
 
@@ -3191,6 +3243,45 @@ inline bool CopyArray(InterpState &S, CodePtr OpPC, uint32_t SrcIndex,
     DestPtr.initializeElement(DestIndex + I);
   }
   return true;
+}
+
+inline bool SetArrayFillerPtr(InterpState &S, CodePtr OpPC, uint32_t LocalIndex) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  const auto &FillerValue = S.Stk.pop<Pointer>();
+  const auto &Arr = S.Stk.peek<Pointer>();
+
+
+
+  // llvm::errs() << "Array: " << Arr << '\n';
+  // Arr.getFieldDesc()->dump();
+  assert(Arr.getFieldDesc()->hasArrayFiller());
+  // llvm::errs() << "FillerValue: " << FillerValue << '\n';
+  // FillerValue.getFieldDesc()->dump();
+  assert(Arr.isArrayRoot());
+  assert(FillerValue.isRoot());
+
+
+  assert(Arr.getNumAllocatedElems() < Arr.getNumAllocatedElemsWithFiller());
+  // llvm::errs() << Arr.getNumAllocatedElems() << '\n';
+  // llvm::errs() << Arr.getNumAllocatedElemsWithFiller() << '\n';
+  // llvm::errs() << "Filler index: " << (Arr.getNumAllocatedElems())<< '\n';
+  Pointer ArrayFillerDest = Arr.atIndex(Arr.getNumAllocatedElems()).narrow();
+ // ArrayFillerDest = Pointer(Arr.block(),
+  // llvm::errs()<< "Filler ptr: " << ArrayFillerDest << '\n';
+
+  // ArrayFillerDest.getFieldDesc()->dump();
+
+  if (Arr.getFieldDesc()->isPrimitiveArray()) {
+    // llvm::errs() << "Primitive array!\n";
+    TYPE_SWITCH(ArrayFillerDest.getFieldDesc()->getPrimType(),
+      // {ArrayFillerDest.deref<T>() = FillerValue.deref<T>();});
+  {new (&ArrayFillerDest.deref<T>()) T(FillerValue.deref<T>()); });// = FillerValue.deref<T>();});
+    return true;
+ //   ArrayFiller
+  }
+
+
+  return DoMemcpy(S, OpPC, FillerValue, ArrayFillerDest);
 }
 
 /// Just takes a pointer and checks if it's an incomplete

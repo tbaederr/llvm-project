@@ -142,8 +142,13 @@ public:
     IsInitialized = false;
   }
 
+  void moveArrayData(Block *To) const {
+    Desc->moveArrayData(this, To);
+  }
+
   void dump() const { dump(llvm::errs()); }
   void dump(llvm::raw_ostream &OS) const;
+  void dumpContents() const;
 
   bool isAccessible() const { return AccessFlags == 0; }
 

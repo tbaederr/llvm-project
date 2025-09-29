@@ -16,6 +16,9 @@
 #include "PrimType.h"
 #include "Program.h"
 #include "clang/AST/Attr.h"
+#include "clang/Basic/UnsignedOrNone.h"
+#include "llvm/ADT/ScopeExit.h"
+#include "llvm/Support/Casting.h"
 
 using namespace clang;
 using namespace clang::interp;
@@ -1937,16 +1940,30 @@ bool Compiler<Emitter>::visitInitList(ArrayRef<const Expr *> Inits,
   }
 
   if (QT->isArrayType()) {
+    // E->dumpColor();
     if (Inits.size() == 1 && QT == Inits[0]->getType())
       return this->delegate(Inits[0]);
 
     const ConstantArrayType *CAT =
         Ctx.getASTContext().getAsConstantArrayType(QT);
-    uint64_t NumElems = CAT->getZExtSize();
+    uint64_t Capacity = CAT->getZExtSize();
 
-    if (!this->emitCheckArraySize(NumElems, E))
+    if (!this->emitCheckArraySize(Capacity, E))
       return false;
 
+#if 0
+    E->dumpColor();
+    llvm::errs() << "Initializer:\n";
+    if (Initializer)
+      Initializer->dumpColor();
+    else
+     llvm::errs() << "NULL\n";
+    if (InitializingDecl)
+      InitializingDecl->dumpColor();
+    else
+     llvm::errs() << "NULL\n";
+    llvm::errs() << "\n";
+#endif
     OptPrimType InitT = classify(CAT->getElementType());
     unsigned ElementIndex = 0;
     for (const Expr *Init : Inits) {
@@ -1977,15 +1994,68 @@ bool Compiler<Emitter>::visitInitList(ArrayRef<const Expr *> Inits,
       }
     }
 
-    // Expand the filler expression.
-    // FIXME: This should go away.
-    if (ArrayFiller) {
-      for (; ElementIndex != NumElems; ++ElementIndex) {
-        if (!this->visitArrayElemInit(ElementIndex, ArrayFiller, InitT))
+    auto isInit = [&](const Expr *E) -> bool{
+      if (const auto *VD = dyn_cast_if_present<VarDecl>(this->InitializingDecl))
+        return E == VD->getInit();
+      return false;
+    };
+
+    // llvm::errs() << "ElementIndex: " << ElementIndex << '\n';
+
+
+
+    if (isInit(E) && ArraySize::shouldUseFiller(ElementIndex, Capacity) &&
+        Context::shouldBeGloballyIndexed(InitializingDecl)) {
+      // llvm::errs() << "ADDING THE ARRAY FILLER... at index " << ElementIndex
+                    // << "\n";
+      assert(ArrayFiller);
+
+      unsigned TempOffset = 0;
+      if (InitT) {
+        TempOffset = this->allocateLocalPrimitive(ArrayFiller, *InitT, /*IsConst=*/false);
+        if (!this->visit(ArrayFiller))
           return false;
+        if (!this->emitSetLocal(*InitT, TempOffset, ArrayFiller))
+          return false;
+      } else {
+        if (UnsignedOrNone LocalOffset = this->allocateLocal(ArrayFiller)) {
+          TempOffset = *LocalOffset;
+          // llvm::errs() << "Filler Offset: " << TempOffset << '\n';
+          if (!this->emitGetPtrLocal(*LocalOffset, E))
+            return false;
+
+          if (!this->visitInitializer(ArrayFiller))
+            return false;
+
+          if (!this->emitFinishInitPop(ArrayFiller))
+            return false;
+        } else {
+          return false;
+        }
+      }
+
+      // Now copy the array filler from the local to the array.
+
+      if (!this->emitGetPtrLocal(TempOffset, E))
+        return false;
+      if (!this->emitSetArrayFillerPtr(TempOffset, E))
+        return false;
+
+
+
+ //     if (!this->visitArrayElemInit(ElementIndex, ArrayFiller, InitT))
+  //      return false;
+    } else {
+      // Expand the filler expression.
+      if (ArrayFiller) {
+        for (; ElementIndex != Capacity; ++ElementIndex) {
+          if (!this->visitArrayElemInit(ElementIndex, ArrayFiller, InitT))
+            return false;
+        }
       }
     }
 
+  //  assert(false);
     return this->emitFinishInit(E);
   }
 
@@ -4235,9 +4305,12 @@ template <class Emitter>
 bool Compiler<Emitter>::visitInitializer(const Expr *E) {
   assert(!canClassify(E->getType()));
 
+  this->Initializer = E;
   OptionScope<Emitter> Scope(this, /*NewDiscardResult=*/false,
                              /*NewInitializing=*/true, /*ToLValue=*/false);
-  return this->Visit(E);
+  bool b = this->Visit(E);
+  this->Initializer = nullptr;
+  return b;
 }
 
 template <class Emitter> bool Compiler<Emitter>::visitAsLValue(const Expr *E) {
@@ -4884,6 +4957,8 @@ Compiler<Emitter>::visitVarDecl(const VarDecl *VD, const Expr *Init,
   }
   // Local variables.
   InitLinkScope<Emitter> ILS(this, InitLink::Decl(VD));
+  this->InitializingDecl =VD;
+  //DeclScope<Emitter> LocalScope(this, VD);
 
   if (VarT) {
     unsigned Offset = this->allocateLocalPrimitive(

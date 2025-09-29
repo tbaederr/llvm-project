@@ -187,6 +187,7 @@ template <PrimType OpType> bool EvalEmitter::emitRet(SourceInfo Info) {
 }
 
 template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   if (!isActive())
     return true;
 
@@ -201,21 +202,28 @@ template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
   if (this->PtrCB)
     return (*this->PtrCB)(Ptr);
 
-  if (!EvalResult.checkReturnValue(S, Ctx, Ptr, Info))
+  if (!EvalResult.checkReturnValue(S, Ctx, Ptr, Info)) {
+    // llvm::errs() << "checkReturnValue failed\n";
     return false;
-  if (CheckFullyInitialized && !EvalResult.checkFullyInitialized(S, Ptr))
+  }
+  if (CheckFullyInitialized && !EvalResult.checkFullyInitialized(S, Ptr)) {
+    // llvm::errs() << "Not fully initialized!\n";
     return false;
+  }
 
   // Implicitly convert lvalue to rvalue, if requested.
   if (ConvertResultToRValue) {
+    // llvm::errs() << "ltor\n";
     if (!Ptr.isZero() && !Ptr.isDereferencable())
       return false;
 
     if (Ptr.pointsToStringLiteral() && Ptr.isArrayRoot())
       return false;
 
-    if (!Ptr.isZero() && !CheckFinalLoad(S, OpPC, Ptr))
+    if (!Ptr.isZero() && !CheckFinalLoad(S, OpPC, Ptr)) {
+      // llvm::errs() << "final load!\n";
       return false;
+    }
 
     // Never allow reading from a non-const pointer, unless the memory
     // has been created in this evaluation.
@@ -227,6 +235,7 @@ template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
             Ptr.toRValue(Ctx, EvalResult.getSourceType())) {
       EvalResult.takeValue(std::move(*V));
     } else {
+      // llvm::errs() << "torvalue failed\n";
       return false;
     }
   } else {
@@ -253,6 +262,7 @@ bool EvalEmitter::emitRetVoid(SourceInfo Info) {
 }
 
 bool EvalEmitter::emitRetValue(SourceInfo Info) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   const auto &Ptr = S.Stk.pop<Pointer>();
 
   if (!EvalResult.checkReturnValue(S, Ctx, Ptr, Info))

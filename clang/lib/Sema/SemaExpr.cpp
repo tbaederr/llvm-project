@@ -10382,7 +10382,7 @@ QualType Sema::CheckVectorOperands(ExprResult &LHS, ExprResult &RHS,
     return ReportInvalid ? InvalidOperands(Loc, LHS, RHS) : QualType();
 
   // If the vector types are identical, return.
-  if (Context.hasSameType(LHSType, RHSType))
+  if (Context.hasSameUnqualifiedType(LHSType, RHSType))
     return Context.getCommonSugaredType(LHSType, RHSType);
 
   // If we have compatible AltiVec and GCC vector types, use the AltiVec type.
@@ -17469,6 +17469,7 @@ ExprResult
 Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
                                       VerifyICEDiagnoser &Diagnoser,
                                       AllowFoldKind CanFold) {
+  // return E;
   SourceLocation DiagLoc = E->getBeginLoc();
 
   if (getLangOpts().CPlusPlus11) {

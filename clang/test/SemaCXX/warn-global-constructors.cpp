@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -std=c++11 -fsyntax-only -Wglobal-constructors %s -verify=expected,cxx11
-// RUN: %clang_cc1 -std=c++20 -fsyntax-only -Wglobal-constructors %s -verify=expected
+// RUN: %clang_cc1 -std=c++11 -fsyntax-only -Wglobal-constructors %s -verify=expected,cxx11 -fexperimental-new-constant-interpreter
+// RUN: %clang_cc1 -std=c++20 -fsyntax-only -Wglobal-constructors %s -verify=expected -fexperimental-new-constant-interpreter
 
 int opaque_int();
 

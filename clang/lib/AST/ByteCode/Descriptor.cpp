@@ -17,6 +17,7 @@
 #include "Record.h"
 #include "Source.h"
 #include "clang/AST/ExprCXX.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 using namespace clang::interp;
@@ -288,10 +289,10 @@ Descriptor::Descriptor(const DeclTy &D, const Type *SourceTy, PrimType Type,
                        MetadataSize MD, bool IsConst, bool IsTemporary,
                        bool IsMutable, bool IsVolatile)
     : Source(D), SourceType(SourceTy), ElemSize(primSize(Type)), Size(ElemSize),
-      MDSize(MD.value_or(0)), AllocSize(align(Size + MDSize)), PrimT(Type),
-      IsConst(IsConst), IsMutable(IsMutable), IsTemporary(IsTemporary),
-      IsVolatile(IsVolatile), CtorFn(getCtorPrim(Type)),
-      DtorFn(getDtorPrim(Type)) {
+      Capacity(Size), MDSize(MD.value_or(0)), AllocSize(align(Size + MDSize)),
+      PrimT(Type), IsConst(IsConst), IsMutable(IsMutable),
+      IsTemporary(IsTemporary), IsVolatile(IsVolatile),
+      CtorFn(getCtorPrim(Type)), DtorFn(getDtorPrim(Type)) {
   assert(AllocSize >= Size);
   assert(Source && "Missing source");
 }
@@ -301,7 +302,7 @@ Descriptor::Descriptor(const DeclTy &D, PrimType Type, MetadataSize MD,
                        size_t NumElems, bool IsConst, bool IsTemporary,
                        bool IsMutable)
     : Source(D), ElemSize(primSize(Type)), Size(ElemSize * NumElems),
-      MDSize(MD.value_or(0)),
+      Capacity(NumElems), MDSize(MD.value_or(0)),
       AllocSize(align(MDSize) + align(Size) + sizeof(InitMapPtr)), PrimT(Type),
       IsConst(IsConst), IsMutable(IsMutable), IsTemporary(IsTemporary),
       IsArray(true), CtorFn(getCtorArrayPrim(Type)),
@@ -310,11 +311,26 @@ Descriptor::Descriptor(const DeclTy &D, PrimType Type, MetadataSize MD,
   assert(NumElems <= (MaxArrayElemBytes / ElemSize));
 }
 
+Descriptor::Descriptor(const DeclTy &D, PrimType Type, MetadataSize MD,
+                       ArraySize ArrSize, bool IsConst, bool IsTemporary,
+                       bool IsMutable)
+    : Source(D), ElemSize(primSize(Type)),
+      Size(ElemSize * (ArrSize.Size + ArrSize.hasFiller())),
+      // Size(ElemSize * (ArrSize.Size)),
+      Capacity(ArrSize.Capacity), MDSize(MD.value_or(0)),
+      AllocSize(align(MDSize) + align(Size) + sizeof(InitMapPtr)), PrimT(Type),
+      IsConst(IsConst), IsMutable(IsMutable), IsTemporary(IsTemporary),
+      IsArray(true), CtorFn(getCtorArrayPrim(Type)),
+      DtorFn(getDtorArrayPrim(Type)) {
+  assert(Source && "Missing source");
+  assert(ArrSize.Size <= (MaxArrayElemBytes / ElemSize));
+}
+
 /// Primitive unknown-size arrays.
 Descriptor::Descriptor(const DeclTy &D, PrimType Type, MetadataSize MD,
                        bool IsTemporary, bool IsConst, UnknownSize)
     : Source(D), ElemSize(primSize(Type)), Size(UnknownSizeMark),
-      MDSize(MD.value_or(0)),
+      Capacity(Size), MDSize(MD.value_or(0)),
       AllocSize(MDSize + sizeof(InitMapPtr) + alignof(void *)), PrimT(Type),
       IsConst(IsConst), IsMutable(false), IsTemporary(IsTemporary),
       IsArray(true), CtorFn(getCtorArrayPrim(Type)),
@@ -329,7 +345,7 @@ Descriptor::Descriptor(const DeclTy &D, const Type *SourceTy,
                        bool IsMutable)
     : Source(D), SourceType(SourceTy),
       ElemSize(Elem->getAllocSize() + sizeof(InlineDescriptor)),
-      Size(ElemSize * NumElems), MDSize(MD.value_or(0)),
+      Size(ElemSize * NumElems), Capacity(NumElems), MDSize(MD.value_or(0)),
       AllocSize(std::max<size_t>(alignof(void *), Size) + MDSize),
       ElemDesc(Elem), IsConst(IsConst), IsMutable(IsMutable),
       IsTemporary(IsTemporary), IsArray(true), CtorFn(ctorArrayDesc),
@@ -337,11 +353,29 @@ Descriptor::Descriptor(const DeclTy &D, const Type *SourceTy,
   assert(Source && "Missing source");
 }
 
+/// Arrays of composite elements.
+Descriptor::Descriptor(const DeclTy &D, const Type *SourceTy,
+                       const Descriptor *Elem, MetadataSize MD,
+                       ArraySize ArrSize, bool IsConst, bool IsTemporary,
+                       bool IsMutable)
+    : Source(D), SourceType(SourceTy),
+      ElemSize(Elem->getAllocSize() + sizeof(InlineDescriptor)),
+      Size(ElemSize * (ArrSize.Size + ArrSize.hasFiller())),
+      // Size(ElemSize * (ArrSize.Size)),
+      Capacity(ArrSize.Capacity), MDSize(MD.value_or(0)),
+      AllocSize(std::max<size_t>(alignof(void *), Size) + MDSize),
+      ElemDesc(Elem), IsConst(IsConst), IsMutable(IsMutable),
+      IsTemporary(IsTemporary), IsArray(true), CtorFn(ctorArrayDesc),
+      DtorFn(Elem->DtorFn ? dtorArrayDesc : nullptr) {
+  assert(Source && "Missing source");
+  // llvm::errs() << "COMPOSITE ARRAY: " << ArrSize.Size << " / " << ArrSize.Capacity << '\n';
+}
+
 /// Unknown-size arrays of composite elements.
 Descriptor::Descriptor(const DeclTy &D, const Descriptor *Elem, MetadataSize MD,
                        bool IsTemporary, UnknownSize)
     : Source(D), ElemSize(Elem->getAllocSize() + sizeof(InlineDescriptor)),
-      Size(UnknownSizeMark), MDSize(MD.value_or(0)),
+      Size(UnknownSizeMark), Capacity(Size), MDSize(MD.value_or(0)),
       AllocSize(MDSize + alignof(void *)), ElemDesc(Elem), IsConst(true),
       IsMutable(false), IsTemporary(IsTemporary), IsArray(true),
       CtorFn(ctorArrayDesc), DtorFn(Elem->DtorFn ? dtorArrayDesc : nullptr) {
@@ -353,16 +387,16 @@ Descriptor::Descriptor(const DeclTy &D, const Record *R, MetadataSize MD,
                        bool IsConst, bool IsTemporary, bool IsMutable,
                        bool IsVolatile)
     : Source(D), ElemSize(std::max<size_t>(alignof(void *), R->getFullSize())),
-      Size(ElemSize), MDSize(MD.value_or(0)), AllocSize(Size + MDSize),
-      ElemRecord(R), IsConst(IsConst), IsMutable(IsMutable),
-      IsTemporary(IsTemporary), IsVolatile(IsVolatile), CtorFn(ctorRecord),
-      DtorFn(needsRecordDtor(R) ? dtorRecord : nullptr) {
+      Size(ElemSize), Capacity(Size), MDSize(MD.value_or(0)),
+      AllocSize(Size + MDSize), ElemRecord(R), IsConst(IsConst),
+      IsMutable(IsMutable), IsTemporary(IsTemporary), IsVolatile(IsVolatile),
+      CtorFn(ctorRecord), DtorFn(needsRecordDtor(R) ? dtorRecord : nullptr) {
   assert(Source && "Missing source");
 }
 
 /// Dummy.
 Descriptor::Descriptor(const DeclTy &D, MetadataSize MD)
-    : Source(D), ElemSize(1), Size(1), MDSize(MD.value_or(0)),
+    : Source(D), ElemSize(1), Size(1), Capacity(Size), MDSize(MD.value_or(0)),
       AllocSize(MDSize), ElemRecord(nullptr), IsConst(true), IsMutable(false),
       IsTemporary(false) {
   assert(Source && "Missing source");
@@ -468,10 +502,311 @@ bool Descriptor::hasTrivialDtor() const {
 
 bool Descriptor::isUnion() const { return isRecord() && ElemRecord->isUnion(); }
 
+using BlockMoveFn = void (*)(Block *Storage, std::byte *SrcFieldPtr,
+                             std::byte *DstFieldPtr,
+                             const Descriptor *FieldDesc, const Descriptor *NewDesc);
+
+
+template <typename T>
+static void moveTy(Block *, std::byte *Src, std::byte *Dst,
+                   const Descriptor *, const Descriptor *) {
+
+ // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  auto *SrcPtr = reinterpret_cast<T *>(Src);
+  if constexpr (!std::is_same_v<T, Floating> &&
+    !std::is_same_v<T, MemberPointer> && !std::is_same_v<T, Pointer>) {
+ // llvm::errs() << "Moving value " <<  (*SrcPtr) << " (" << (int)(*SrcPtr) << ")\n";//'\n';
+  }
+  auto *DstPtr = reinterpret_cast<T *>(Dst);
+  new (DstPtr) T(std::move(*SrcPtr));
+}
+static BlockMoveFn getMovePrim(PrimType Type) {
+  TYPE_SWITCH(Type, return moveTy<T>);
+  llvm_unreachable("unknown PrimType");
+}
+
+/// Moving a primitive array.
+template <typename T>
+static void moveArrayTy(Block *, std::byte *Src, std::byte *Dst,
+                        const Descriptor *D, const Descriptor *NewDesc) {
+ // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  InitMapPtr &SrcIMP = *reinterpret_cast<InitMapPtr *>(Src);
+  // llvm::errs() << "SrcIMP: " << (bool) SrcIMP << '\n';
+  SrcIMP = std::nullopt;
+
+
+ // new (Dst) InitMapPtr(
+ // new (Dst) InitMapPtr(std::move(SrcIMP));
+ //llvm::errs() << "New init map has " << NewDesc->getNumElems() << " elements\n";
+  auto *NewInitMap = new (Dst) InitMapPtr(std::make_pair(false, std::make_shared<InitMap>(NewDesc->getNumElems())));
+
+  Src += sizeof(InitMapPtr);
+  Dst += sizeof(InitMapPtr);
+
+
+ // if constexpr (!needsCtor<T>()) {
+ //   std::memcpy(Dst, Src, D->getNumElems() * D->getElemSize());
+ // } else {
+    for (unsigned I = 0, NE = D->getNumElemsWithoutFiller(); I < NE; ++I) {
+     // llvm::errs() << "Elem offset: " << D->getMetadataSize() << " + " << sizeof(InitMapPtr) << " + (" << I << " * " << sizeof(T) << ")\n";// (I * sizeof(T))) << '\n';
+   //   llvm::errs() << "Elem offset: " << (D->getMetadataSize() + sizeof(InitMapPtr) + (I * sizeof(T))) << '\n';
+      auto *SrcPtr = &reinterpret_cast<T *>(Src)[I];
+      auto *DstPtr = &reinterpret_cast<T *>(Dst)[I];
+      // llvm::errs() << "SRC Elem: " << *SrcPtr << '\n';
+      new (DstPtr) T(std::move(*SrcPtr));
+      NewInitMap->value().second->initializeElement(I);
+      //   }
+      //
+  }
+}
+
+static BlockMoveFn getMoveArrayPrim(PrimType Type) {
+  TYPE_SWITCH(Type, return moveArrayTy<T>);
+  llvm_unreachable("unknown Expr");
+}
+
+static void moveRecord(Block *B, std::byte *Src, std::byte *Dst,
+                       const Descriptor *D, const Descriptor *NewDesc);
+static void moveArrayDesc(Block *B, std::byte *Src, std::byte *Dst,
+                          const Descriptor *D, const Descriptor *NewDesc);
+static BlockMoveFn getMoveFn(const Descriptor *D) {
+  if (D->isPrimitive())
+    return getMovePrim(D->getPrimType());
+  if (D->isPrimitiveArray())
+    return getMoveArrayPrim(D->getPrimType());
+  if (D->isCompositeArray())
+    return moveArrayDesc;
+  if (D->isRecord())
+    return moveRecord;
+
+  return nullptr;
+}
+
+static BlockMoveFn getElemMoveFn(const Descriptor *D) {
+  assert(D->isArray());
+  if (D->isPrimitiveArray())
+    return getMovePrim(D->getPrimType());
+  assert(D->ElemDesc);
+  return getMoveFn(D->ElemDesc);
+}
+
+
+static void moveRecord(Block *B, std::byte *Src, std::byte *Dst,
+                       const Descriptor *D, const Descriptor *) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  assert(D);
+  assert(D->ElemRecord);
+
+  for (const auto &F : D->ElemRecord->fields()) {
+    auto FieldOffset = F.Offset;
+    // llvm::errs() << "FieldOffset: " << FieldOffset << '\n';
+    const auto *SrcDesc =
+        reinterpret_cast<const InlineDescriptor *>(Src + FieldOffset) - 1;
+    auto *DestDesc =
+        reinterpret_cast<InlineDescriptor *>(Dst + FieldOffset) - 1;
+ //   llvm::errs() << "Field desc before:\n";
+  //  SrcDesc->dump();
+    std::memcpy(DestDesc, SrcDesc, sizeof(InlineDescriptor));
+ //   llvm::errs() << "AFter:\n";
+ //   DestDesc->dump();
+
+    if (auto Fn = getMoveFn(F.Desc))
+      Fn(B, Src + FieldOffset, Dst + FieldOffset, F.Desc, nullptr);
+  }
+
+  for (const auto &Base : D->ElemRecord->bases()) {
+    auto BaseOffset = Base.Offset;
+    const auto *SrcDesc =
+        reinterpret_cast<const InlineDescriptor *>(Src + BaseOffset) - 1;
+    auto *DestDesc = reinterpret_cast<InlineDescriptor *>(Dst + BaseOffset) - 1;
+    std::memcpy(DestDesc, SrcDesc, sizeof(InlineDescriptor));
+
+    if (auto Fn = getMoveFn(Base.Desc))
+      Fn(B, Src + BaseOffset, Dst + BaseOffset, Base.Desc, nullptr);
+  }
+
+  for (const auto &VBase : D->ElemRecord->virtual_bases()) {
+    auto VBaseOffset = VBase.Offset;
+    const auto *SrcDesc =
+        reinterpret_cast<const InlineDescriptor *>(Src + VBaseOffset) - 1;
+    auto *DestDesc =
+        reinterpret_cast<InlineDescriptor *>(Dst + VBaseOffset) - 1;
+    std::memcpy(DestDesc, SrcDesc, sizeof(InlineDescriptor));
+  }
+}
+
+
+
+
+
+
+static void moveArrayDesc(Block *B, std::byte *Src, std::byte *Dst,
+                          const Descriptor *D, const Descriptor *NewDesc) {
+ // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  const unsigned NumElems = D->getNumElemsWithoutFiller();
+  const unsigned ElemSize =
+      D->ElemDesc->getAllocSize() + sizeof(InlineDescriptor);
+
+  // llvm::errs() << "Elems: " << NumElems << '\n';
+
+
+  unsigned ElemOffset = 0;
+  for (unsigned I = 0; I != NumElems; ++I, ElemOffset += ElemSize) {
+    // llvm::errs() << "Moving composite array element " << I << '\n';
+    auto *SrcPtr = Src + ElemOffset;
+    auto *DstPtr = Dst + ElemOffset;
+
+    auto *SrcDesc = reinterpret_cast<InlineDescriptor *>(SrcPtr);
+    auto *SrcElemLoc = reinterpret_cast<std::byte *>(SrcDesc + 1);
+    auto *DstDesc = reinterpret_cast<InlineDescriptor *>(DstPtr);
+    auto *DstElemLoc = reinterpret_cast<std::byte *>(DstDesc + 1);
+
+    *DstDesc = *SrcDesc;
+
+    if (auto Fn = getMoveFn(D->ElemDesc)) {
+      // llvm::errs() << "Elem Movefn!\n";
+      Fn(B, SrcElemLoc, DstElemLoc, D->ElemDesc, NewDesc);
+    } else {
+      // llvm::errs() << "elem has no move fn\n";
+    }
+  }
+}
+
+
+
+
+
+
+
+
+void Descriptor::moveArrayData(const Block *From, Block *To) const {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << "----------------------------------------------------------------------------------\n";
+  //llvm::errs() << "Contents before:\n";
+  //From->dumpContents();
+ // To->getDescriptor()->dumpFull();
+  // llvm::errs() << "From " << From << " to " << To << '\n';
+  assert(From->getDescriptor() == this);
+
+  // First, copy block-level metadata.
+  assert(From->getDescriptor()->getMetadataSize() == To->getDescriptor()->getMetadataSize());
+  std::memcpy(To->rawData(), From->rawData(), MDSize);
+  unsigned OldNumElems = this->getNumElemsWithoutFiller();
+  unsigned NewNumElems = To->getDescriptor()->getNumElemsWithoutFiller();
+  assert(NewNumElems > OldNumElems);
+  assert(this->hasArrayFiller());
+
+  // llvm::errs() << "Old size: " << this->getNumElemsWithoutFiller() << '\n';
+  // llvm::errs() << "New size: " << To->getDescriptor()->getNumElemsWithoutFiller() << '\n';
+
+  // llvm::errs() << "Old Desc: "; From->getDescriptor()->dump();
+  // llvm::errs() << "New Desc: "; To->getDescriptor()->dump();
+
+  unsigned ElemSize = getElemSize();
+  // Copy all the old data over.
+
+
+  // llvm::errs() << "### Moving old existing array elements..\n";
+  if (this->isPrimitiveArray()) {
+    auto MoveFn = getMoveArrayPrim(this->getPrimType());
+    MoveFn(To, const_cast<std::byte*>(From->data()), To->data(), this, To->getDescriptor());
+  } else {
+    assert(isCompositeArray());
+    moveArrayDesc(To, const_cast<std::byte*>(From->data()), To->data(), this, To->getDescriptor());
+  }
+
+  // Now fill the rest by copying over the array filler.
+  // llvm::errs() << "#### Filler:\n";
+ // ElemDesc->dump();
+  unsigned ElemIndex = this->getNumElemsWithoutFiller();
+  assert(ElemSize == To->getDescriptor()->getElemSize());
+  unsigned ArrayFillerIndex = this->getNumElemsWithoutFiller();
+  // llvm::errs() << "Array filler index: " << ArrayFillerIndex << '\n';
+  // llvm::errs() << "ElemIndex: " << ElemIndex << ", NewNumElems: " << NewNumElems << '\n';
+  // llvm::errs()<< "ElemSize: " << ElemSize << '\n';
+  unsigned ArrayFillerOffset = From->getDescriptor()->getMetadataSize() + (ElemSize * ArrayFillerIndex);
+  unsigned DstOffset = To->getDescriptor()->getMetadataSize();
+  DstOffset += ElemIndex * ElemSize;
+  if (this->isPrimitiveArray()) {
+    DstOffset += sizeof(InitMapPtr);
+    ArrayFillerOffset += sizeof(InitMapPtr);
+  }
+
+  DstOffset = ArrayFillerOffset;
+
+  // llvm::errs() << "ArrayFillerOffset: " << ArrayFillerOffset<< '\n';
+  bool ElemsHaveInlineDesc = this->isCompositeArray();
+
+  for (; ElemIndex != NewNumElems; ++ElemIndex) {
+  // llvm::errs() << "----- ARRAY FILLER SPLAT\n";
+  // llvm::errs() << "Dst offset: " << DstOffset << '\n';
+
+    if (ElemsHaveInlineDesc) {
+      auto *SrcDesc = reinterpret_cast<InlineDescriptor *>(To->data() + ArrayFillerOffset);
+      auto *DstDesc = reinterpret_cast<InlineDescriptor *>(To->data() + DstOffset);
+      *DstDesc = *SrcDesc;
+      DstOffset += sizeof(InlineDescriptor);
+    } else {
+      InitMapPtr &DstIMP = *reinterpret_cast<InitMapPtr *>(To->data());
+      DstIMP->second->initializeElement(ElemIndex);
+    }
+
+   // llvm::errs() << "MoveFn start offset: " << DstOffset << '\n';
+      auto MoveFn = getElemMoveFn(this);
+      if (ElemsHaveInlineDesc)
+        MoveFn(To, const_cast<std::byte*>(From->rawData() + (ArrayFillerOffset + sizeof(InlineDescriptor))), To->rawData() + DstOffset, ElemDesc, To->getDescriptor());
+      else
+        MoveFn(To, const_cast<std::byte*>(From->rawData() + (ArrayFillerOffset)), To->rawData() + DstOffset, ElemDesc, To->getDescriptor());
+
+    if (ElemsHaveInlineDesc)
+      DstOffset += (ElemSize - sizeof(InlineDescriptor));
+    else
+      DstOffset += (ElemSize);
+  }
+
+ // llvm::errs() << "ElemIndex after adding new elems: " << ElemIndex << '\n';
+ // To->getDescriptor()->dump();
+
+  // At last, if we didn't expand to the full capacity, we need to carry the
+  // evaluated array filler around with us.
+  if (NewNumElems < To->getDescriptor()->Capacity) {
+    // llvm::errs() << "AHA!\n";
+    // llvm::errs()<< "need to add the filler again at index " << NewNumElems << '\n';
+    // llvm::errs() << "DstOffset now: " << DstOffset << '\n';
+
+    if (ElemsHaveInlineDesc) {
+      auto *SrcDesc = reinterpret_cast<InlineDescriptor *>(To->data() + ArrayFillerOffset);
+      auto *DstDesc = reinterpret_cast<InlineDescriptor *>(To->data() + DstOffset);
+
+      *DstDesc = *SrcDesc;
+      DstOffset += sizeof(InlineDescriptor);
+    } else {
+      InitMapPtr &DstIMP = *reinterpret_cast<InitMapPtr *>(To->data());
+      DstIMP->second->initializeElement(ElemIndex);
+    }
+
+    // Note that DstOffset gets advanced in the loop above and now points to the element after the
+    // filled-in elements.
+    // llvm::errs() << "MoveFn start offset: " << DstOffset << '\n';
+    auto MoveFn = getElemMoveFn(this);
+    if (ElemsHaveInlineDesc)
+      MoveFn(To, const_cast<std::byte*>(From->rawData() + (ArrayFillerOffset + sizeof(InlineDescriptor))), To->rawData() + DstOffset, ElemDesc, To->getDescriptor());
+    else
+      MoveFn(To, const_cast<std::byte*>(From->rawData() + (ArrayFillerOffset)), To->rawData() + DstOffset, ElemDesc, To->getDescriptor());
+  }
+}
+
 InitMap::InitMap(unsigned N)
-    : UninitFields(N), Data(std::make_unique<T[]>(numFields(N))) {}
+    : UninitFields(N), Data(std::make_unique<T[]>(numFields(N))) {
+      #ifndef NDEBUG
+      NumFields = N;
+      #endif
+    }
 
 bool InitMap::initializeElement(unsigned I) {
+  #ifndef NDEBUG
+  assert(I < NumFields);
+  #endif
   unsigned Bucket = I / PER_FIELD;
   T Mask = T(1) << (I % PER_FIELD);
   if (!(data()[Bucket] & Mask)) {
@@ -482,6 +817,9 @@ bool InitMap::initializeElement(unsigned I) {
 }
 
 bool InitMap::isElementInitialized(unsigned I) const {
+  #ifndef NDEBUG
+  assert(I < NumFields);
+  #endif
   unsigned Bucket = I / PER_FIELD;
   return data()[Bucket] & (T(1) << (I % PER_FIELD));
 }

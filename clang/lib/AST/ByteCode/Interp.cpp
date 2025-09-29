@@ -792,6 +792,7 @@ bool CheckLocalLoad(InterpState &S, CodePtr OpPC, const Block *B) {
 
 bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
                AccessKinds AK) {
+  // llvm::errs() << __FUNCTION__ << ": " << Ptr << '\n';
   if (Ptr.isZero()) {
     const auto &Src = S.Current->getSource(OpPC);
 
@@ -823,8 +824,24 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   if (!CheckLifetime(S, OpPC, Ptr.getLifetime(), AK))
     return false;
-  if (!Ptr.isInitialized())
+  if (!Ptr.isInitialized()) {
+     // llvm::errs() << "NOT initialized: " << Ptr << "\n";
+     // Ptr.getDeclDesc()->dump();
+    // llvm::errs() << "Index " << Ptr.getIndex() << '\n';
+  //  llvm::errs() << Ptr << '\n';
+  //  Ptr.getFieldDesc()->dump();
+  //  llvm::errs()<< Ptr.getBase() << '\n';
+ //   Ptr.getBase().getFieldDesc()->dump();
+ //   llvm::errs()<< Ptr.getBase().getBase() << '\n';
+ //   Ptr.getBase().getBase().getFieldDesc()->dump();
+
+ //  llvm::errs()<< Ptr.getBase().getBase().getBase() << '\n';
+ //   Ptr.getBase().getBase().getBase().getFieldDesc()->dump();
+
+
+  //  llvm::errs() << Ptr.getBase().getArray().getIndex() << '\n';
     return DiagnoseUninitialized(S, OpPC, Ptr, AK);
+  }
   if (!CheckTemporary(S, OpPC, Ptr.block(), AK))
     return false;
 
@@ -1596,6 +1613,9 @@ bool Call(InterpState &S, CodePtr OpPC, const Function *Func,
 
   if (!Func->isFullyCompiled())
     compileFunction(S, Func);
+
+  // Func->dump();
+
 
   if (!CheckCallable(S, OpPC, Func))
     return cleanup();

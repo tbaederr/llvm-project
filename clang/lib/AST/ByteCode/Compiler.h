@@ -451,6 +451,7 @@ protected:
   /// variable. This is set in visitInitializer().
   bool Initializing = false;
   const ValueDecl *InitializingDecl = nullptr;
+  const Expr *Initializer = nullptr;
 
   llvm::SmallVector<InitLink> InitStack;
   bool InitStackActive = false;

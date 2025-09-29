@@ -14,6 +14,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Expr.h"
 
 using namespace clang;
 using namespace clang::interp;
@@ -262,7 +263,7 @@ UnsignedOrNone Program::createGlobal(const DeclTy &D, QualType Ty,
                             IsTemporary, /*IsMutable=*/false, IsVolatile);
   else
     Desc = createDescriptor(D, Ty.getTypePtr(), Descriptor::GlobalMD, IsConst,
-                            IsTemporary, /*IsMutable=*/false, IsVolatile);
+                            IsTemporary, /*IsMutable=*/false, IsVolatile, Init);
 
   if (!Desc)
     return std::nullopt;
@@ -281,6 +282,58 @@ UnsignedOrNone Program::createGlobal(const DeclTy &D, QualType Ty,
   Globals.push_back(G);
 
   return I;
+}
+
+void Program::reallocGlobal(Block *Prev, const Descriptor *NewDesc) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << "BEFORE REALLOC:\n";
+  // dump();
+
+
+  assert(Prev->getDescriptor()->IsArray);
+  assert(NewDesc->IsArray);
+
+  //const Descriptor *PrevDesc = Prev->getDescriptor();
+
+  auto *G = new (Allocator, NewDesc->getAllocSize()) Global(
+      Ctx.getEvalID(), Prev->getDeclID(), NewDesc, true,false, false);
+  G->block()->invokeCtor();
+
+  auto [_, PrevIndex] = *GlobalIndices.find(Prev->getDescriptor()->getSource().getOpaqueValue());
+
+  // llvm::errs() << "PrevIndex: " << PrevIndex << '\n';
+
+  // new (G->block()->rawData()) GlobalInlineDescriptor(Globals[PrevIndex]->getInlineDesc());//PrevGlobal->getInlineDesc());
+  // GlobalIndices[Prev->getDescriptor()->getSource().getOpaqueValue()] =
+
+  // FIXME: Don't forget the redeclarations if the source is a declaration.
+  /// Move data over from the old block to the new one.
+
+
+    Prev->moveArrayData(G->block());
+
+
+#if 1
+  if (NewDesc->isPrimitiveArray()) {
+    Pointer(G->block()).initializeAllElements();
+  } else {
+
+
+
+    auto P = Pointer(G->block());
+    // unsigned NewElems = NewDesc->getNumElemsWithoutFiller() - PrevDesc->getNumElemsWithoutFiller();
+    // llvm::errs() << "new elems: " << NewElems << '\n';
+   // for (unsigned I = 0; I != NewDesc->getNumElems(); ++I) {
+     // llvm::errs() << "Initializing composite array element " << I << '\n';
+     // P.atIndex(I).narrow().initialize();
+   // }
+  }
+#endif
+
+  Globals[PrevIndex] = G;
+  Prev->movePointersTo(G->block());
+  // llvm::errs() << "AFTER REALLOC:\n";
+  // dump();
 }
 
 Function *Program::getFunction(const FunctionDecl *F) {
@@ -394,6 +447,17 @@ Record *Program::getOrCreateRecord(const RecordDecl *RD) {
   return R;
 }
 
+static unsigned getNumInits(const Expr *E, unsigned Capacity) {
+  unsigned N = Capacity;
+  if (const auto *ILE = dyn_cast_if_present<InitListExpr>(E))
+    N = ILE->getNumInitsWithEmbedExpanded();
+  if (const auto *PE = dyn_cast_if_present<ParenListExpr>(E))
+    N = PE->getNumExprs();
+  if (ArraySize::shouldUseFiller(N, Capacity))
+    return N;
+  return Capacity;
+}
+
 Descriptor *Program::createDescriptor(const DeclTy &D, const Type *Ty,
                                       Descriptor::MetadataSize MDSize,
                                       bool IsConst, bool IsTemporary,
@@ -413,27 +477,39 @@ Descriptor *Program::createDescriptor(const DeclTy &D, const Type *Ty,
     QualType ElemTy = ArrayType->getElementType();
     // Array of well-known bounds.
     if (const auto *CAT = dyn_cast<ConstantArrayType>(ArrayType)) {
+      size_t Capacity = CAT->getZExtSize();
+      size_t Size = getNumInits(Init, Capacity);
       size_t NumElems = CAT->getZExtSize();
+
+      if (const auto *VD = dyn_cast_if_present<ValueDecl>(D.dyn_cast<const Decl*>())) {
+        if (!Context::shouldBeGloballyIndexed(VD))
+          Size = Capacity;
+      }
+
+      // llvm::errs() << "Size: " << Size << ". Capacity: " << Capacity << '\n';
+
+
       if (OptPrimType T = Ctx.classify(ElemTy)) {
         // Arrays of primitives.
         unsigned ElemSize = primSize(*T);
         if (std::numeric_limits<unsigned>::max() / ElemSize <= NumElems) {
           return {};
         }
-        return allocateDescriptor(D, *T, MDSize, NumElems, IsConst, IsTemporary,
-                                  IsMutable);
+        return allocateDescriptor(D, *T, MDSize, ArraySize(Size, Capacity),
+                                  IsConst, IsTemporary, IsMutable);
       }
-        // Arrays of composites. In this case, the array is a list of pointers,
-        // followed by the actual elements.
-        const Descriptor *ElemDesc = createDescriptor(
-            D, ElemTy.getTypePtr(), std::nullopt, IsConst, IsTemporary);
-        if (!ElemDesc)
-          return nullptr;
-        unsigned ElemSize = ElemDesc->getAllocSize() + sizeof(InlineDescriptor);
-        if (std::numeric_limits<unsigned>::max() / ElemSize <= NumElems)
-          return {};
-        return allocateDescriptor(D, Ty, ElemDesc, MDSize, NumElems, IsConst,
-                                  IsTemporary, IsMutable);
+
+      // Arrays of composites.
+      const Descriptor *ElemDesc = createDescriptor(
+          D, ElemTy.getTypePtr(), std::nullopt, IsConst, IsTemporary);
+      if (!ElemDesc)
+        return nullptr;
+      unsigned ElemSize = ElemDesc->getAllocSize() + sizeof(InlineDescriptor);
+      if (std::numeric_limits<unsigned>::max() / ElemSize <= NumElems)
+        return {};
+      return allocateDescriptor(D, Ty, ElemDesc, MDSize,
+                                ArraySize(Size, Capacity), IsConst,
+                                IsTemporary, IsMutable);
     }
 
     // Array of unknown bounds - cannot be accessed and pointer arithmetic

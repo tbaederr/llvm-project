@@ -812,9 +812,20 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
     }
 
     if (const auto *AT = Ty->getAsArrayTypeUnsafe()) {
-      const size_t NumElems = Ptr.getNumElems();
+      const Descriptor *Desc = Ptr.getFieldDesc();
+      // llvm::errs() << "End: " << Desc->getNumElemsWithoutFiller() << " / "
+                   // << Desc->Capacity << '\n';
+
+      size_t Capacity = Desc->Capacity;
+      const size_t NumElems = Ptr.getNumAllocatedElems();
+          // Desc->getNumElemsWithoutFiller(); // Ptr.getNumElems();
       QualType ElemTy = AT->getElementType();
-      R = APValue(APValue::UninitArray{}, NumElems, NumElems);
+      R = APValue(APValue::UninitArray{}, NumElems, Desc->Capacity);
+
+      // llvm::errs() << "ToRvalue of array. NumElems: "<< NumElems << ". Capacity: " << Capacity << '\n';
+
+
+
 
       bool Ok = true;
       OptPrimType ElemT = Ctx.classify(ElemTy);
@@ -826,6 +837,18 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
           Ok &= Composite(ElemTy, Ptr.atIndex(I).narrow(), Slot);
         }
       }
+
+      if (NumElems != Capacity) {
+        // llvm::errs() << "Adding array filler to APValue. Index: " << NumElems << "\n";
+        APValue &Slot = R.getArrayFiller();
+        if (ElemT) {
+          TYPE_SWITCH(*ElemT, Slot = Ptr.elem<T>(NumElems).toAPValue(ASTCtx));
+        } else {
+          Ok &= Composite(ElemTy, Ptr.atIndex(NumElems).narrow(), Slot);
+        }
+      }
+
+      // llvm::errs() << "Ok: " << Ok << '\n';
       return Ok;
     }
 
