@@ -615,7 +615,6 @@ static bool isSimpleAPValue(const APValue &Value) {
   case APValue::ComplexFloat:
   case APValue::LValue:
   case APValue::MemberPointer:
-  case APValue::AddrLabelDiff:
     return true;
   case APValue::Vector:
   case APValue::Array:
@@ -849,12 +848,6 @@ void TextNodeDumper::Visit(const APValue &Value, QualType Ty) {
       OS << "null";
     return;
   }
-  case APValue::AddrLabelDiff:
-    OS << "AddrLabelDiff ";
-    OS << "&&" << Value.getAddrLabelDiffLHS()->getLabel()->getName();
-    OS << " - ";
-    OS << "&&" << Value.getAddrLabelDiffRHS()->getLabel()->getName();
-    return;
   }
   llvm_unreachable("Unknown APValue kind!");
 }

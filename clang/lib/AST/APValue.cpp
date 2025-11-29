@@ -373,10 +373,6 @@ APValue::APValue(const APValue &RHS)
                       RHS.isMemberPointerToDerivedMember(),
                       RHS.getMemberPointerPath());
     break;
-  case AddrLabelDiff:
-    MakeAddrLabelDiff();
-    setAddrLabelDiff(RHS.getAddrLabelDiffLHS(), RHS.getAddrLabelDiffRHS());
-    break;
   }
 }
 
@@ -428,8 +424,6 @@ void APValue::DestroyDataAndMakeUninit() {
     ((UnionData *)(char *)&Data)->~UnionData();
   else if (Kind == MemberPointer)
     ((MemberPointerData *)(char *)&Data)->~MemberPointerData();
-  else if (Kind == AddrLabelDiff)
-    ((AddrLabelDiffData *)(char *)&Data)->~AddrLabelDiffData();
   Kind = None;
   AllowConstexprUnknown = false;
 }
@@ -438,7 +432,6 @@ bool APValue::needsCleanup() const {
   switch (getKind()) {
   case None:
   case Indeterminate:
-  case AddrLabelDiff:
     return false;
   case Struct:
   case Union:
@@ -497,11 +490,6 @@ void APValue::Profile(llvm::FoldingSetNodeID &ID) const {
   switch (Kind) {
   case None:
   case Indeterminate:
-    return;
-
-  case AddrLabelDiff:
-    ID.AddPointer(getAddrLabelDiffLHS()->getLabel()->getCanonicalDecl());
-    ID.AddPointer(getAddrLabelDiffRHS()->getLabel()->getCanonicalDecl());
     return;
 
   case Struct:
@@ -944,11 +932,6 @@ void APValue::printPretty(raw_ostream &Out, const PrintingPolicy &Policy,
     }
     Out << "0";
     return;
-  case APValue::AddrLabelDiff:
-    Out << "&&" << getAddrLabelDiffLHS()->getLabel()->getName();
-    Out << " - ";
-    Out << "&&" << getAddrLabelDiffRHS()->getLabel()->getName();
-    return;
   }
   llvm_unreachable("Unknown APValue kind!");
 }
@@ -1140,11 +1123,6 @@ LinkageInfo LinkageComputer::getLVForValue(const APValue &V,
   case APValue::ComplexFloat:
   case APValue::Vector:
     break;
-
-  case APValue::AddrLabelDiff:
-    // Even for an inline function, it's not reasonable to treat a difference
-    // between the addresses of labels as an external value.
-    return LinkageInfo::internal();
 
   case APValue::Struct: {
     for (unsigned I = 0, N = V.getStructNumBases(); I != N; ++I)

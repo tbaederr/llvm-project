@@ -419,17 +419,6 @@ let Class = PropertyTypeCase<APValue, "Union"> in {
     return APValue(cast_if_present<clang::FieldDecl>(fieldDecl), std::move(value));
   }]>;
 }
-let Class = PropertyTypeCase<APValue, "AddrLabelDiff"> in {
-  def : Property<"lhs", StmtRef> {
-    let Read = [{ const_cast<AddrLabelExpr *>(node.getAddrLabelDiffLHS()) }];
-  }
-  def : Property<"rhs", StmtRef> {
-    let Read = [{ const_cast<AddrLabelExpr *>(node.getAddrLabelDiffRHS()) }];
-  }
-  def : Creator<[{
-    return APValue(cast<AddrLabelExpr>(lhs), cast<AddrLabelExpr>(rhs));
-  }]>;
-}
 let Class = PropertyTypeCase<APValue, "MemberPointer"> in {
   def : Property<"isDerived", Bool> {
     let Read = [{ node.isMemberPointerToDerivedMember() }];

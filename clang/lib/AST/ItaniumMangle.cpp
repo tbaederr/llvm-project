@@ -6395,7 +6395,6 @@ static bool isZeroInitialized(QualType T, const APValue &V) {
   switch (V.getKind()) {
   case APValue::None:
   case APValue::Indeterminate:
-  case APValue::AddrLabelDiff:
     return false;
 
   case APValue::Struct: {
@@ -6552,9 +6551,6 @@ void CXXNameMangler::mangleValueInTemplateArg(QualType T, const APValue &V,
     mangleType(T);
     Out << 'E';
     break;
-
-  case APValue::AddrLabelDiff:
-    llvm_unreachable("unexpected value kind in template argument");
 
   case APValue::Struct: {
     const CXXRecordDecl *RD = T->getAsCXXRecordDecl();

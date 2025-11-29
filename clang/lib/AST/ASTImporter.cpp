@@ -10642,16 +10642,6 @@ ASTNodeImporter::ImportAPValue(const APValue &FromValue) {
     Result.setUnion(cast<FieldDecl>(ImpFDecl), ImpValue);
     break;
   }
-  case APValue::AddrLabelDiff: {
-    Result.MakeAddrLabelDiff();
-    const Expr *ImpLHS = importChecked(Err, FromValue.getAddrLabelDiffLHS());
-    const Expr *ImpRHS = importChecked(Err, FromValue.getAddrLabelDiffRHS());
-    if (Err)
-      return std::move(Err);
-    Result.setAddrLabelDiff(cast<AddrLabelExpr>(ImpLHS),
-                            cast<AddrLabelExpr>(ImpRHS));
-    break;
-  }
   case APValue::MemberPointer: {
     const Decl *ImpMemPtrDecl =
         importChecked(Err, FromValue.getMemberPointerDecl());

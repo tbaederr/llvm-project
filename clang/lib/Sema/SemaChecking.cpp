@@ -11031,7 +11031,7 @@ static IntRange GetValueRange(APValue &result, QualType Ty, unsigned MaxWidth) {
   // FIXME: The only reason we need to pass the type in here is to get
   // the sign right on this one case.  It would be nice if APValue
   // preserved this.
-  assert(result.isLValue() || result.isAddrLabelDiff());
+  assert(result.isLValue());
   return IntRange(MaxWidth, Ty->isUnsignedIntegerOrEnumerationType());
 }
 

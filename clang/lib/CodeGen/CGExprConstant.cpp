@@ -2509,24 +2509,6 @@ ConstantEmitter::tryEmitPrivate(const APValue &Value, QualType DestType,
     }
     return llvm::ConstantVector::get(Inits);
   }
-  case APValue::AddrLabelDiff: {
-    const AddrLabelExpr *LHSExpr = Value.getAddrLabelDiffLHS();
-    const AddrLabelExpr *RHSExpr = Value.getAddrLabelDiffRHS();
-    llvm::Constant *LHS = tryEmitPrivate(LHSExpr, LHSExpr->getType());
-    llvm::Constant *RHS = tryEmitPrivate(RHSExpr, RHSExpr->getType());
-    if (!LHS || !RHS) return nullptr;
-
-    // Compute difference
-    llvm::Type *ResultType = CGM.getTypes().ConvertType(DestType);
-    LHS = llvm::ConstantExpr::getPtrToInt(LHS, CGM.IntPtrTy);
-    RHS = llvm::ConstantExpr::getPtrToInt(RHS, CGM.IntPtrTy);
-    llvm::Constant *AddrLabelDiff = llvm::ConstantExpr::getSub(LHS, RHS);
-
-    // LLVM is a bit sensitive about the exact format of the
-    // address-of-label difference; make sure to truncate after
-    // the subtraction.
-    return llvm::ConstantExpr::getTruncOrBitCast(AddrLabelDiff, ResultType);
-  }
   case APValue::Struct:
   case APValue::Union:
     return ConstStructBuilder::BuildStruct(*this, Value, DestType);

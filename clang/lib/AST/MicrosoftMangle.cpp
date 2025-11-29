@@ -2157,11 +2157,6 @@ void MicrosoftCXXNameMangler::mangleTemplateArgValue(QualType T,
     return;
   }
 
-  case APValue::AddrLabelDiff: {
-    Error("template argument (value type: address label diff)");
-    return;
-  }
-
   case APValue::FixedPoint: {
     Error("template argument (value type: fixed point)");
     return;

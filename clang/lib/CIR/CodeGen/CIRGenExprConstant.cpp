@@ -1906,7 +1906,6 @@ mlir::Attribute ConstantEmitter::tryEmitPrivate(const APValue &value,
                                       cir::FPAttr::get(complexElemTy, imag));
   }
   case APValue::FixedPoint:
-  case APValue::AddrLabelDiff:
     cgm.errorNYI(
         "ConstExprEmitter::tryEmitPrivate fixed point, addr label diff");
     return {};

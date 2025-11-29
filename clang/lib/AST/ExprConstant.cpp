@@ -2722,7 +2722,6 @@ static bool HandleConversionToBool(const APValue &Val, bool &Result) {
   case APValue::Array:
   case APValue::Struct:
   case APValue::Union:
-  case APValue::AddrLabelDiff:
     return false;
   }
 
@@ -7849,7 +7848,7 @@ class APValueToBufferConverter {
 
     case APValue::Union:
     case APValue::MemberPointer:
-    case APValue::AddrLabelDiff: {
+      {
       Info.FFDiag(BCE->getBeginLoc(),
                   diag::note_constexpr_bit_cast_unsupported_type)
           << Ty;
@@ -14671,7 +14670,7 @@ public:
   bool Success(const APValue &V, const Expr *E) {
     // C++23 [expr.const]p8 If we have a variable that is unknown reference or
     // pointer allow further evaluation of the value.
-    if (V.isLValue() || V.isAddrLabelDiff() || V.isIndeterminate() ||
+    if (V.isLValue() || V.isIndeterminate() ||
         V.allowConstexprUnknown()) {
       Result = V;
       return true;
@@ -17337,6 +17336,7 @@ bool DataRecursiveIntBinOpEvaluator::
     return true;
   }
 
+#if 0
   if (E->getOpcode() == BO_Sub && LHSVal.isLValue() && RHSVal.isLValue()) {
     // Handle (intptr_t)&&A - (intptr_t)&&B.
     if (!LHSVal.getLValueOffset().isZero() ||
@@ -17357,6 +17357,7 @@ bool DataRecursiveIntBinOpEvaluator::
     Result = APValue(LHSAddrExpr, RHSAddrExpr);
     return true;
   }
+#endif
 
   // All the remaining cases expect both operands to be an integer
   if (!LHSVal.isInt() || !RHSVal.isInt())
@@ -17920,6 +17921,7 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
       if (ArePotentiallyOverlappingStringLiterals(Info, LHSValue, RHSValue))
         return DiagArith(diag::note_constexpr_literal_arith);
 
+#if 0
       const AddrLabelExpr *LHSAddrExpr = dyn_cast<AddrLabelExpr>(LHSExpr);
       const AddrLabelExpr *RHSAddrExpr = dyn_cast<AddrLabelExpr>(RHSExpr);
       if (!LHSAddrExpr || !RHSAddrExpr)
@@ -17929,6 +17931,7 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
           RHSAddrExpr->getLabel()->getDeclContext())
         return Error(E);
       return Success(APValue(LHSAddrExpr, RHSAddrExpr), E);
+#endif
     }
     const CharUnits &LHSOffset = LHSValue.getLValueOffset();
     const CharUnits &RHSOffset = RHSValue.getLValueOffset();
@@ -18331,13 +18334,6 @@ bool IntExprEvaluator::VisitCastExpr(const CastExpr *E) {
       return false;
 
     if (!Result.isInt()) {
-      // Allow casts of address-of-label differences if they are no-ops
-      // or narrowing.  (The narrowing case isn't actually guaranteed to
-      // be constant-evaluatable except in some narrow cases which are hard
-      // to detect here.  We let it through on the assumption the user knows
-      // what they are doing.)
-      if (Result.isAddrLabelDiff())
-        return Info.Ctx.getTypeSize(DestType) <= Info.Ctx.getTypeSize(SrcType);
       // Only allow casts of lvalues if they are lossless.
       return Info.Ctx.getTypeSize(DestType) == Info.Ctx.getTypeSize(SrcType);
     }

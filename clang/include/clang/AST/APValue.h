@@ -140,7 +140,6 @@ public:
     Struct,
     Union,
     MemberPointer,
-    AddrLabelDiff
   };
 
   class alignas(uint64_t) LValueBase {
@@ -300,16 +299,12 @@ private:
     UnionData &operator=(const UnionData &) = delete;
     ~UnionData();
   };
-  struct AddrLabelDiffData {
-    const AddrLabelExpr* LHSExpr;
-    const AddrLabelExpr* RHSExpr;
-  };
   struct MemberPointerData;
 
   // We ensure elsewhere that Data is big enough for LV and MemberPointerData.
   typedef llvm::AlignedCharArrayUnion<void *, APSInt, APFloat, ComplexAPSInt,
                                       ComplexAPFloat, Vec, Arr, StructData,
-                                      UnionData, AddrLabelDiffData> DataType;
+                                      UnionData> DataType;
   static const size_t DataSize = sizeof(DataType);
 
   DataType Data;
@@ -422,13 +417,6 @@ public:
       : Kind(None), AllowConstexprUnknown(false) {
     MakeMemberPointer(Member, IsDerivedMember, Path);
   }
-  /// Creates a new address label diff APValue.
-  /// \param LHSExpr The left-hand side of the difference.
-  /// \param RHSExpr The right-hand side of the difference.
-  APValue(const AddrLabelExpr *LHSExpr, const AddrLabelExpr *RHSExpr)
-      : Kind(None), AllowConstexprUnknown(false) {
-    MakeAddrLabelDiff(); setAddrLabelDiff(LHSExpr, RHSExpr);
-  }
   static APValue IndeterminateValue() {
     APValue Result;
     Result.Kind = Indeterminate;
@@ -475,7 +463,6 @@ public:
   bool isStruct() const { return Kind == Struct; }
   bool isUnion() const { return Kind == Union; }
   bool isMemberPointer() const { return Kind == MemberPointer; }
-  bool isAddrLabelDiff() const { return Kind == AddrLabelDiff; }
 
   void dump() const;
   void dump(raw_ostream &OS, const ASTContext &Context) const;
@@ -642,15 +629,6 @@ public:
   bool isMemberPointerToDerivedMember() const;
   ArrayRef<const CXXRecordDecl*> getMemberPointerPath() const;
 
-  const AddrLabelExpr* getAddrLabelDiffLHS() const {
-    assert(isAddrLabelDiff() && "Invalid accessor");
-    return ((const AddrLabelDiffData *)(const char *)&Data)->LHSExpr;
-  }
-  const AddrLabelExpr* getAddrLabelDiffRHS() const {
-    assert(isAddrLabelDiff() && "Invalid accessor");
-    return ((const AddrLabelDiffData *)(const char *)&Data)->RHSExpr;
-  }
-
   void setInt(APSInt I) {
     assert(isInt() && "Invalid accessor");
     *(APSInt *)(char *)&Data = std::move(I);
@@ -688,12 +666,6 @@ public:
                  ArrayRef<LValuePathEntry> Path, bool OnePastTheEnd,
                  bool IsNullPtr);
   void setUnion(const FieldDecl *Field, const APValue &Value);
-  void setAddrLabelDiff(const AddrLabelExpr* LHSExpr,
-                        const AddrLabelExpr* RHSExpr) {
-    ((AddrLabelDiffData *)(char *)&Data)->LHSExpr = LHSExpr;
-    ((AddrLabelDiffData *)(char *)&Data)->RHSExpr = RHSExpr;
-  }
-
 private:
   void DestroyDataAndMakeUninit();
   void MakeInt() {
@@ -740,12 +712,6 @@ private:
   }
   void MakeMemberPointer(const ValueDecl *Member, bool IsDerivedMember,
                          ArrayRef<const CXXRecordDecl*> Path);
-  void MakeAddrLabelDiff() {
-    assert(isAbsent() && "Bad state change");
-    new ((void *)(char *)&Data) AddrLabelDiffData();
-    Kind = AddrLabelDiff;
-  }
-
 private:
   /// The following functions are used as part of initialization, during
   /// deserialization and importing. Reserve the space so that it can be

@@ -7387,9 +7387,6 @@ ExprResult Sema::CheckTemplateArgument(NamedDecl *Param, QualType ParamType,
       }
     }
 
-    if (Value.isAddrLabelDiff())
-      return Diag(StartLoc, diag::err_non_type_template_arg_addr_label_diff);
-
     if (ArgPE) {
       SugaredConverted = TemplateArgument(Arg, /*IsCanonical=*/false);
       CanonicalConverted =
@@ -8079,8 +8076,6 @@ static Expr *BuildExpressionFromNonTypeTemplateArgumentValue(
   };
 
   switch (Val.getKind()) {
-  case APValue::AddrLabelDiff:
-    // This cannot occur in a template argument at all.
   case APValue::Array:
   case APValue::Struct:
   case APValue::Union:
