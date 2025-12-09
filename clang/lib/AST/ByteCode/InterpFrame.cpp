@@ -91,7 +91,7 @@ void InterpFrame::initScope(unsigned Idx) {
     return;
 
   for (auto &Local : Func->getScope(Idx).locals()) {
-    localBlock(Local.Offset)->invokeCtor();
+    localBlock(Local.Offset)->invokeCtor(false);
   }
 }
 

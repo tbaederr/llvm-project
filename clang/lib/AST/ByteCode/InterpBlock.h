@@ -123,9 +123,10 @@ public:
   template <typename T> T &deref() { return *reinterpret_cast<T *>(data()); }
 
   /// Invokes the constructor.
-  void invokeCtor() {
+  void invokeCtor(bool Zero = true) {
     assert(!IsInitialized);
-    std::memset(rawData(), 0, Desc->getAllocSize());
+    if (Zero)
+      std::memset(rawData(), 0, Desc->getAllocSize());
     if (Desc->CtorFn) {
       Desc->CtorFn(this, data(), Desc->IsConst, Desc->IsMutable,
                    Desc->IsVolatile,

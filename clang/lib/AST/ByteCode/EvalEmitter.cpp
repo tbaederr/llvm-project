@@ -107,7 +107,7 @@ Scope::Local EvalEmitter::createLocal(Descriptor *D) {
   // Allocate memory for a local.
   auto Memory = std::make_unique<char[]>(sizeof(Block) + D->getAllocSize());
   auto *B = new (Memory.get()) Block(Ctx.getEvalID(), D, /*isStatic=*/false);
-  B->invokeCtor();
+  B->invokeCtor(false);
 
   // Initialize local variable inline descriptor.
   InlineDescriptor &Desc = *reinterpret_cast<InlineDescriptor *>(B->rawData());
