@@ -142,9 +142,12 @@ unsigned Program::getOrCreateDummy(const DeclTy &D) {
   assert(!QT.isNull());
 
   Descriptor *Desc;
+
+
   if (OptPrimType T = Ctx.classify(QT))
-    Desc = createDescriptor(D, *T, /*SourceTy=*/nullptr, std::nullopt,
-                            /*IsConst=*/QT.isConstQualified());
+    Desc = allocateDescriptor(D);
+    // Desc = createDescriptor(D, *T, /*SourceTy=*/nullptr, std::nullopt,
+                            // /*IsConst=*/QT.isConstQualified());
   else
     Desc = createDescriptor(D, QT.getTypePtr(), std::nullopt,
                             /*IsConst=*/QT.isConstQualified());
