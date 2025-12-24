@@ -2376,8 +2376,8 @@ bool Destroy(InterpState &S, CodePtr OpPC, uint32_t I) {
   for (auto &Local : S.Current->getFunction()->getScope(I).locals_reverse()) {
     if (!S.Current->getLocalBlock(Local.Offset)->isInitialized())
       continue;
-    const Pointer &Ptr = S.Current->getLocalPointer(Local.Offset);
-    if (Ptr.getLifetime() == Lifetime::Ended) {
+    if (S.Current->getLocalLifetime(Local.Offset) == Lifetime::Ended) {
+      const Pointer &Ptr = S.Current->getLocalPointer(Local.Offset);
       // Try to use the declaration for better diagnostics
       if (const Decl *D = Ptr.getDeclDesc()->asDecl()) {
         auto *ND = cast<NamedDecl>(D);

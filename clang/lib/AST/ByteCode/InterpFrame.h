@@ -93,6 +93,11 @@ public:
   Pointer getLocalPointer(unsigned Offset) const;
   Block *getLocalBlock(unsigned Offset) const;
 
+  /// Returns the lifetime of the given local variable without creating a Pointer.
+  Lifetime getLocalLifetime(unsigned Offset) const {
+    return localInlineDesc(Offset)->LifeState;
+  }
+
   /// Returns the value of an argument.
   template <typename T> const T &getParam(unsigned Offset) const {
     auto Pt = Params.find(Offset);
