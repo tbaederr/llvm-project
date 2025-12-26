@@ -221,7 +221,7 @@ void cleanupAfterFunctionCall(InterpState &S, CodePtr OpPC,
                               const Function *Func);
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
-bool Ret(InterpState &S, CodePtr &PC) {
+__attribute__((preserve_none)) bool Ret(InterpState &S, CodePtr &PC) {
   const T &Ret = S.Stk.pop<T>();
 
   assert(S.Current);
@@ -243,7 +243,8 @@ bool Ret(InterpState &S, CodePtr &PC) {
   return true;
 }
 
-inline bool RetVoid(InterpState &S, CodePtr &PC) {
+__attribute__((preserve_none)) inline bool RetVoid(InterpState &S,
+                                                   CodePtr &PC) {
   assert(S.Current->getFrameOffset() == S.Stk.size() && "Invalid frame");
 
   if (!S.checkingPotentialConstantExpression() || S.Current->Caller)
@@ -3040,7 +3041,7 @@ static inline bool ShiftFixedPoint(InterpState &S, CodePtr OpPC, bool Left) {
 // NoRet
 //===----------------------------------------------------------------------===//
 
-inline bool NoRet(InterpState &S, CodePtr OpPC) {
+__attribute__((preserve_none)) inline bool NoRet(InterpState &S, CodePtr OpPC) {
   SourceLocation EndLoc = S.Current->getCallee()->getEndLoc();
   S.FFDiag(EndLoc, diag::note_constexpr_no_return);
   return false;
