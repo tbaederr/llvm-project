@@ -28,7 +28,8 @@
 using namespace clang;
 using namespace clang::interp;
 
-static bool RetValue(InterpState &S, CodePtr &Pt) {
+__attribute__((preserve_none)) static bool RetValue(InterpState &S,
+                                                    CodePtr &Pt) {
   llvm::report_fatal_error("Interpreter cannot return values");
 }
 
@@ -2324,38 +2325,39 @@ bool FinishInitGlobal(InterpState &S, CodePtr OpPC) {
   return true;
 }
 
-// https://github.com/llvm/llvm-project/issues/102513
-#if defined(_MSC_VER) && !defined(__clang__) && !defined(NDEBUG)
-#pragma optimize("", off)
-#endif
+__attribute__((preserve_none)) static bool InterpNext(InterpState &S,
+                                                      CodePtr &PC);
+
 bool Interpret(InterpState &S) {
   // The current stack frame when we started Interpret().
   // This is being used by the ops to determine wheter
   // to return from this function and thus terminate
   // interpretation.
-  const InterpFrame *StartFrame = S.Current;
   assert(!S.Current->isRoot());
   CodePtr PC = S.Current->getPC();
 
-  // Empty program.
-  if (!PC)
-    return true;
-
-  for (;;) {
-    auto Op = PC.read<Opcode>();
-    CodePtr OpPC = PC;
-
-    switch (Op) {
-#define GET_INTERP
-#include "Opcodes.inc"
-#undef GET_INTERP
-    }
-  }
+  return InterpNext(S, PC);
 }
-// https://github.com/llvm/llvm-project/issues/102513
-#if defined(_MSC_VER) && !defined(__clang__) && !defined(NDEBUG)
-#pragma optimize("", on)
-#endif
+
+#define GET_INTERPFNS_
+#include "Opcodes.inc"
+#undef GET_INTERPFNS_
+
+using InterpFn = __attribute__((preserve_none)) bool (*)(InterpState &,
+                                                         CodePtr &PC);
+
+const InterpFn InterpFunctions[] = {
+#define GET_INTERPFNS
+#include "Opcodes.inc"
+#undef GET_INTERPFNS
+};
+
+__attribute__((preserve_none)) static bool InterpNext(InterpState &S,
+                                                      CodePtr &PC) {
+  auto Op = PC.read<Opcode>();
+  auto Fn = InterpFunctions[Op];
+  [[clang::musttail]] return Fn(S, PC);
+}
 
 } // namespace interp
 } // namespace clang
