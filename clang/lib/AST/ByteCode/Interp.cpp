@@ -28,8 +28,13 @@
 using namespace clang;
 using namespace clang::interp;
 
-__attribute__((preserve_none)) static bool RetValue(InterpState &S,
-                                                    CodePtr &Pt) {
+#ifdef __clang__
+#define PRESERVE_NONE [[clang::preserve_none]]
+#else
+#define PRESERVE_NONE
+#endif
+
+PRESERVE_NONE static bool RetValue(InterpState &S, CodePtr &Pt) {
   llvm::report_fatal_error("Interpreter cannot return values");
 }
 
@@ -2325,8 +2330,7 @@ bool FinishInitGlobal(InterpState &S, CodePtr OpPC) {
   return true;
 }
 
-__attribute__((preserve_none)) static bool InterpNext(InterpState &S,
-                                                      CodePtr &PC);
+PRESERVE_NONE static bool InterpNext(InterpState &S, CodePtr &PC);
 
 bool Interpret(InterpState &S) {
   // The current stack frame when we started Interpret().
@@ -2339,21 +2343,23 @@ bool Interpret(InterpState &S) {
   return InterpNext(S, PC);
 }
 
-#define GET_INTERPFNS_
+// The dispatcher functions read the opcode arguments from the
+// bytecode and call the implementation function.
+#define GET_INTERPFN_DISPATCHERS
 #include "Opcodes.inc"
-#undef GET_INTERPFNS_
+#undef GET_INTERPFN_DISPATCHERS
 
-using InterpFn = __attribute__((preserve_none)) bool (*)(InterpState &,
-                                                         CodePtr &PC);
+using InterpFn = bool (*)(InterpState &, CodePtr &PC) PRESERVE_NONE;
 
+// Array of the dispatcher functions defined above.
 const InterpFn InterpFunctions[] = {
-#define GET_INTERPFNS
+#define GET_INTERPFN_LIST
 #include "Opcodes.inc"
-#undef GET_INTERPFNS
+#undef GET_INTERPFN_LIST
 };
 
-__attribute__((preserve_none)) static bool InterpNext(InterpState &S,
-                                                      CodePtr &PC) {
+// Read the next opcode and call the dispatcher function.
+PRESERVE_NONE static bool InterpNext(InterpState &S, CodePtr &PC) {
   auto Op = PC.read<Opcode>();
   auto Fn = InterpFunctions[Op];
   [[clang::musttail]] return Fn(S, PC);
