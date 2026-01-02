@@ -2529,7 +2529,9 @@ bool Compiler<Emitter>::VisitAbstractConditionalOperator(
   LabelTy LabelFalse = this->getLabel(); // Label for the false expr.
 
   if (IsBcpCall) {
-    if (!this->emitStartSpeculation(E))
+    // llvm::errs() << "EMIT START SPECULATION (ACO)\n";
+    // if (!this->emitStartSpeculation(E))
+    if (!this->emitPushIgnoreDiags(E))
       return false;
   }
 
@@ -2560,8 +2562,16 @@ bool Compiler<Emitter>::VisitAbstractConditionalOperator(
   this->fallthrough(LabelEnd);
   this->emitLabel(LabelEnd);
 
-  if (IsBcpCall)
-    return this->emitEndSpeculation(E);
+
+  if (IsBcpCall) {
+    // llvm::errs() << "EMIT END SPECULATION (ACO)\n";
+    // if (!this->emitEndSpeculation(E))
+    if (!this->emitPopIgnoreDiags(E))
+      return false;
+  }
+
+
+
   return true;
 }
 
@@ -5076,14 +5086,16 @@ bool Compiler<Emitter>::VisitBuiltinCallExpr(const CallExpr *E,
       return this->emitConst(0, E);
     }
 
+    // llvm::errs() << "EMIT START SPECULATION (CALL)\n";
     if (!this->emitStartSpeculation(E))
       return false;
     LabelTy EndLabel = this->getLabel();
     if (!this->speculate(E, EndLabel))
       return false;
-    this->fallthrough(EndLabel);
+    // llvm::errs() << "EMIT END SPECULATION (CALL)\n";
     if (!this->emitEndSpeculation(E))
       return false;
+    this->fallthrough(EndLabel);
     if (DiscardResult)
       return this->emitPop(classifyPrim(E), E);
     return true;

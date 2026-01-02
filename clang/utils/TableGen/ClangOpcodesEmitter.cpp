@@ -34,8 +34,6 @@ private:
   /// The name is obtained by concatenating the name with the list of types.
   void EmitEnum(raw_ostream &OS, StringRef N, const Record *R);
 
-  /// Emits the switch case and the invocation in the interpreter.
-  void EmitInterp(raw_ostream &OS, StringRef N, const Record *R);
   void EmitInterpFnList(raw_ostream &OS, StringRef N, const Record *R);
   void EmitInterpFnDispatchers(raw_ostream &OS, StringRef N, const Record *R);
 
@@ -93,7 +91,6 @@ void ClangOpcodesEmitter::run(raw_ostream &OS) {
       N = Opcode->getName();
 
     EmitEnum(OS, N, Opcode);
-    EmitInterp(OS, N, Opcode);
     EmitInterpFnList(OS, N, Opcode);
     EmitInterpFnDispatchers(OS, N, Opcode);
     EmitDisasm(OS, N, Opcode);
@@ -119,6 +116,12 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
   Enumerate(R, N, [&](ArrayRef<const Record *> TS, const Twine &ID) {
     OS << "PRESERVE_NONE\nstatic bool Interp_" << ID
        << "(InterpState &S, CodePtr &PC) {\n";
+
+    if (ID.str() == "EndSpeculation") {
+      OS << "    return EndSpeculation(S, PC);\n";
+      OS << "}\n";
+      return;
+    }
 
     bool CanReturn = R->getValueAsBit("CanReturn");
     const auto &Args = R->getValueAsListOfDefs("Args");
@@ -190,63 +193,6 @@ void ClangOpcodesEmitter::EmitInterpFnList(raw_ostream &OS, StringRef N,
   Enumerate(R, N, [&OS](ArrayRef<const Record *>, const Twine &ID) {
     OS << "&Interp_" << ID << ",\n";
   });
-  OS << "#endif\n";
-}
-
-void ClangOpcodesEmitter::EmitInterp(raw_ostream &OS, StringRef N,
-                                     const Record *R) {
-  OS << "#ifdef GET_INTERP\n";
-
-  Enumerate(R, N,
-            [this, R, &OS, &N](ArrayRef<const Record *> TS, const Twine &ID) {
-              bool CanReturn = R->getValueAsBit("CanReturn");
-              bool ChangesPC = R->getValueAsBit("ChangesPC");
-              const auto &Args = R->getValueAsListOfDefs("Args");
-
-              OS << "case OP_" << ID << ": {\n";
-
-              if (CanReturn)
-                OS << "  bool DoReturn = (S.Current == StartFrame);\n";
-
-              // Emit calls to read arguments.
-              for (size_t I = 0, N = Args.size(); I < N; ++I) {
-                const auto *Arg = Args[I];
-                bool AsRef = Arg->getValueAsBit("AsRef");
-
-                if (AsRef)
-                  OS << "  const auto &V" << I;
-                else
-                  OS << "  const auto V" << I;
-                OS << " = ";
-                OS << "ReadArg<" << Arg->getValueAsString("Name")
-                   << ">(S, PC);\n";
-              }
-
-              // Emit a call to the template method and pass arguments.
-              OS << "  if (!" << N;
-              PrintTypes(OS, TS);
-              OS << "(S";
-              if (ChangesPC)
-                OS << ", PC";
-              else
-                OS << ", OpPC";
-              for (size_t I = 0, N = Args.size(); I < N; ++I)
-                OS << ", V" << I;
-              OS << "))\n";
-              OS << "    return false;\n";
-
-              // Bail out if interpreter returned.
-              if (CanReturn) {
-                OS << "  if (!S.Current || S.Current->isRoot())\n";
-                OS << "    return true;\n";
-
-                OS << "  if (DoReturn)\n";
-                OS << "    return true;\n";
-              }
-
-              OS << "  continue;\n";
-              OS << "}\n";
-            });
   OS << "#endif\n";
 }
 

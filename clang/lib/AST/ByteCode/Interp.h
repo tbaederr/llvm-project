@@ -33,6 +33,7 @@
 #include "clang/AST/Expr.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/ADT/ScopeExit.h"
 #include <type_traits>
 
 #ifdef __clang__
@@ -3263,22 +3264,44 @@ inline bool Unsupported(InterpState &S, CodePtr OpPC) {
   return false;
 }
 
+
+inline bool PushIgnoreDiags(InterpState &S, CodePtr OpPC) {
+  ++S.DiagIgnoreDepth;
+  if (S.DiagIgnoreDepth != 1)
+    return true;
+  assert(S.PrevDiags == nullptr);
+  S.PrevDiags = S.getEvalStatus().Diag;
+  S.getEvalStatus().Diag = nullptr;
+  assert(!S.diagnosing());
+  return true;
+}
+
+inline bool PopIgnoreDiags(InterpState &S, CodePtr OpPC) {
+  --S.DiagIgnoreDepth;
+  if (S.DiagIgnoreDepth == 0) {
+    S.getEvalStatus().Diag = S.PrevDiags;
+    S.PrevDiags = nullptr;
+  }
+    return true;
+}
+
 inline bool StartSpeculation(InterpState &S, CodePtr OpPC) {
   ++S.SpeculationDepth;
   if (S.SpeculationDepth != 1)
     return true;
 
-  assert(S.PrevDiags == nullptr);
-  S.PrevDiags = S.getEvalStatus().Diag;
-  S.getEvalStatus().Diag = nullptr;
+  // assert(S.PrevDiags == nullptr);
+  // S.PrevDiags = S.getEvalStatus().Diag;
+  // S.getEvalStatus().Diag = nullptr;
   return true;
 }
+
 inline bool EndSpeculation(InterpState &S, CodePtr OpPC) {
   assert(S.SpeculationDepth != 0);
   --S.SpeculationDepth;
   if (S.SpeculationDepth == 0) {
-    S.getEvalStatus().Diag = S.PrevDiags;
-    S.PrevDiags = nullptr;
+    // S.getEvalStatus().Diag = S.PrevDiags;
+    // S.PrevDiags = nullptr;
   }
   return true;
 }

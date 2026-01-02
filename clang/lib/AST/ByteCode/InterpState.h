@@ -183,6 +183,7 @@ public:
   /// Things needed to do speculative execution.
   SmallVectorImpl<PartialDiagnosticAt> *PrevDiags = nullptr;
   unsigned SpeculationDepth = 0;
+  unsigned DiagIgnoreDepth = 0;
   std::optional<bool> ConstantContextOverride;
 
   llvm::SmallVector<
