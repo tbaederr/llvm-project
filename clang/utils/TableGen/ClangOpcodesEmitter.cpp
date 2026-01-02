@@ -126,27 +126,26 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
 
     if (Args.empty()) {
       if (CanReturn) {
-        OS << " [[clang::musttail]] return " << N;
+        OS << " MUSTTAIL return " << N;
         PrintTypes(OS, TS);
         OS << "(S, PC);\n";
         OS << "}\n";
         return;
       }
 
-      // OS << "llvm::errs() << \"Calling \" << \"" << N << "\\n\";";//'\n';
       OS << "  if (!" << N;
       PrintTypes(OS, TS);
       OS << "(S, PC))\n";
-      OS << "  return false;\n";
-      OS << "[[clang::musttail]] return InterpNext(S, PC);\n";
+      OS << "    return false;\n";
+      OS << "  MUSTTAIL return InterpNext(S, PC);\n";
       OS << "}\n";
       return;
     }
 
-    OS << "{\n";
+    OS << "  {\n";
 
     if (!ChangesPC)
-      OS << "  CodePtr OpPC = PC;\n";
+      OS << "    CodePtr OpPC = PC;\n";
 
     // Emit calls to read arguments.
     for (size_t I = 0, N = Args.size(); I < N; ++I) {
@@ -154,17 +153,16 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
       bool AsRef = Arg->getValueAsBit("AsRef");
 
       if (AsRef)
-        OS << "  const auto &V" << I;
+        OS << "    const auto &V" << I;
       else
-        OS << "  const auto V" << I;
+        OS << "    const auto V" << I;
       OS << " = ";
       OS << "ReadArg<" << Arg->getValueAsString("Name") << ">(S, PC);\n";
     }
 
-    OS << "  if (!" << N;
+    OS << "    if (!" << N;
     PrintTypes(OS, TS);
     OS << "(S";
-    // OS << ", OpPC";
     if (ChangesPC)
       OS << ", PC";
     else
@@ -172,15 +170,14 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
     for (size_t I = 0, N = Args.size(); I < N; ++I)
       OS << ", V" << I;
     OS << "))\n";
-    OS << "    return false;\n";
+    OS << "      return false;\n";
 
-    OS << "}\n";
+    OS << "  }\n";
 
     if (!CanReturn)
-      OS << "[[clang::musttail]] return InterpNext(S, PC);\n";
+      OS << "  MUSTTAIL return InterpNext(S, PC);\n";
     else
-      OS << " return true;\n";
-    // OS << "  return false;\n";
+      OS << "  return true;\n";
 
     OS << "}\n";
   });

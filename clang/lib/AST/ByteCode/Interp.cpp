@@ -34,6 +34,16 @@ using namespace clang::interp;
 #define PRESERVE_NONE
 #endif
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#ifdef NDEBUG
+#define MUSTTAIL [[msvc::musttail]]
+#else
+#define MUSTTAIL
+#endif
+#else
+#define MUSTTAIL [[clang::musttail]]
+#endif
+
 PRESERVE_NONE static bool RetValue(InterpState &S, CodePtr &Pt) {
   llvm::report_fatal_error("Interpreter cannot return values");
 }
