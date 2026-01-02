@@ -35,6 +35,12 @@
 #include "llvm/ADT/APSInt.h"
 #include <type_traits>
 
+#ifdef __clang__
+#define PRESERVE_NONE [[clang::preserve_none]]
+#else
+#define PRESERVE_NONE
+#endif
+
 namespace clang {
 namespace interp {
 
@@ -221,7 +227,7 @@ void cleanupAfterFunctionCall(InterpState &S, CodePtr OpPC,
                               const Function *Func);
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
-__attribute__((preserve_none)) bool Ret(InterpState &S, CodePtr &PC) {
+bool Ret(InterpState &S, CodePtr &PC) PRESERVE_NONE {
   const T &Ret = S.Stk.pop<T>();
 
   assert(S.Current);
@@ -243,8 +249,7 @@ __attribute__((preserve_none)) bool Ret(InterpState &S, CodePtr &PC) {
   return true;
 }
 
-__attribute__((preserve_none)) inline bool RetVoid(InterpState &S,
-                                                   CodePtr &PC) {
+inline bool RetVoid(InterpState &S, CodePtr &PC) PRESERVE_NONE {
   assert(S.Current->getFrameOffset() == S.Stk.size() && "Invalid frame");
 
   if (!S.checkingPotentialConstantExpression() || S.Current->Caller)
@@ -3040,8 +3045,7 @@ static inline bool ShiftFixedPoint(InterpState &S, CodePtr OpPC, bool Left) {
 //===----------------------------------------------------------------------===//
 // NoRet
 //===----------------------------------------------------------------------===//
-
-__attribute__((preserve_none)) inline bool NoRet(InterpState &S, CodePtr OpPC) {
+inline bool NoRet(InterpState &S, CodePtr OpPC) PRESERVE_NONE {
   SourceLocation EndLoc = S.Current->getCallee()->getEndLoc();
   S.FFDiag(EndLoc, diag::note_constexpr_no_return);
   return false;

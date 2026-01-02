@@ -28,12 +28,6 @@
 using namespace clang;
 using namespace clang::interp;
 
-#ifdef __clang__
-#define PRESERVE_NONE [[clang::preserve_none]]
-#else
-#define PRESERVE_NONE
-#endif
-
 #if defined(_MSC_VER) && !defined(__clang__)
 #ifdef NDEBUG
 #define MUSTTAIL [[msvc::musttail]]
