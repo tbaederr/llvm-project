@@ -28,7 +28,7 @@
 using namespace clang;
 using namespace clang::interp;
 
-#ifdef __clang__
+#if 0
 #define PRESERVE_NONE [[clang::preserve_none]]
 #else
 #define PRESERVE_NONE
