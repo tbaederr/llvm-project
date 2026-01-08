@@ -2160,7 +2160,7 @@ bool StoreBitFieldActivatePop(InterpState &S, CodePtr OpPC) {
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool Init(InterpState &S, CodePtr OpPC) {
-  const T &Value = S.Stk.pop<T>();
+  const T Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
   if (!CheckInit(S, OpPC, Ptr))
     return false;
@@ -2171,7 +2171,7 @@ bool Init(InterpState &S, CodePtr OpPC) {
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitPop(InterpState &S, CodePtr OpPC) {
-  const T &Value = S.Stk.pop<T>();
+  const T Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
   if (!CheckInit(S, OpPC, Ptr))
     return false;
@@ -2185,7 +2185,7 @@ bool InitPop(InterpState &S, CodePtr OpPC) {
 /// 3) Sets the value on the pointer, leaving the pointer on the stack.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
-  const T &Value = S.Stk.pop<T>();
+  const T Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
 
   const Descriptor *Desc = Ptr.getFieldDesc();
@@ -2219,7 +2219,7 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
 /// The same as InitElem, but pops the pointer as well.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
-  const T &Value = S.Stk.pop<T>();
+  const T Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
   const Descriptor *Desc = Ptr.getFieldDesc();
