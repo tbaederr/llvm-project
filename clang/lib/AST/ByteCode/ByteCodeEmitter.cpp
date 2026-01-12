@@ -137,7 +137,7 @@ int32_t ByteCodeEmitter::getOffset(LabelTy Label) {
 /// Pointers will be automatically marshalled as 32-bit IDs.
 template <typename T>
 static void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
-                 const T &Val, bool &Success) {
+                 T Val, bool &Success) {
   size_t ValPos = Code.size();
   size_t Size;
 
@@ -167,7 +167,7 @@ static void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
 /// Emits a serializable value. These usually (potentially) contain
 /// heap-allocated memory and aren't trivially copyable.
 template <typename T>
-static void emitSerialized(llvm::SmallVectorImpl<std::byte> &Code, const T &Val,
+static void emitSerialized(llvm::SmallVectorImpl<std::byte> &Code, const T Val,
                            bool &Success) {
   size_t ValPos = Code.size();
   size_t Size = align(Val.bytesToSerialize());
@@ -187,25 +187,25 @@ static void emitSerialized(llvm::SmallVectorImpl<std::byte> &Code, const T &Val,
 
 template <>
 void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
-          const Floating &Val, bool &Success) {
+          const Floating Val, bool &Success) {
   emitSerialized(Code, Val, Success);
 }
 
 template <>
 void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
-          const IntegralAP<false> &Val, bool &Success) {
+          const IntegralAP<false> Val, bool &Success) {
   emitSerialized(Code, Val, Success);
 }
 
 template <>
 void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
-          const IntegralAP<true> &Val, bool &Success) {
+          const IntegralAP<true> Val, bool &Success) {
   emitSerialized(Code, Val, Success);
 }
 
 template <>
 void emit(Program &P, llvm::SmallVectorImpl<std::byte> &Code,
-          const FixedPoint &Val, bool &Success) {
+          const FixedPoint Val, bool &Success) {
   emitSerialized(Code, Val, Success);
 }
 
