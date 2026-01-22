@@ -3290,6 +3290,18 @@ inline bool PopCC(InterpState &S, CodePtr OpPC) {
   return true;
 }
 
+inline bool PushMSVCCE(InterpState &S, CodePtr OpPC) {
+  // This is a per-frame property.
+  ++S.Current->MSVCConstexprAllowed;
+  return true;
+}
+
+inline bool PopMSVCCE(InterpState &S, CodePtr OpPC) {
+  // This is a per-frame property.
+  --S.Current->MSVCConstexprAllowed;
+  return true;
+}
+
 /// Do nothing and just abort execution.
 inline bool Error(InterpState &S, CodePtr OpPC) { return false; }
 
