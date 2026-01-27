@@ -1773,8 +1773,10 @@ StmtResult Parser::ParseWhileStatement(SourceLocation *TrailingElseLoc,
 
   // OpenACC Restricts a while-loop inside of certain construct/clause
   // combinations, so diagnose that here in OpenACC mode.
-  SemaOpenACC::LoopInConstructRAII LCR{getActions().OpenACC()};
-  getActions().OpenACC().ActOnWhileStmt(WhileLoc);
+  if (getLangOpts().OpenACC) {
+    SemaOpenACC::LoopInConstructRAII LCR{getActions().OpenACC()};
+    getActions().OpenACC().ActOnWhileStmt(WhileLoc);
+  }
   getCurScope()->setPrecedingLabel(PrecedingLabel);
 
   // C99 6.8.5p5 - In C99, the body of the while statement is a scope, even if
@@ -1823,8 +1825,10 @@ StmtResult Parser::ParseDoStatement(LabelDecl *PrecedingLabel) {
 
   // OpenACC Restricts a do-while-loop inside of certain construct/clause
   // combinations, so diagnose that here in OpenACC mode.
-  SemaOpenACC::LoopInConstructRAII LCR{getActions().OpenACC()};
-  getActions().OpenACC().ActOnDoStmt(DoLoc);
+  if (getLangOpts().OpenACC) {
+    SemaOpenACC::LoopInConstructRAII LCR{getActions().OpenACC()};
+    getActions().OpenACC().ActOnDoStmt(DoLoc);
+  }
   getCurScope()->setPrecedingLabel(PrecedingLabel);
 
   // C99 6.8.5p5 - In C99, the body of the do statement is a scope, even if
@@ -2234,12 +2238,14 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc,
 
   // OpenACC Restricts a for-loop inside of certain construct/clause
   // combinations, so diagnose that here in OpenACC mode.
-  SemaOpenACC::LoopInConstructRAII LCR{getActions().OpenACC()};
-  if (ForRangeInfo.ParsedForRangeDecl())
-    getActions().OpenACC().ActOnRangeForStmtBegin(ForLoc, ForRangeStmt.get());
-  else
-    getActions().OpenACC().ActOnForStmtBegin(
-        ForLoc, FirstPart.get(), SecondPart.get().second, ThirdPart.get());
+  if (getLangOpts().OpenACC) {
+    SemaOpenACC::LoopInConstructRAII LCR{getActions().OpenACC()};
+    if (ForRangeInfo.ParsedForRangeDecl())
+      getActions().OpenACC().ActOnRangeForStmtBegin(ForLoc, ForRangeStmt.get());
+    else
+      getActions().OpenACC().ActOnForStmtBegin(
+          ForLoc, FirstPart.get(), SecondPart.get().second, ThirdPart.get());
+  }
 
   // Set this only right before parsing the body to disallow break/continue in
   // the other parts.
