@@ -2283,7 +2283,8 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc,
   // Pop the body scope if needed.
   InnerScope.Exit();
 
-  getActions().OpenACC().ActOnForStmtEnd(ForLoc, Body);
+  if (getLangOpts().OpenACC)
+    getActions().OpenACC().ActOnForStmtEnd(ForLoc, Body);
 
   // Leave the for-scope.
   ForScope.Exit();
