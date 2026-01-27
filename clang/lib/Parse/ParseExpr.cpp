@@ -2976,10 +2976,27 @@ ExprResult Parser::ParseStringLiteralExpression(bool AllowUserDefinedLiteral,
   assert(tokenIsLikeStringLiteral(Tok, getLangOpts()) &&
          "Not a string-literal-like token!");
 
+
+
+  Token FirstString = Tok;
+  ConsumeAnyToken();
+
+  if (!tokenIsLikeStringLiteral(Tok, getLangOpts())) {
+    if (Unevaluated) {
+      assert(!AllowUserDefinedLiteral && "UDL are always evaluated");
+      return Actions.ActOnUnevaluatedStringLiteral(ArrayRef(FirstString));
+    }
+    return Actions.ActOnStringLiteral(ArrayRef(FirstString),
+                                      AllowUserDefinedLiteral ? getCurScope()
+                                                              : nullptr);
+  }
+
   // String concatenation.
   // Note: some keywords like __FUNCTION__ are not considered to be strings
   // for concatenation purposes, unless Microsoft extensions are enabled.
   SmallVector<Token, 4> StringToks;
+  StringToks.push_back(FirstString);
+
 
   do {
     StringToks.push_back(Tok);
