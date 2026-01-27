@@ -934,7 +934,7 @@ private:
 ///
 /// Right now this is a very lightweight container, but the expectation
 /// is that this will become significantly more serious.
-class ParsedAttributes : public ParsedAttributesView {
+class ParsedAttributes final : public ParsedAttributesView {
 public:
   ParsedAttributes(AttributeFactory &factory) : pool(factory) {}
   ParsedAttributes(const ParsedAttributes &) = delete;

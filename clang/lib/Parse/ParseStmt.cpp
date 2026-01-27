@@ -65,6 +65,8 @@ StmtResult Parser::ParseStatementOrDeclaration(StmtVector &Stmts,
   // statement are different from [[]] attributes that follow an __attribute__
   // at the start of the statement. Thus, we're not using MaybeParseAttributes
   // here because we don't want to allow arbitrary orderings.
+
+  if (isAllowedCXX11AttributeSpecifier() || (getLangOpts().OpenCL && Tok.is(tok::kw___attribute)) || (getLangOpts().HLSL && Tok.is(tok::l_square))) {
   ParsedAttributes CXX11Attrs(AttrFactory);
   bool HasStdAttr =
       MaybeParseCXX11Attributes(CXX11Attrs, /*MightBeObjCMessageSend*/ true);
@@ -96,6 +98,18 @@ StmtResult Parser::ParseStatementOrDeclaration(StmtVector &Stmts,
     return Res;
 
   return Actions.ActOnAttributedStmt(CXX11Attrs, Res.get());
+  }
+
+  ParsedAttributes A(AttrFactory);
+  ParsedAttributes B(AttrFactory);
+  return ParseStatementOrDeclarationAfterAttributes(
+      Stmts, StmtCtx, TrailingElseLoc, A, B,
+      PrecedingLabel);
+
+
+  // no attributes.
+  // CXX11Attrs, GNUOrMSAttrs,
+      // PrecedingLabel);
 }
 
 namespace {
@@ -144,11 +158,10 @@ StmtResult Parser::ParseStatementOrDeclarationAfterAttributes(
   // or they directly 'return;' if not.
 Retry:
   tok::TokenKind Kind  = Tok.getKind();
-  SourceLocation AtLoc;
   switch (Kind) {
   case tok::at: // May be a @try or @throw statement
     {
-      AtLoc = ConsumeToken();  // consume @
+      SourceLocation AtLoc = ConsumeToken();  // consume @
       return ParseObjCAtStatement(AtLoc, StmtCtx);
     }
 
