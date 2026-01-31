@@ -2336,7 +2336,6 @@ bool arePotentiallyOverlappingStringLiterals(const Pointer &LHS,
 
 static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr,
                                 PrimType T) {
-
   if (T == PT_IntAPS) {
     auto &Val = Ptr.deref<IntegralAP<true>>();
     if (!Val.singleWord()) {
@@ -2355,16 +2354,34 @@ static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr,
       uint64_t *NewMemory = new (S.P) uint64_t[Val.numWords()];
       Val.take(NewMemory);
     }
+  } else if (T == PT_MemberPtr) {
+    auto &Val = Ptr.deref<MemberPointer>();
+    unsigned PathLength = Val.getPathLength();
+    auto *NewPath = new (S.P) const CXXRecordDecl *[PathLength];
+    for (unsigned I = 0; I != PathLength; ++I) {
+      NewPath[I] = Val.getPathEntry(I);
+    }
+    Val.takePath(NewPath);
   }
 }
 
 template <typename T>
 static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr) {
   assert(needsAlloc<T>());
-  auto &Val = Ptr.deref<T>();
-  if (!Val.singleWord()) {
-    uint64_t *NewMemory = new (S.P) uint64_t[Val.numWords()];
-    Val.take(NewMemory);
+  if constexpr (std::is_same_v<T, MemberPointer>) {
+    auto &Val = Ptr.deref<MemberPointer>();
+    unsigned PathLength = Val.getPathLength();
+    auto *NewPath = new (S.P) const CXXRecordDecl *[PathLength];
+    for (unsigned I = 0; I != PathLength; ++I) {
+      NewPath[I] = Val.getPathEntry(I);
+    }
+    Val.takePath(NewPath);
+  } else {
+    auto &Val = Ptr.deref<T>();
+    if (!Val.singleWord()) {
+      uint64_t *NewMemory = new (S.P) uint64_t[Val.numWords()];
+      Val.take(NewMemory);
+    }
   }
 }
 
@@ -2375,9 +2392,9 @@ static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
         TYPE_SWITCH_ALLOC(Fi.Desc->getPrimType(), {
           copyPrimitiveMemory<T>(S, Ptr.atField(Fi.Offset));
         });
-        copyPrimitiveMemory(S, Ptr.atField(Fi.Offset), Fi.Desc->getPrimType());
-      } else
+      } else {
         finishGlobalRecurse(S, Ptr.atField(Fi.Offset));
+      }
     }
     return;
   }
@@ -2488,6 +2505,108 @@ bool Destroy(InterpState &S, CodePtr OpPC, uint32_t I) {
   }
 
   S.Current->destroy(I);
+  return true;
+}
+
+/// DerivedToBaseMemberPointer
+bool CastMemberPtrBasePop(InterpState &S, CodePtr OpPC, int32_t Off,
+                          const RecordDecl *BaseDecl) {
+  const auto &Ptr = S.Stk.pop<MemberPointer>();
+
+  if (!Ptr.isDerivedMember() && Ptr.hasPath()) {
+    const CXXRecordDecl *Expected;
+    if (Ptr.getPathLength() >= 2)
+      Expected = Ptr.getPathEntry(Ptr.getPathLength() - 2);
+    else
+      Expected = Ptr.getRecordDecl();
+
+    if (Expected->getCanonicalDecl() != BaseDecl->getCanonicalDecl()) {
+      // C++11 [expr.static.cast]p12: In a conversion from (D::*) to (B::*),
+      // if B does not contain the original member and is not a base or
+      // derived class of the class containing the original member, the result
+      // of the cast is undefined.
+      // C++11 [conv.mem]p2 does not cover this case for a cast from (B::*) to
+      // (D::*). We consider that to be a language defect.
+      return false;
+    }
+
+    unsigned OldPathLength = Ptr.getPathLength();
+    unsigned NewPathLength = OldPathLength - 1;
+    bool IsDerivedMember = NewPathLength != 0;
+    auto NewPath = S.allocMemberPointerPath(OldPathLength - 1);
+    for (unsigned I = 0; I != OldPathLength - 1; ++I) {
+      NewPath[I] = Ptr.getPathEntry(I);
+    }
+
+    S.Stk.push<MemberPointer>(
+        Ptr.atInstanceBase(Off, OldPathLength - 1, NewPath, IsDerivedMember));
+    return true;
+  }
+
+  // Allocate the new path.
+  unsigned OldPathLength = Ptr.getPathLength();
+  bool IsDerivedMember = Ptr.isDerivedMember() || OldPathLength == 0;
+  unsigned NewPathLength = OldPathLength + 1;
+
+  auto NewPath = S.allocMemberPointerPath(NewPathLength);
+  for (unsigned I = 0; I != OldPathLength; ++I) {
+    NewPath[I] = Ptr.getPathEntry(I);
+  }
+  NewPath[OldPathLength] = cast<CXXRecordDecl>(BaseDecl);
+
+  S.Stk.push<MemberPointer>(
+      Ptr.atInstanceBase(Off, NewPathLength, NewPath, IsDerivedMember));
+  return true;
+}
+
+/// BaseToDerivedMemberPointer
+bool CastMemberPtrDerivedPop(InterpState &S, CodePtr OpPC, int32_t Off,
+                             const RecordDecl *BaseDecl) {
+  const auto &Ptr = S.Stk.pop<MemberPointer>();
+
+  if (!Ptr.isDerivedMember()) {
+    // Simply append.
+    unsigned OldPathLength = Ptr.getPathLength();
+    auto NewPath = S.allocMemberPointerPath(OldPathLength + 1);
+    for (unsigned I = 0; I != OldPathLength; ++I) {
+      NewPath[I] = Ptr.getPathEntry(I);
+    }
+    NewPath[OldPathLength] = cast<CXXRecordDecl>(BaseDecl);
+
+    S.Stk.push<MemberPointer>(
+        Ptr.atInstanceBase(Off, OldPathLength + 1, NewPath));
+    return true;
+  }
+
+  // Perform a cast towards the class of the Decl (either up or down the
+  // hierarchy).
+  const CXXRecordDecl *Expected;
+  if (Ptr.getPathLength() >= 2)
+    Expected = Ptr.getPathEntry(Ptr.getPathLength() - 2);
+  else
+    Expected = Ptr.getRecordDecl();
+
+  if (Expected->getCanonicalDecl() != BaseDecl->getCanonicalDecl()) {
+    // C++11 [expr.static.cast]p12: In a conversion from (D::*) to (B::*),
+    // if B does not contain the original member and is not a base or
+    // derived class of the class containing the original member, the result
+    // of the cast is undefined.
+    // C++11 [conv.mem]p2 does not cover this case for a cast from (B::*) to
+    // (D::*). We consider that to be a language defect.
+    return false;
+  }
+
+  unsigned OldPathLength = Ptr.getPathLength();
+  unsigned NewPathLength = OldPathLength - 1;
+  bool IsDerivedMember = NewPathLength != 0;
+
+  auto NewPath = S.allocMemberPointerPath(OldPathLength - 1);
+  for (unsigned I = 0; I != OldPathLength - 1; ++I) {
+    NewPath[I] = Ptr.getPathEntry(I);
+  }
+
+  S.Stk.push<MemberPointer>(
+      Ptr.atInstanceBase(Off, OldPathLength - 1, NewPath, IsDerivedMember));
   return true;
 }
 

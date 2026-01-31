@@ -146,6 +146,11 @@ public:
     return Floating(Mem, llvm::APFloatBase::SemanticsToEnum(Sem));
   }
 
+  const CXXRecordDecl **allocMemberPointerPath(unsigned Length) {
+    return reinterpret_cast<const CXXRecordDecl **>(
+        this->allocate(Length * sizeof(CXXRecordDecl *)));
+  }
+
 private:
   friend class EvaluationResult;
   friend class InterpStateCCOverride;
