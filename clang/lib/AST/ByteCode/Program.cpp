@@ -379,8 +379,10 @@ Record *Program::getOrCreateRecord(const RecordDecl *RD) {
     } else {
       Desc = createDescriptor(FD, FT.getTypePtr(), std::nullopt, IsConst,
                               /*isTemporary=*/false, IsMutable, IsVolatile);
-      HasPtrField = HasPtrField || (Desc && Desc->isPrimitiveArray() &&
-                                    Desc->getPrimType() == PT_Ptr);
+      HasPtrField =
+          HasPtrField ||
+          (Desc && Desc->isPrimitiveArray() && Desc->getPrimType() == PT_Ptr) ||
+          (Desc && Desc->ElemRecord && Desc->ElemRecord->hasPtrField());
     }
     if (!Desc)
       return nullptr;
