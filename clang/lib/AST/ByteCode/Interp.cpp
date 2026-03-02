@@ -510,8 +510,7 @@ bool CheckNull(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
   return false;
 }
 
-bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
-                AccessKinds AK) {
+bool CheckRange(InterpState &S, CodePtr OpPC, PtrView Ptr, AccessKinds AK) {
   if (!Ptr.isOnePastEnd() && !Ptr.isZeroSizeArray())
     return true;
   if (S.getLangOpts().CPlusPlus) {
@@ -587,14 +586,14 @@ bool CheckConst(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
   return false;
 }
 
-bool CheckMutable(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
+bool CheckMutable(InterpState &S, CodePtr OpPC, PtrView Ptr) {
   assert(Ptr.isLive() && "Pointer is not live");
   if (!Ptr.isMutable())
     return true;
 
   // In C++14 onwards, it is permitted to read a mutable member whose
   // lifetime began within the evaluation.
-  if (S.getLangOpts().CPlusPlus14 && Ptr.block()->getEvalID() == S.EvalID)
+  if (S.getLangOpts().CPlusPlus14 && Ptr.getEvalID() == S.EvalID)
     return true;
 
   const SourceInfo &Loc = S.Current->getSource(OpPC);
@@ -1872,6 +1871,10 @@ bool CallVirt(InterpState &S, CodePtr OpPC, const Function *Func,
   size_t ArgSize = Func->getArgSize() + VarArgSize;
   size_t ThisOffset = ArgSize - (Func->hasRVO() ? primSize(PT_Ptr) : 0);
   Pointer &ThisPtr = S.Stk.peek<Pointer>(ThisOffset);
+
+  if (!ThisPtr.isBlockPointer())
+    return false;
+
   const FunctionDecl *Callee = Func->getDecl();
 
   const CXXRecordDecl *DynamicDecl = nullptr;
@@ -2024,12 +2027,12 @@ bool CallPtr(InterpState &S, CodePtr OpPC, uint32_t ArgSize,
   return Call(S, OpPC, F, VarArgSize);
 }
 
-static void startLifetimeRecurse(const Pointer &Ptr) {
+static void startLifetimeRecurse(PtrView Ptr) {
   if (const Record *R = Ptr.getRecord()) {
     Ptr.startLifetime();
 
     for (const Record::Field &Fi : R->fields()) {
-      Pointer FP = Ptr.atField(Fi.Offset);
+      PtrView FP = Ptr.atField(Fi.Offset);
       if (FP.getLifetime() != Lifetime::Started)
         startLifetimeRecurse(FP);
     }
@@ -2039,7 +2042,7 @@ static void startLifetimeRecurse(const Pointer &Ptr) {
   if (const Descriptor *FieldDesc = Ptr.getFieldDesc();
       FieldDesc->isCompositeArray()) {
     for (unsigned I = 0; I != FieldDesc->getNumElems(); ++I) {
-      Pointer EP = Ptr.atIndex(I).narrow();
+      PtrView EP = Ptr.atIndex(I).narrow();
       if (EP.getLifetime() != Lifetime::Started)
         startLifetimeRecurse(EP);
     }
@@ -2056,7 +2059,7 @@ bool StartThisLifetime(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Current->getThis();
   if (!Ptr.isBlockPointer())
     return false;
-  startLifetimeRecurse(Ptr);
+  startLifetimeRecurse(Ptr.view());
   return true;
 }
 
@@ -2073,7 +2076,7 @@ bool StartThisLifetime1(InterpState &S, CodePtr OpPC) {
 
 // FIXME: It might be better to the recursing as part of the generated code for
 // a destructor?
-static void setLifeStateRecurse(const Pointer &Ptr, Lifetime L) {
+static void setLifeStateRecurse(PtrView Ptr, Lifetime L) {
   if (const Record *R = Ptr.getRecord()) {
     Ptr.setLifeState(L);
     for (const Record::Field &Fi : R->fields())
@@ -2099,7 +2102,7 @@ bool EndLifetime(InterpState &S, CodePtr OpPC) {
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
 
-  setLifeStateRecurse(Ptr.narrow(), Lifetime::Ended);
+  setLifeStateRecurse(Ptr.view().narrow(), Lifetime::Ended);
   return true;
 }
 
@@ -2109,7 +2112,7 @@ bool EndLifetimePop(InterpState &S, CodePtr OpPC) {
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
 
-  setLifeStateRecurse(Ptr.narrow(), Lifetime::Ended);
+  setLifeStateRecurse(Ptr.view().narrow(), Lifetime::Ended);
   return true;
 }
 
@@ -2118,7 +2121,7 @@ bool MarkDestroyed(InterpState &S, CodePtr OpPC) {
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
 
-  setLifeStateRecurse(Ptr.narrow(), Lifetime::Destroyed);
+  setLifeStateRecurse(Ptr.view().narrow(), Lifetime::Destroyed);
   return true;
 }
 
@@ -2148,7 +2151,7 @@ bool CheckNewTypeMismatch(InterpState &S, CodePtr OpPC, const Expr *E,
   if (!CheckRange(S, OpPC, Ptr, AK_Construct))
     return false;
 
-  startLifetimeRecurse(Ptr);
+  startLifetimeRecurse(Ptr.view());
 
   // Similar to CheckStore(), but with the additional CheckTemporary() call and
   // the AccessKinds are different.
