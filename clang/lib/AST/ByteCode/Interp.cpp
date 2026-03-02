@@ -399,7 +399,7 @@ bool CheckActive(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
 
   const FieldDecl *ActiveField = nullptr;
   for (const Record::Field &F : R->fields()) {
-    const Pointer &Field = U.atField(F.Offset);
+    PtrView Field = U.view().atField(F.Offset);
     if (Field.isActive()) {
       ActiveField = Field.getField();
       break;
@@ -1955,7 +1955,7 @@ bool CallPtr(InterpState &S, CodePtr OpPC, uint32_t ArgSize,
   return Call(S, OpPC, F, VarArgSize);
 }
 
-static void startLifetimeRecurse(const Pointer &Ptr) {
+static void startLifetimeRecurse(PtrView Ptr) {
   if (const Record *R = Ptr.getRecord()) {
     Ptr.startLifetime();
     for (const Record::Field &Fi : R->fields())
@@ -1967,7 +1967,7 @@ static void startLifetimeRecurse(const Pointer &Ptr) {
       FieldDesc->isCompositeArray()) {
     assert(Ptr.getLifetime() == Lifetime::Started);
     for (unsigned I = 0; I != FieldDesc->getNumElems(); ++I)
-      startLifetimeRecurse(Ptr.atIndex(I).narrow());
+      startLifetimeRecurse(Ptr.atIndex(I));
     return;
   }
 
@@ -1978,13 +1978,13 @@ bool StartLifetime(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Stk.peek<Pointer>();
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
-  startLifetimeRecurse(Ptr.narrow());
+  startLifetimeRecurse(Ptr.narrow().view());
   return true;
 }
 
 // FIXME: It might be better to the recursing as part of the generated code for
 // a destructor?
-static void endLifetimeRecurse(const Pointer &Ptr) {
+static void endLifetimeRecurse(PtrView Ptr) {
   if (const Record *R = Ptr.getRecord()) {
     Ptr.endLifetime();
     for (const Record::Field &Fi : R->fields())
@@ -1997,7 +1997,7 @@ static void endLifetimeRecurse(const Pointer &Ptr) {
     // No endLifetime() for array roots.
     assert(Ptr.getLifetime() == Lifetime::Started);
     for (unsigned I = 0; I != FieldDesc->getNumElems(); ++I)
-      endLifetimeRecurse(Ptr.atIndex(I).narrow());
+      endLifetimeRecurse(Ptr.atIndex(I));
     return;
   }
 
@@ -2010,7 +2010,7 @@ bool EndLifetime(InterpState &S, CodePtr OpPC) {
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
 
-  endLifetimeRecurse(Ptr.narrow());
+  endLifetimeRecurse(Ptr.narrow().view());
   return true;
 }
 
@@ -2020,7 +2020,7 @@ bool EndLifetimePop(InterpState &S, CodePtr OpPC) {
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
 
-  endLifetimeRecurse(Ptr.narrow());
+  endLifetimeRecurse(Ptr.narrow().view());
   return true;
 }
 
@@ -2043,7 +2043,7 @@ bool CheckNewTypeMismatch(InterpState &S, CodePtr OpPC, const Expr *E,
   if (!CheckRange(S, OpPC, Ptr, AK_Construct))
     return false;
 
-  startLifetimeRecurse(Ptr);
+  startLifetimeRecurse(Ptr.view());
 
   // Similar to CheckStore(), but with the additional CheckTemporary() call and
   // the AccessKinds are different.
@@ -2331,7 +2331,7 @@ bool arePotentiallyOverlappingStringLiterals(const Pointer &LHS,
   return Shorter == Longer.take_front(Shorter.size());
 }
 
-static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr,
+static void copyPrimitiveMemory(InterpState &S, PtrView Ptr,
                                 PrimType T) {
   if (T == PT_IntAPS) {
     auto &Val = Ptr.deref<IntegralAP<true>>();
@@ -2361,7 +2361,7 @@ static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr,
 }
 
 template <typename T>
-static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr) {
+static void copyPrimitiveMemory(InterpState &S, PtrView Ptr) {
   assert(needsAlloc<T>());
   if constexpr (std::is_same_v<T, MemberPointer>) {
     auto &Val = Ptr.deref<MemberPointer>();
@@ -2378,7 +2378,7 @@ static void copyPrimitiveMemory(InterpState &S, const Pointer &Ptr) {
   }
 }
 
-static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
+static void finishGlobalRecurse(InterpState &S, PtrView Ptr) {
   if (const Record *R = Ptr.getRecord()) {
     for (const Record::Field &Fi : R->fields()) {
       if (Fi.Desc->isPrimitive()) {
@@ -2402,7 +2402,7 @@ static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
       if (!needsAlloc(PT))
         return;
       assert(NumElems >= 1);
-      const Pointer EP = Ptr.atIndex(0);
+      PtrView EP = Ptr.atIndex(0);
       bool AllSingleWord = true;
       TYPE_SWITCH_ALLOC(PT, {
         if (!EP.deref<T>().singleWord()) {
@@ -2413,13 +2413,13 @@ static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
       if (AllSingleWord)
         return;
       for (unsigned I = 1; I != D->getNumElems(); ++I) {
-        const Pointer EP = Ptr.atIndex(I);
+        PtrView EP = Ptr.atIndex(I);
         copyPrimitiveMemory(S, EP, PT);
       }
     } else {
       assert(D->isCompositeArray());
       for (unsigned I = 0; I != D->getNumElems(); ++I) {
-        const Pointer EP = Ptr.atIndex(I).narrow();
+        PtrView EP = Ptr.atIndex(I);
         finishGlobalRecurse(S, EP);
       }
     }
@@ -2429,7 +2429,7 @@ static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
 bool FinishInitGlobal(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
-  finishGlobalRecurse(S, Ptr);
+  finishGlobalRecurse(S, Ptr.view());
   if (Ptr.canBeInitialized()) {
     Ptr.initialize();
     Ptr.activate();
