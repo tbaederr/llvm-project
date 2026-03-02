@@ -2451,7 +2451,6 @@ void InitListChecker::CheckStructUnionTypes(
       continue;
     }
 
-    SourceLocation InitLoc = Init ? Init->getBeginLoc() : IList->getEndLoc();
     InitializedEntity BaseEntity = InitializedEntity::InitializeBase(
         SemaRef.Context, &Base, false, &Entity);
     if (Init) {
@@ -2459,14 +2458,17 @@ void InitListChecker::CheckStructUnionTypes(
                           StructuredList, StructuredIndex);
       InitializedSomething = true;
     } else {
+      SourceLocation InitLoc = Init ? Init->getBeginLoc() : IList->getEndLoc();
       CheckEmptyInitializable(BaseEntity, InitLoc);
     }
 
-    if (!VerifyOnly)
+    if (!VerifyOnly) {
+        SourceLocation InitLoc = Init ? Init->getBeginLoc() : IList->getEndLoc();
       if (checkDestructorReference(Base.getType(), InitLoc, SemaRef)) {
         hadError = true;
         return;
       }
+    }
   }
 
   // If structDecl is a forward declaration, this loop won't do
@@ -2483,7 +2485,6 @@ void InitListChecker::CheckStructUnionTypes(
 
   while (Index < IList->getNumInits()) {
     Expr *Init = IList->getInit(Index);
-    SourceLocation InitLoc = Init->getBeginLoc();
 
     if (DesignatedInitExpr *DIE = dyn_cast<DesignatedInitExpr>(Init)) {
       // If we're not the subobject that matches up with the '{' for
@@ -2509,6 +2510,7 @@ void InitListChecker::CheckStructUnionTypes(
         InitializedFields.insert(F);
         if (!DesignatedInitFailed) {
           QualType ET = SemaRef.Context.getBaseElementType(F->getType());
+          SourceLocation InitLoc = Init->getBeginLoc();
           if (checkDestructorReference(ET, InitLoc, SemaRef)) {
             hadError = true;
             return;
@@ -2544,7 +2546,7 @@ void InitListChecker::CheckStructUnionTypes(
     // Don't allow non-designated initializers on randomized structures.
     if (RD->isRandomized() && !IsZeroInitializer(Init)) {
       if (!VerifyOnly)
-        SemaRef.Diag(InitLoc, diag::err_non_designated_init_used);
+        SemaRef.Diag(Init->getBeginLoc(), diag::err_non_designated_init_used);
       hadError = true;
       break;
     }
@@ -2584,7 +2586,7 @@ void InitListChecker::CheckStructUnionTypes(
 
     if (!VerifyOnly) {
       QualType ET = SemaRef.Context.getBaseElementType(Field->getType());
-      if (checkDestructorReference(ET, InitLoc, SemaRef)) {
+      if (checkDestructorReference(ET, Init->getBeginLoc(), SemaRef)) {
         hadError = true;
         return;
       }
