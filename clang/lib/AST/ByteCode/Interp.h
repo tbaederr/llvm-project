@@ -240,7 +240,7 @@ void cleanupAfterFunctionCall(InterpState &S, CodePtr OpPC,
                               const Function *Func);
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
-PRESERVE_NONE bool Ret(InterpState &S, CodePtr &PC) {
+PRESERVE_NONE bool Ret(InterpState &S, CodePtr &PC, bool &Stop) {
   const T &Ret = S.Stk.pop<T>();
 
   assert(S.Current);
@@ -259,10 +259,12 @@ PRESERVE_NONE bool Ret(InterpState &S, CodePtr &PC) {
     // The topmost frame should come from an EvalEmitter,
     // which has its own implementation of the Ret<> instruction.
   }
+
+  Stop = true;
   return true;
 }
 
-PRESERVE_NONE inline bool RetVoid(InterpState &S, CodePtr &PC) {
+PRESERVE_NONE inline bool RetVoid(InterpState &S, CodePtr &PC, bool &Stop) {
   assert(S.Current->getFrameOffset() == S.Stk.size() && "Invalid frame");
 
   if (!S.checkingPotentialConstantExpression() || S.Current->Caller)
@@ -276,6 +278,8 @@ PRESERVE_NONE inline bool RetVoid(InterpState &S, CodePtr &PC) {
     InterpFrame::free(S.Current);
     S.Current = nullptr;
   }
+
+  Stop = true;
   return true;
 }
 

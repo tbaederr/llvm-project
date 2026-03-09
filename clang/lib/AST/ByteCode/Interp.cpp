@@ -38,7 +38,7 @@ using namespace clang::interp;
 #define MUSTTAIL
 #endif
 
-PRESERVE_NONE static bool RetValue(InterpState &S, CodePtr &Pt) {
+PRESERVE_NONE static bool RetValue(InterpState &S, CodePtr &Ptr, bool &Stop) {
   llvm::report_fatal_error("Interpreter cannot return values");
 }
 
@@ -2521,6 +2521,23 @@ bool CastMemberPtrDerivedPop(InterpState &S, CodePtr OpPC, int32_t Off,
 
 PRESERVE_NONE static bool InterpNext(InterpState &S, CodePtr &PC);
 
+
+// The dispatcher functions read the opcode arguments from the
+// bytecode and call the implementation function.
+#define GET_INTERPFN_DISPATCHERS
+#include "Opcodes.inc"
+#undef GET_INTERPFN_DISPATCHERS
+
+
+using InterpFn = bool (*)(InterpState &, CodePtr &PC, bool &Stop) PRESERVE_NONE;
+// Array of the dispatcher functions defined above.
+const InterpFn InterpFunctions[] = {
+#define GET_INTERPFN_LIST
+#include "Opcodes.inc"
+#undef GET_INTERPFN_LIST
+};
+
+
 bool Interpret(InterpState &S) {
   // The current stack frame when we started Interpret().
   // This is being used by the ops to determine wheter
@@ -2529,30 +2546,25 @@ bool Interpret(InterpState &S) {
   assert(!S.Current->isRoot());
   CodePtr PC = S.Current->getPC();
 
-  return InterpNext(S, PC);
+  bool Stop = false;
+  while (!Stop) {
+    auto Op = PC.read<Opcode>();
+    auto Fn = InterpFunctions[Op];
+
+    if (!Fn(S, PC, Stop))
+        return false;
+  }
+
+  return true;
 }
 
-// The dispatcher functions read the opcode arguments from the
-// bytecode and call the implementation function.
-#define GET_INTERPFN_DISPATCHERS
-#include "Opcodes.inc"
-#undef GET_INTERPFN_DISPATCHERS
-
-using InterpFn = bool (*)(InterpState &, CodePtr &PC) PRESERVE_NONE;
-
-// Array of the dispatcher functions defined above.
-const InterpFn InterpFunctions[] = {
-#define GET_INTERPFN_LIST
-#include "Opcodes.inc"
-#undef GET_INTERPFN_LIST
-};
 
 // Read the next opcode and call the dispatcher function.
-PRESERVE_NONE static bool InterpNext(InterpState &S, CodePtr &PC) {
-  auto Op = PC.read<Opcode>();
-  auto Fn = InterpFunctions[Op];
-  [[clang::musttail]] return Fn(S, PC);
-}
+// PRESERVE_NONE static bool InterpNext(InterpState &S, CodePtr &PC) {
+  // auto Op = PC.read<Opcode>();
+  // auto Fn = InterpFunctions[Op];
+  // [[clang::musttail]] return Fn(S, PC);
+// }
 
 /// This is used to implement speculative execution via __builtin_constant_p
 /// when we generate bytecode.
@@ -2577,13 +2589,26 @@ PRESERVE_NONE static bool BCP(InterpState &S, CodePtr &RealPC, int32_t Offset,
 
   CodePtr PC = RealPC;
   auto SpeculativeInterp = [&S, &PC]() -> bool {
+    bool Stop = false;
     // Ignore diagnostics during speculative execution.
     PushIgnoreDiags(S, PC);
     auto _ = llvm::scope_exit([&]() { PopIgnoreDiags(S, PC); });
 
+#if 0
+
     auto Op = PC.read<Opcode>();
     auto Fn = InterpFunctions[Op];
-    return Fn(S, PC);
+    return Fn(S, PC, Stop);
+#endif
+
+    while (!Stop) {
+      auto Op = PC.read<Opcode>();
+      auto Fn = InterpFunctions[Op];
+
+      if (!Fn(S, PC, Stop))
+          return false;
+    }
+    return true;
   };
 
   if (SpeculativeInterp()) {

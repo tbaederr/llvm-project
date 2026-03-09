@@ -643,6 +643,8 @@ class OverflowOpcode : Opcode {
   let Types = [AluTypeClass];
   let Args = [ArgBool];
   let HasGroup = 1;
+
+
 }
 
 class OverflowBitfieldOpcode : Opcode {

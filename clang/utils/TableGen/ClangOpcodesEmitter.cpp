@@ -115,9 +115,10 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
   OS << "#ifdef GET_INTERPFN_DISPATCHERS\n";
   Enumerate(R, N, [&](ArrayRef<const Record *> TS, const Twine &ID) {
     OS << "PRESERVE_NONE\nstatic bool Interp_" << ID
-       << "(InterpState &S, CodePtr &PC) {\n";
+       << "(InterpState &S, CodePtr &PC, bool &Stop) {\n";
 
     if (ID.str() == "EndSpeculation") {
+      OS << " Stop = true;\n";
       OS << "    return EndSpeculation(S, PC);\n";
       OS << "}\n";
       return;
@@ -129,9 +130,10 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
 
     if (Args.empty()) {
       if (CanReturn) {
+        OS << " Stop = true;\n";
         OS << " MUSTTAIL return " << N;
         PrintTypes(OS, TS);
-        OS << "(S, PC);\n";
+        OS << "(S, PC, Stop);\n";
         OS << "}\n";
         return;
       }
@@ -140,7 +142,8 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
       PrintTypes(OS, TS);
       OS << "(S, PC))\n";
       OS << "    return false;\n";
-      OS << "  MUSTTAIL return InterpNext(S, PC);\n";
+      // OS << "  MUSTTAIL return InterpNext(S, PC);\n";
+      OS << "  return true;\n";
       OS << "}\n";
       return;
     }
@@ -178,7 +181,8 @@ void ClangOpcodesEmitter::EmitInterpFnDispatchers(raw_ostream &OS, StringRef N,
     OS << "  }\n";
 
     if (!CanReturn)
-      OS << "  MUSTTAIL return InterpNext(S, PC);\n";
+      // OS << "  MUSTTAIL return InterpNext(S, PC);\n";
+      OS << "  return true;\n";
     else
       OS << "  return true;\n";
 
