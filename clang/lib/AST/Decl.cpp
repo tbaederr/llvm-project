@@ -2585,11 +2585,10 @@ EvaluatedStmt *VarDecl::getEvaluatedStmt() const {
 }
 
 APValue *VarDecl::evaluateValue() const {
-  SmallVector<PartialDiagnosticAt, 8> Notes;
-  return evaluateValueImpl(Notes, hasConstantInitialization());
+  return evaluateValueImpl(nullptr, hasConstantInitialization());
 }
 
-APValue *VarDecl::evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> &Notes,
+APValue *VarDecl::evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> *Notes,
                                     bool IsConstantInitialization) const {
   EvaluatedStmt *Eval = ensureEvaluatedStmt();
 
@@ -2620,7 +2619,7 @@ APValue *VarDecl::evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> &Notes,
   if (IsConstantInitialization &&
       (Ctx.getLangOpts().CPlusPlus ||
        (isConstexpr() && Ctx.getLangOpts().C23)) &&
-      !Notes.empty())
+      (Notes && !Notes->empty()))
     Result = false;
 
   // Ensure the computed APValue is cleaned up later if evaluation succeeded,
@@ -2689,7 +2688,7 @@ bool VarDecl::checkForConstantInitialization(
 
   // Evaluate the initializer to check whether it's a constant expression.
   Eval->HasConstantInitialization =
-      evaluateValueImpl(Notes, true) && Notes.empty();
+      evaluateValueImpl(&Notes, true) && Notes.empty();
 
   // If evaluation as a constant initializer failed, allow re-evaluation as a
   // non-constant initializer if we later find we want the value.

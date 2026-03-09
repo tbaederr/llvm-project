@@ -1408,12 +1408,13 @@ public:
   EvaluatedStmt *getEvaluatedStmt() const;
 
   /// Attempt to evaluate the value of the initializer attached to this
-  /// declaration, and produce notes explaining why it cannot be evaluated.
-  /// Returns a pointer to the value if evaluation succeeded, 0 otherwise.
+  /// declaration. No notes are produced if evaluation fails.
+  ///
+  /// Returns a pointer to the value if evaluation succeeded, nullptr otherwise.
   APValue *evaluateValue() const;
 
 private:
-  APValue *evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> &Notes,
+  APValue *evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> *Notes,
                              bool IsConstantInitialization) const;
 
 public:

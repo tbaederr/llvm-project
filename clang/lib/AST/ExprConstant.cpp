@@ -21025,7 +21025,7 @@ bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
 
 bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
                                  const VarDecl *VD,
-                                 SmallVectorImpl<PartialDiagnosticAt> &Notes,
+                                 SmallVectorImpl<PartialDiagnosticAt> *Notes,
                                  bool IsConstantInitialization) const {
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
@@ -21039,7 +21039,7 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
   });
 
   Expr::EvalStatus EStatus;
-  EStatus.Diag = &Notes;
+  EStatus.Diag = Notes;
 
   EvalInfo Info(Ctx, EStatus,
                 (IsConstantInitialization &&
