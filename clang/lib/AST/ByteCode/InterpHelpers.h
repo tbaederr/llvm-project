@@ -123,7 +123,7 @@ bool CheckArraySize(InterpState &S, CodePtr OpPC, SizeT *NumElements,
           ConstantArrayType::getMaxSizeBits(S.getASTContext()) ||
       *NumElements > MaxElements) {
     if (!IsNoThrow) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
 
       if (NumElements->isSigned() && NumElements->isNegative()) {
         S.FFDiag(Loc, diag::note_constexpr_new_negative)
