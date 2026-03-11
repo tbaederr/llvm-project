@@ -172,9 +172,13 @@ namespace VirtualBases {
   namespace One {
     struct U { int n; };
     struct V : U { int n; };
+
     struct A : virtual V { int n; };
+
     struct Aa { int n; };
+
     struct B : virtual A, Aa {};
+
     struct C : virtual A, Aa {};
     struct D : B, C {};
 
