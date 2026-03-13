@@ -11501,6 +11501,8 @@ static std::optional<IntRange> TryGetExprRange(ASTContext &C, const Expr *E,
                                                bool InConstantContext,
                                                bool Approximate) {
   E = E->IgnoreParens();
+  if (isa<DeclRefExpr>(E))
+    return std::nullopt;
 
   // Try a full evaluation first.
   Expr::EvalResult result;
