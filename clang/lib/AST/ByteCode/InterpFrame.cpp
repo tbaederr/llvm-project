@@ -158,6 +158,8 @@ void InterpFrame::describe(llvm::raw_ostream &OS) const {
 
   const Expr *CallExpr = Caller->getExpr(getRetPC());
   const FunctionDecl *F = getCallee();
+  auto PrintingPolicy = S.getASTContext().getPrintingPolicy();
+  PrintingPolicy.SuppressLambdaBody = true;
 
   bool IsMemberCall = false;
   bool ExplicitInstanceParam = false;
@@ -170,7 +172,7 @@ void InterpFrame::describe(llvm::raw_ostream &OS) const {
     if (const auto *MCE = dyn_cast_if_present<CXXMemberCallExpr>(CallExpr)) {
       const Expr *Object = MCE->getImplicitObjectArgument();
       Object->printPretty(OS, /*Helper=*/nullptr,
-                          S.getASTContext().getPrintingPolicy(),
+                          PrintingPolicy,
                           /*Indentation=*/0);
       if (Object->getType()->isPointerType())
         OS << "->";
@@ -179,7 +181,7 @@ void InterpFrame::describe(llvm::raw_ostream &OS) const {
     } else if (const auto *OCE =
                    dyn_cast_if_present<CXXOperatorCallExpr>(CallExpr)) {
       OCE->getArg(0)->printPretty(OS, /*Helper=*/nullptr,
-                                  S.getASTContext().getPrintingPolicy(),
+                                  PrintingPolicy,
                                   /*Indentation=*/0);
       OS << ".";
     } else if (const auto *M = dyn_cast<CXXMethodDecl>(F)) {
@@ -190,7 +192,7 @@ void InterpFrame::describe(llvm::raw_ostream &OS) const {
     }
   }
 
-  F->getNameForDiagnostic(OS, S.getASTContext().getPrintingPolicy(),
+  F->getNameForDiagnostic(OS, PrintingPolicy,
                           /*Qualified=*/false);
   OS << '(';
   unsigned Off = 0;

@@ -298,6 +298,8 @@ Improvements to Clang's diagnostics
   (``-fimplicit-module-maps``). This does not affect module maps specified
   explicitly via ``-fmodule-map-file=``.
 
+- Removed lambda body from constexpr evaluation diagnostics.
+
 Improvements to Clang's time-trace
 ----------------------------------
 
