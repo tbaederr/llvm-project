@@ -460,6 +460,8 @@ public:
   LLVM_ABI IEEEFloat(const fltSemantics &, integerPart);
   LLVM_ABI IEEEFloat(const fltSemantics &, uninitializedTag);
   LLVM_ABI IEEEFloat(const fltSemantics &, const APInt &);
+  LLVM_ABI IEEEFloat(const fltSemantics &, const uint64_t *Memory,
+                     unsigned BitWidth);
   LLVM_ABI explicit IEEEFloat(double d);
   LLVM_ABI explicit IEEEFloat(float f);
   LLVM_ABI IEEEFloat(const IEEEFloat &);
@@ -772,27 +774,36 @@ private:
   APInt convertFloat6E3M2FNAPFloatToAPInt() const;
   APInt convertFloat6E2M3FNAPFloatToAPInt() const;
   APInt convertFloat4E2M1FNAPFloatToAPInt() const;
-  void initFromAPInt(const fltSemantics *Sem, const APInt &api);
+  void initFromMemory(const fltSemantics *Sem, const uint64_t *Memory,
+                      unsigned BitWidth);
+  void initFromAPInt(const fltSemantics *Sem, const APInt &api) {
+    initFromMemory(Sem, api.getRawData(), api.getBitWidth());
+  }
+
   template <const fltSemantics &S> void initFromIEEEAPInt(const APInt &api);
-  void initFromHalfAPInt(const APInt &api);
-  void initFromBFloatAPInt(const APInt &api);
-  void initFromFloatAPInt(const APInt &api);
-  void initFromDoubleAPInt(const APInt &api);
-  void initFromQuadrupleAPInt(const APInt &api);
-  void initFromF80LongDoubleAPInt(const APInt &api);
-  void initFromPPCDoubleDoubleLegacyAPInt(const APInt &api);
-  void initFromFloat8E5M2APInt(const APInt &api);
-  void initFromFloat8E5M2FNUZAPInt(const APInt &api);
-  void initFromFloat8E4M3APInt(const APInt &api);
-  void initFromFloat8E4M3FNAPInt(const APInt &api);
-  void initFromFloat8E4M3FNUZAPInt(const APInt &api);
-  void initFromFloat8E4M3B11FNUZAPInt(const APInt &api);
-  void initFromFloat8E3M4APInt(const APInt &api);
-  void initFromFloatTF32APInt(const APInt &api);
-  void initFromFloat8E8M0FNUAPInt(const APInt &api);
-  void initFromFloat6E3M2FNAPInt(const APInt &api);
-  void initFromFloat6E2M3FNAPInt(const APInt &api);
-  void initFromFloat4E2M1FNAPInt(const APInt &api);
+  template <const fltSemantics &S>
+  void initFromIEEEMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromHalfMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromBFloatMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloatMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromDoubleMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromQuadrupleMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromF80LongDoubleMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromPPCDoubleDoubleLegacyMemory(const uint64_t *Memory,
+                                           unsigned BitWidth);
+  void initFromFloat8E5M2Memory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat8E5M2FNUZMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat8E4M3Memory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat8E4M3FNMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat8E4M3FNUZMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat8E4M3B11FNUZMemory(const uint64_t *Memory,
+                                       unsigned BitWidth);
+  void initFromFloat8E3M4Memory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloatTF32Memory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat8E8M0FNUMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat6E3M2FNMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat6E2M3FNMemory(const uint64_t *Memory, unsigned BitWidth);
+  void initFromFloat4E2M1FNMemory(const uint64_t *Memory, unsigned BitWidth);
 
   void assign(const IEEEFloat &);
   void copySignificand(const IEEEFloat &);
@@ -863,6 +874,8 @@ public:
   LLVM_ABI DoubleAPFloat(const fltSemantics &S, uninitializedTag);
   LLVM_ABI DoubleAPFloat(const fltSemantics &S, integerPart);
   LLVM_ABI DoubleAPFloat(const fltSemantics &S, const APInt &I);
+  LLVM_ABI DoubleAPFloat(const fltSemantics &S, const uint64_t *Memory,
+                         unsigned BitWidth);
   LLVM_ABI DoubleAPFloat(const fltSemantics &S, APFloat &&First,
                          APFloat &&Second);
   LLVM_ABI DoubleAPFloat(const DoubleAPFloat &RHS);
@@ -1119,6 +1132,9 @@ public:
   APFloat(const fltSemantics &Semantics, uninitializedTag)
       : U(Semantics, uninitialized) {}
   APFloat(const fltSemantics &Semantics, const APInt &I) : U(Semantics, I) {}
+  APFloat(const fltSemantics &Semantics, const uint64_t *Memory,
+          unsigned BitWidth)
+      : U(Semantics, Memory, BitWidth) {}
   explicit APFloat(double d) : U(IEEEFloat(d), IEEEdouble()) {}
   explicit APFloat(float f) : U(IEEEFloat(f), IEEEsingle()) {}
   APFloat(const APFloat &RHS) = default;

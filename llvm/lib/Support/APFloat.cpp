@@ -3747,9 +3747,10 @@ float128 IEEEFloat::convertToQuad() const {
 ///  exponent!=0 nor all 1's, integer bit 0 ("unnormal")
 ///  exponent = 0, integer bit 1 ("pseudodenormal")
 /// At the moment, the first three are treated as NaNs, the last one as Normal.
-void IEEEFloat::initFromF80LongDoubleAPInt(const APInt &api) {
-  uint64_t i1 = api.getRawData()[0];
-  uint64_t i2 = api.getRawData()[1];
+void IEEEFloat::initFromF80LongDoubleMemory(const uint64_t *Memory,
+                                            unsigned BitWidth) {
+  uint64_t i1 = Memory[0];
+  uint64_t i2 = Memory[1];
   uint64_t myexponent = (i2 & 0x7fff);
   uint64_t mysignificand = i1;
   uint8_t myintegerbit = mysignificand >> 63;
@@ -3778,14 +3779,15 @@ void IEEEFloat::initFromF80LongDoubleAPInt(const APInt &api) {
   }
 }
 
-void IEEEFloat::initFromPPCDoubleDoubleLegacyAPInt(const APInt &api) {
-  uint64_t i1 = api.getRawData()[0];
-  uint64_t i2 = api.getRawData()[1];
+void IEEEFloat::initFromPPCDoubleDoubleLegacyMemory(const uint64_t *Memory,
+                                                    unsigned BitWidth) {
+  uint64_t i1 = Memory[0];
+  uint64_t i2 = Memory[1];
   opStatus fs;
   bool losesInfo;
 
   // Get the first double and convert to our format.
-  initFromDoubleAPInt(APInt(64, i1));
+  initFromDoubleMemory(&i1, 64);
   fs = convert(APFloatBase::semPPCDoubleDoubleLegacy, rmNearestTiesToEven,
                &losesInfo);
   assert(fs == opOK && !losesInfo);
@@ -3808,9 +3810,10 @@ void IEEEFloat::initFromPPCDoubleDoubleLegacyAPInt(const APInt &api) {
 // No encodings for {zero, infinities or denorms}.
 // NaN is represented by all 1's.
 // Bias is 127.
-void IEEEFloat::initFromFloat8E8M0FNUAPInt(const APInt &api) {
+void IEEEFloat::initFromFloat8E8M0FNUMemory(const uint64_t *Memory,
+                                            unsigned BitWidth) {
   const uint64_t exponent_mask = 0xff;
-  uint64_t val = api.getRawData()[0];
+  uint64_t val = Memory[0];
   uint64_t myexponent = (val & exponent_mask);
 
   initialize(&APFloatBase::semFloat8E8M0FNU);
@@ -3836,9 +3839,11 @@ void IEEEFloat::initFromFloat8E8M0FNUAPInt(const APInt &api) {
   category = fcNormal;
   exponent = myexponent - 127; // 127 is bias
 }
+
 template <const fltSemantics &S>
-void IEEEFloat::initFromIEEEAPInt(const APInt &api) {
-  assert(api.getBitWidth() == S.sizeInBits);
+void IEEEFloat::initFromIEEEMemory(const uint64_t *Memory, unsigned BitWidth) {
+  assert(BitWidth == S.sizeInBits);
+  unsigned NumWords = llvm::APInt::getNumWords(BitWidth);
   constexpr integerPart integer_bit = integerPart{1}
                                       << ((S.precision - 1) % integerPartWidth);
   constexpr uint64_t significand_mask = integer_bit - 1;
@@ -3854,14 +3859,14 @@ void IEEEFloat::initFromIEEEAPInt(const APInt &api) {
   // Copy the bits of the significand. We need to clear out the exponent and
   // sign bit in the last word.
   std::array<integerPart, stored_significand_parts> mysignificand;
-  std::copy_n(api.getRawData(), mysignificand.size(), mysignificand.begin());
+  std::copy_n(Memory, mysignificand.size(), mysignificand.begin());
   if constexpr (significand_mask != 0) {
     mysignificand[mysignificand.size() - 1] &= significand_mask;
   }
 
   // We assume the last word holds the sign bit, the exponent, and potentially
   // some of the trailing significand field.
-  uint64_t last_word = api.getRawData()[api.getNumWords() - 1];
+  uint64_t last_word = Memory[NumWords - 1];
   uint64_t myexponent =
       (last_word >> (trailing_significand_bits % 64)) & exponent_mask;
 
@@ -3918,111 +3923,126 @@ void IEEEFloat::initFromIEEEAPInt(const APInt &api) {
     significandParts()[mysignificand.size()-1] |= integer_bit; // integer bit
 }
 
-void IEEEFloat::initFromQuadrupleAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semIEEEquad>(api);
+void IEEEFloat::initFromQuadrupleMemory(const uint64_t *Memory,
+                                        unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semIEEEquad>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromDoubleAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semIEEEdouble>(api);
+void IEEEFloat::initFromDoubleMemory(const uint64_t *Memory,
+                                     unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semIEEEdouble>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloatAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semIEEEsingle>(api);
+void IEEEFloat::initFromFloatMemory(const uint64_t *Memory, unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semIEEEsingle>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromBFloatAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semBFloat>(api);
+void IEEEFloat::initFromBFloatMemory(const uint64_t *Memory,
+                                     unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semBFloat>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromHalfAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semIEEEhalf>(api);
+void IEEEFloat::initFromHalfMemory(const uint64_t *Memory, unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semIEEEhalf>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E5M2APInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E5M2>(api);
+void IEEEFloat::initFromFloat8E5M2Memory(const uint64_t *Memory,
+                                         unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E5M2>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E5M2FNUZAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E5M2FNUZ>(api);
+void IEEEFloat::initFromFloat8E5M2FNUZMemory(const uint64_t *Memory,
+                                             unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E5M2FNUZ>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E4M3APInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E4M3>(api);
+void IEEEFloat::initFromFloat8E4M3Memory(const uint64_t *Memory,
+                                         unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E4M3>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E4M3FNAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E4M3FN>(api);
+void IEEEFloat::initFromFloat8E4M3FNMemory(const uint64_t *Memory,
+                                           unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E4M3FN>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E4M3FNUZAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E4M3FNUZ>(api);
+void IEEEFloat::initFromFloat8E4M3FNUZMemory(const uint64_t *Memory,
+                                             unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E4M3FNUZ>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E4M3B11FNUZAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E4M3B11FNUZ>(api);
+void IEEEFloat::initFromFloat8E4M3B11FNUZMemory(const uint64_t *Memory,
+                                                unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E4M3B11FNUZ>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat8E3M4APInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat8E3M4>(api);
+void IEEEFloat::initFromFloat8E3M4Memory(const uint64_t *Memory,
+                                         unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat8E3M4>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloatTF32APInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloatTF32>(api);
+void IEEEFloat::initFromFloatTF32Memory(const uint64_t *Memory,
+                                        unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloatTF32>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat6E3M2FNAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat6E3M2FN>(api);
+void IEEEFloat::initFromFloat6E3M2FNMemory(const uint64_t *Memory,
+                                           unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat6E3M2FN>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat6E2M3FNAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat6E2M3FN>(api);
+void IEEEFloat::initFromFloat6E2M3FNMemory(const uint64_t *Memory,
+                                           unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat6E2M3FN>(Memory, BitWidth);
 }
 
-void IEEEFloat::initFromFloat4E2M1FNAPInt(const APInt &api) {
-  initFromIEEEAPInt<APFloatBase::semFloat4E2M1FN>(api);
+void IEEEFloat::initFromFloat4E2M1FNMemory(const uint64_t *Memory,
+                                           unsigned BitWidth) {
+  initFromIEEEMemory<APFloatBase::semFloat4E2M1FN>(Memory, BitWidth);
 }
 
 /// Treat api as containing the bits of a floating point number.
-void IEEEFloat::initFromAPInt(const fltSemantics *Sem, const APInt &api) {
-  assert(api.getBitWidth() == Sem->sizeInBits);
+void IEEEFloat::initFromMemory(const fltSemantics *Sem, const uint64_t *Memory,
+                               unsigned BitWidth) {
+  assert(BitWidth == Sem->sizeInBits);
   if (Sem == &APFloatBase::semIEEEhalf)
-    return initFromHalfAPInt(api);
+    return initFromHalfMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semBFloat)
-    return initFromBFloatAPInt(api);
+    return initFromBFloatMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semIEEEsingle)
-    return initFromFloatAPInt(api);
+    return initFromFloatMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semIEEEdouble)
-    return initFromDoubleAPInt(api);
+    return initFromDoubleMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semX87DoubleExtended)
-    return initFromF80LongDoubleAPInt(api);
+    return initFromF80LongDoubleMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semIEEEquad)
-    return initFromQuadrupleAPInt(api);
+    return initFromQuadrupleMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semPPCDoubleDoubleLegacy)
-    return initFromPPCDoubleDoubleLegacyAPInt(api);
+    return initFromPPCDoubleDoubleLegacyMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E5M2)
-    return initFromFloat8E5M2APInt(api);
+    return initFromFloat8E5M2Memory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E5M2FNUZ)
-    return initFromFloat8E5M2FNUZAPInt(api);
+    return initFromFloat8E5M2FNUZMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E4M3)
-    return initFromFloat8E4M3APInt(api);
+    return initFromFloat8E4M3Memory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E4M3FN)
-    return initFromFloat8E4M3FNAPInt(api);
+    return initFromFloat8E4M3FNMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E4M3FNUZ)
-    return initFromFloat8E4M3FNUZAPInt(api);
+    return initFromFloat8E4M3FNUZMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E4M3B11FNUZ)
-    return initFromFloat8E4M3B11FNUZAPInt(api);
+    return initFromFloat8E4M3B11FNUZMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E3M4)
-    return initFromFloat8E3M4APInt(api);
+    return initFromFloat8E3M4Memory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloatTF32)
-    return initFromFloatTF32APInt(api);
+    return initFromFloatTF32Memory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat8E8M0FNU)
-    return initFromFloat8E8M0FNUAPInt(api);
+    return initFromFloat8E8M0FNUMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat6E3M2FN)
-    return initFromFloat6E3M2FNAPInt(api);
+    return initFromFloat6E3M2FNMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat6E2M3FN)
-    return initFromFloat6E2M3FNAPInt(api);
+    return initFromFloat6E2M3FNMemory(Memory, BitWidth);
   if (Sem == &APFloatBase::semFloat4E2M1FN)
-    return initFromFloat4E2M1FNAPInt(api);
+    return initFromFloat4E2M1FNMemory(Memory, BitWidth);
 
   llvm_unreachable("unsupported semantics");
 }
@@ -4093,6 +4113,11 @@ void IEEEFloat::makeSmallestNormalized(bool Negative) {
 
 IEEEFloat::IEEEFloat(const fltSemantics &Sem, const APInt &API) {
   initFromAPInt(&Sem, API);
+}
+
+IEEEFloat::IEEEFloat(const fltSemantics &Sem, const uint64_t *Memory,
+                     unsigned BitWidth) {
+  initFromMemory(&Sem, Memory, BitWidth);
 }
 
 IEEEFloat::IEEEFloat(float f) {
@@ -4733,6 +4758,15 @@ DoubleAPFloat::DoubleAPFloat(const fltSemantics &S, const APInt &I)
       Floats(new APFloat[2]{
           APFloat(APFloatBase::semIEEEdouble, APInt(64, I.getRawData()[0])),
           APFloat(APFloatBase::semIEEEdouble, APInt(64, I.getRawData()[1]))}) {
+  assert(Semantics == &APFloatBase::semPPCDoubleDouble);
+}
+
+DoubleAPFloat::DoubleAPFloat(const fltSemantics &S, const uint64_t *Memory,
+                             unsigned BitWidth)
+    : Semantics(&S),
+      Floats(new APFloat[2]{
+          APFloat(APFloatBase::semIEEEdouble, APInt(64, Memory[0])),
+          APFloat(APFloatBase::semIEEEdouble, APInt(64, Memory[1]))}) {
   assert(Semantics == &APFloatBase::semPPCDoubleDouble);
 }
 

@@ -24,6 +24,7 @@ class ASTContext;
 /// the APFloat/APInt values will never get freed. APNumericStorage uses
 /// ASTContext's allocator for memory allocation.
 class APNumericStorage {
+protected:
   union {
     uint64_t VAL;   ///< Used to store the <= 64 bits integer value.
     uint64_t *pVal; ///< Used to store the >64 bits integer value.
@@ -59,7 +60,10 @@ public:
 class APFloatStorage : private APNumericStorage {
 public:
   llvm::APFloat getValue(const llvm::fltSemantics &Semantics) const {
-    return llvm::APFloat(Semantics, getIntValue());
+    unsigned NumWords = llvm::APInt::getNumWords(BitWidth);
+    if (NumWords > 1)
+      return llvm::APFloat(Semantics, pVal, BitWidth);
+    return llvm::APFloat(Semantics, &VAL, BitWidth);
   }
   void setValue(const ASTContext &C, const llvm::APFloat &Val) {
     setIntValue(C, Val.bitcastToAPInt());
