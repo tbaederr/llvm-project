@@ -71,13 +71,8 @@ InterpFrame::InterpFrame(InterpState &S, const Function *Func, CodePtr RetPC,
 InterpFrame::~InterpFrame() {
   if (Func) {
     // De-initialize all argument blocks.
-    for (unsigned I = 0, N = Func->getNumWrittenParams(); I != N; ++I) {
-      Block *B = argBlock(I);
-      if (B->isInitialized()) {
-        B->removePointers();
-        B->invokeDtor();
-      }
-    }
+    for (unsigned I = 0, N = Func->getNumWrittenParams(); I != N; ++I)
+      S.deallocate(argBlock(I));
   }
 
   // When destroying the InterpFrame, call the Dtor for all block
