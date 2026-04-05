@@ -13102,7 +13102,10 @@ StmtResult TreeTransform<Derived>::TransformUnresolvedSYCLKernelCallStmt(
 template <typename Derived>
 ExprResult TreeTransform<Derived>::TransformCXXReflectExpr(CXXReflectExpr *E) {
   // TODO(reflection): Implement its transform
-  assert(false && "not implemented yet");
+  if (!E->isTypeDependent())
+    return E;
+
+  assert(false && "unknown or unimplemented reflection entities");
   return ExprError();
 }
 
