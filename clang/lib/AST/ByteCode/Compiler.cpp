@@ -966,9 +966,7 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
       return false;
     if (!this->emitActivate(E))
       return false;
-    if (!this->visitInitializer(SubExpr))
-      return false;
-    return this->emitPopPtr(E);
+    return this->visitInitializerPop(SubExpr);
   }
 
   default:
@@ -2120,9 +2118,7 @@ bool Compiler<Emitter>::visitInitList(ArrayRef<const Expr *> Inits,
       if (Activate && !this->emitActivate(E))
         return false;
 
-      if (!this->visitInitializer(Init))
-        return false;
-      return this->emitPopPtr(E);
+      return this->visitInitializerPop(Init);
     };
 
     if (R->isUnion()) {
@@ -2168,10 +2164,7 @@ bool Compiler<Emitter>::visitInitList(ArrayRef<const Expr *> Inits,
           if (!this->emitGetPtrBase(B->Offset, Init))
             return false;
 
-          if (!this->visitInitializer(Init))
-            return false;
-
-          if (!this->emitPopPtr(E))
+          if (!this->visitInitializerPop(Init))
             return false;
           // Base initializers don't increase InitIndex, since they don't count
           // into the Record's fields.
@@ -2349,9 +2342,7 @@ bool Compiler<Emitter>::visitArrayElemInit(unsigned ElemIndex, const Expr *Init,
     return false;
   if (!this->emitArrayElemPtrUint32(Init))
     return false;
-  if (!this->visitInitializer(Init))
-    return false;
-  return this->emitPopPtr(Init);
+  return this->visitInitializerPop(Init);
 }
 
 template <class Emitter>
@@ -3413,10 +3404,7 @@ bool Compiler<Emitter>::VisitLambdaExpr(const LambdaExpr *E) {
       if (!this->emitGetPtrField(F.Offset, E))
         return false;
 
-      if (!this->visitInitializer(Init))
-        return false;
-
-      if (!this->emitPopPtr(E))
+      if (!this->visitInitializerPop(Init))
         return false;
     }
   }
@@ -4638,6 +4626,15 @@ bool Compiler<Emitter>::visitInitializer(const Expr *E) {
   return this->Visit(E) && this->emitFinishInit(E);
 }
 
+template <class Emitter>
+bool Compiler<Emitter>::visitInitializerPop(const Expr *E) {
+  assert(!canClassify(E->getType()));
+
+  OptionScope<Emitter> Scope(this, /*NewDiscardResult=*/false,
+                             /*NewInitializing=*/true, /*ToLValue=*/false);
+  return this->Visit(E) && this->emitFinishInitPop(E);
+}
+
 template <class Emitter> bool Compiler<Emitter>::visitAsLValue(const Expr *E) {
   OptionScope<Emitter> Scope(this, /*NewDiscardResult=*/false,
                              /*NewInitializing=*/false, /*ToLValue=*/true);
@@ -5293,9 +5290,7 @@ VarCreationState Compiler<Emitter>::visitVarDecl(const VarDecl *VD,
     if (!this->emitGetPtrLocal(*Offset, Init))
       return false;
 
-    if (!visitInitializer(Init))
-      return false;
-    return this->emitPopPtr(Init);
+    return this->visitInitializerPop(Init);
   }
   return false;
 }
@@ -6083,9 +6078,7 @@ bool Compiler<Emitter>::visitReturnStmt(const ReturnStmt *RS) {
       // RVO - construct the value in the return location.
       if (!this->emitRVOPtr(RE))
         return false;
-      if (!this->visitInitializer(RE))
-        return false;
-      if (!this->emitPopPtr(RE))
+      if (!this->visitInitializerPop(RE))
         return false;
 
       this->emitCleanup();
@@ -6760,9 +6753,7 @@ bool Compiler<Emitter>::compileConstructor(const CXXConstructorDecl *Ctor) {
     if (Activate && !this->emitActivate(InitExpr))
       return false;
 
-    if (!this->visitInitializer(InitExpr))
-      return false;
-    return this->emitPopPtr(InitExpr);
+    return this->visitInitializerPop(InitExpr);
   };
 
   const RecordDecl *RD = Ctor->getParent();
@@ -6824,9 +6815,7 @@ bool Compiler<Emitter>::compileConstructor(const CXXConstructorDecl *Ctor) {
       if (IsUnion && !this->emitActivate(InitExpr))
         return false;
 
-      if (!this->visitInitializer(InitExpr))
-        return false;
-      if (!this->emitPopPtr(InitExpr))
+      if (!this->visitInitializerPop(InitExpr))
         return false;
     } else if (const IndirectFieldDecl *IFD = Init->getIndirectMember()) {
       LocOverrideScope<Emitter> LOS(this, SourceInfo{},
@@ -6879,9 +6868,7 @@ bool Compiler<Emitter>::compileConstructor(const CXXConstructorDecl *Ctor) {
       assert(Init->isDelegatingInitializer());
       if (!this->emitThis(InitExpr))
         return false;
-      if (!this->visitInitializer(Init->getInit()))
-        return false;
-      if (!this->emitPopPtr(InitExpr))
+      if (!this->visitInitializerPop(Init->getInit()))
         return false;
     }
 
