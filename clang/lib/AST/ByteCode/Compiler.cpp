@@ -8079,6 +8079,19 @@ bool Compiler<Emitter>::emitDestructionPop(const Descriptor *Desc,
 template <class Emitter>
 bool Compiler<Emitter>::emitDummyPtr(const DeclTy &D, const Expr *E) {
   assert(!DiscardResult && "Should've been checked before");
+
+
+
+  if (const auto *VD = dyn_cast<const Decl *>(D)) {
+    return this->emitGetDummyPtr(cast<VarDecl>(VD), E);
+  }
+
+
+
+
+
+
+
   unsigned DummyID = P.getOrCreateDummy(D);
 
   if (!this->emitGetPtrGlobal(DummyID, E))

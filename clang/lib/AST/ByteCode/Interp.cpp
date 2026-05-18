@@ -512,8 +512,27 @@ bool CheckNull(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
 
 bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
                 AccessKinds AK) {
+
+  if (Ptr.isDummyPointer()) {
+    bool IsOnePastEnd = false;
+    const ValueDecl *Field = Ptr.asDummyPointer().getField();
+    if (const auto *AT = Field->getType()->getAsArrayTypeUnsafe()) {
+      unsigned NumElems = cast<ConstantArrayType>(AT)->getZExtSize();
+      if (NumElems == Ptr.asDummyPointer().Path[Ptr.asDummyPointer().PathLength - 1].Index)
+        IsOnePastEnd = true;
+      else 
+        IsOnePastEnd = false;
+
+    }
+
+    if (!IsOnePastEnd)
+      return true;
+
+  } else {
+
   if (!Ptr.isOnePastEnd() && !Ptr.isZeroSizeArray())
     return true;
+  }
   if (S.getLangOpts().CPlusPlus) {
     const SourceInfo &Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_access_past_end)
@@ -807,8 +826,19 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   }
   // Block pointers are the only ones we can actually read from.
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isBlockPointer()) {
+
+    if (Ptr.isDummyPointer()) {
+      // llvm::errs() << "AHA!\n";
+      const ValueDecl *D = Ptr.asDummyPointer().Base;//B->getDescriptor()->asValueDecl();
+      if (!D)
+        return false;
+      return diagnoseUnknownDecl(S, OpPC, D);
+    }
+
+
     return false;
+  }
 
   if (!Ptr.block()->isAccessible()) {
     if (!CheckLive(S, OpPC, Ptr, AK))
@@ -1336,6 +1366,9 @@ bool Free(InterpState &S, CodePtr OpPC, bool DeleteIsArrayForm,
     if (Ptr.isZero())
       return true;
 
+    if (Ptr.isDummyPointer())
+      return false;
+
     // Remove base casts.
     QualType InitialType = Ptr.getType();
     Ptr = Ptr.expand().stripBaseCasts();
@@ -1490,6 +1523,38 @@ static bool getField(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     }
     return false;
   }
+
+  if (Ptr.isDummyPointer()) {
+    // llvm::errs() << "OMG getFIeld for duimmies\n";
+    // llvm::errs() << Ptr << '\n';
+    const DummyPointer &DP = Ptr.asDummyPointer();
+    const ValueDecl *Field = DP.getField();
+    if (!Field->getType()->isRecordType()) {
+      return false;
+    }
+    const Record *R = S.P.getOrCreateRecord(Field->getType()->getAsRecordDecl());
+    // llvm::errs() << "Record: " << R << '\n';
+    const Record::Field *TargetField = nullptr;//R->getField(Off);
+    for (const Record::Field &F  : R->fields()) {
+      if (F.Offset == Off) {
+        TargetField = &F;
+        break;
+      }
+    }
+    // llvm::errs() << "Target: " << TargetField << '\n';
+    const FieldDecl *TargetDecl = TargetField->Decl;
+
+    // llvm::errs() << "Path size before: " << DP.PathLength << '\n';
+
+    LValuePathEntry *NewPath = S.allocLValuePath(1);
+    NewPath[0].FD = TargetDecl;
+
+
+    S.Stk.push<Pointer>(DP.Base, 1, NewPath, /*Offset=*/0);
+    return true;
+  }
+
+
 
   if (!Ptr.isBlockPointer()) {
     // FIXME: The only time we (seem to) get here is when trying to access a
@@ -1885,7 +1950,7 @@ static bool getDynamicDecl(InterpState &S, CodePtr OpPC, Pointer TypePtr,
 
   QualType DynamicType = TypePtr.getType();
   if (TypePtr.isStatic() || TypePtr.isConst()) {
-    if (const VarDecl *VD = TypePtr.getDeclDesc()->asVarDecl();
+    if (const VarDecl *VD = TypePtr.getBaseVarDecl();
         VD && !VD->isConstexpr()) {
       const Expr *E = S.Current->getExpr(OpPC);
       APValue V = TypePtr.toAPValue(S.getASTContext());
@@ -2142,6 +2207,8 @@ bool EndLifetime(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Stk.peek<Pointer>();
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
+  if (Ptr.isDummyPointer())
+    return false;
 
   setLifeStateRecurse(Ptr.narrow(), Lifetime::Ended);
   return true;
@@ -2152,6 +2219,9 @@ bool EndLifetimePop(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Stk.pop<Pointer>();
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
+  if (Ptr.isDummyPointer())
+    return false;
+
 
   setLifeStateRecurse(Ptr.narrow(), Lifetime::Ended);
   return true;
@@ -2161,6 +2231,9 @@ bool MarkDestroyed(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Stk.peek<Pointer>();
   if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
     return false;
+  if (Ptr.isDummyPointer())
+    return false;
+
 
   setLifeStateRecurse(Ptr.narrow(), Lifetime::Destroyed);
   return true;
@@ -2341,7 +2414,7 @@ bool CheckPointerToIntegralCast(InterpState &S, CodePtr OpPC,
   if (Ptr.isIntegralPointer())
     return true;
 
-  if (Ptr.isDummy()) {
+  if (Ptr.isDummy() || Ptr.isDummyPointer()) {
     if (!CheckIntegralAddressCast(S, OpPC, BitWidth))
       return false;
     return Ptr.getIndex() == 0;
@@ -2431,7 +2504,7 @@ bool GetTypeid(InterpState &S, CodePtr OpPC, const Type *TypePtr,
 bool GetTypeidPtr(InterpState &S, CodePtr OpPC, const Type *TypeInfoType) {
   const auto &P = S.Stk.pop<Pointer>();
 
-  if (!P.isBlockPointer())
+  if (!P.isBlockPointer() && !P.isDummyPointer())
     return false;
 
   // Pick the most-derived type.
@@ -2610,6 +2683,8 @@ static void finishGlobalRecurse(InterpState &S, const Pointer &Ptr) {
 
 bool FinishInitGlobal(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << '\n';
 
   finishGlobalRecurse(S, Ptr);
   if (Ptr.canBeInitialized()) {

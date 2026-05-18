@@ -123,6 +123,13 @@ public:
         this->allocate(Length * sizeof(CXXRecordDecl *)));
   }
 
+  LValuePathEntry *allocLValuePath(unsigned Length) {
+    return reinterpret_cast<LValuePathEntry *>(
+        this->allocate(Length * sizeof(LValuePathEntry)));
+
+  }
+
+
   /// Note that a step has been executed. If there are no more steps remaining,
   /// diagnoses and returns \c false.
   bool noteStep(CodePtr OpPC);

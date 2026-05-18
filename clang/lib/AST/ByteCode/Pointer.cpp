@@ -59,6 +59,9 @@ Pointer::Pointer(const Pointer &P)
   case Storage::Typeid:
     Typeid = P.Typeid;
     break;
+  case Storage::Dummy:
+    Dummy = P.Dummy;
+    break;
   }
 }
 
@@ -77,6 +80,9 @@ Pointer::Pointer(Pointer &&P) : Offset(P.Offset), StorageKind(P.StorageKind) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::Dummy:
+    Dummy = P.Dummy;
     break;
   }
 }
@@ -127,6 +133,10 @@ Pointer &Pointer::operator=(const Pointer &P) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::Dummy:
+    Dummy = P.Dummy;
+    break;
   }
   return *this;
 }
@@ -166,6 +176,10 @@ Pointer &Pointer::operator=(Pointer &&P) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::Dummy:
+    Dummy = P.Dummy;
+    break;
   }
   return *this;
 }
@@ -196,6 +210,11 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
                        TypeInfo, QualType(Typeid.TypeInfoType, 0)),
                    CharUnits::Zero(), {},
                    /*OnePastTheEnd=*/false, /*IsNull=*/false);
+  }
+
+  if (isDummyPointer()) {
+    APValue::LValueBase Base = Dummy.Base;
+    return APValue(Base, CharUnits::fromQuantity(Offset), Path, isOnePastEnd());
   }
 
   // Build the lvalue base from the block.
@@ -358,6 +377,13 @@ void Pointer::print(llvm::raw_ostream &OS) const {
     OS << "(Typeid) { " << (const void *)asTypeidPointer().TypePtr << ", "
        << (const void *)asTypeidPointer().TypeInfoType << " + " << Offset
        << "}";
+    break;
+  case Storage::Dummy:
+    OS << "(Dummy) {" << asDummyPointer().Base << ". PathLength: " << asDummyPointer().PathLength<< ". Path: ";
+    for (unsigned I = 0; I != asDummyPointer().PathLength; ++I) {
+      OS << asDummyPointer().Path[I].Index << ' ';
+    }
+    OS << " + " << Offset << "}";
   }
 }
 
@@ -368,6 +394,9 @@ void Pointer::print(llvm::raw_ostream &OS) const {
 /// FIXME: We're still mixing values from the record layout with our internal
 /// offsets, which will inevitably lead to cryptic errors.
 size_t Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << *this << '\n';
+
   switch (StorageKind) {
   case Storage::Int:
     return Int.Value + Offset;
@@ -378,6 +407,15 @@ size_t Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+  case Storage::Dummy: {
+    // llvm::errs() << "Implement " << __FUNCTION__ << " for dummies\n";
+    size_t R = 0;
+    for (unsigned I = 0; I != asDummyPointer().PathLength; ++I)
+      R += asDummyPointer().Path[I].Index;
+
+    return Offset + R;
+
+                       }
   }
 
   size_t Result = 0;
@@ -699,6 +737,10 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
 
   if (A.StorageKind != B.StorageKind)
     return false;
+
+  if (A.isDummyPointer()) {
+    return A.asDummyPointer().Base == B.asDummyPointer().Base;
+  }
 
   return A.asBlockPointer().Pointee == B.asBlockPointer().Pointee;
 }

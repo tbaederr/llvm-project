@@ -62,7 +62,63 @@ struct TypeidPointer {
   const Type *TypeInfoType;
 };
 
-enum class Storage { Int, Block, Fn, Typeid };
+
+union LValuePathEntry {
+  uint64_t Index;
+  const FieldDecl *FD;
+};
+
+struct DummyPointer {
+  const VarDecl *Base;
+  const LValuePathEntry *Path;
+  unsigned PathLength = 0;
+  const ValueDecl *getField() const {
+    if (PathLength == 0)
+      return Base;
+
+    unsigned I = 0;
+    const ValueDecl *D = Base;
+    while (I != PathLength) {
+      if (D->getType()->isRecordType()) {
+        D = Path[I].FD;
+        // const FieldDecl *FD = Path[I].FD;
+
+      }
+      ++I;
+    }
+
+    // FIXME
+    return D;
+  }
+
+
+  QualType getType() const {
+    if (PathLength == 0)
+      return Base->getType();
+
+    unsigned I = 0;
+    QualType T = Base->getType();
+    while (I != PathLength) {
+      if (T->isArrayType()) {
+        T->getAsArrayTypeUnsafe()->getElementType();
+      } else if (T->isRecordType()) {
+        T = Path[I].FD->getType();
+      }
+
+      ++I;
+    }
+    return T;
+  }
+
+
+
+  void takePath(LValuePathEntry *NewPath) {
+    Path = NewPath;
+  }
+
+};
+
+enum class Storage { Int, Block, Fn, Typeid, Dummy };
 
 /// A pointer to a memory block, live or dead.
 ///
@@ -116,6 +172,16 @@ public:
     Typeid.TypePtr = TypePtr;
     Typeid.TypeInfoType = TypeInfoType;
   }
+  Pointer(const VarDecl *VD, uint64_t Offset = 0) : Offset(Offset), StorageKind(Storage::Dummy) {
+    Dummy.Base = VD;
+    Dummy.PathLength = 0;
+  }
+  Pointer(const VarDecl *VD, unsigned PathLength, LValuePathEntry *Path,uint64_t Offset = 0) : Offset(Offset), StorageKind(Storage::Dummy) {
+    Dummy.Base = VD;
+    Dummy.PathLength = PathLength;
+    Dummy.Path = Path;
+  }
+
   Pointer(Block *Pointee, unsigned Base, uint64_t Offset);
   ~Pointer();
 
@@ -132,6 +198,10 @@ public:
 
     if (isFunctionPointer())
       return P.Fn.Func == Fn.Func && P.Offset == Offset;
+
+    if (isDummyPointer()) {
+      return P.Dummy.Base == Dummy.Base && P.Offset == Offset;
+    }
 
     assert(isBlockPointer());
     return P.BS.Pointee == BS.Pointee && P.BS.Base == BS.Base &&
@@ -164,6 +234,10 @@ public:
       return Pointer(Int.Value, Int.Desc, Idx);
     if (isFunctionPointer())
       return Pointer(Fn.Func, Idx);
+    if (isDummyPointer()) { // FIXME
+      llvm::errs() << __FUNCTION__ << " for dummies\n";
+      // return *this;
+    }
 
     if (BS.Base == RootPtrMark)
       return Pointer(BS.Pointee, RootPtrMark, getDeclDesc()->getSize());
@@ -271,6 +345,8 @@ public:
       return !Fn.Func;
     case Storage::Typeid:
       return false;
+    case Storage::Dummy:
+      return Dummy.Base == nullptr;
     }
     llvm_unreachable("Unknown clang::interp::Storage enum");
   }
@@ -290,15 +366,26 @@ public:
 
   /// Accessor for information about the declaration site.
   const Descriptor *getDeclDesc() const {
-    if (isIntegralPointer())
-      return Int.Desc;
-    if (isFunctionPointer() || isTypeidPointer())
-      return nullptr;
-
-    assert(isBlockPointer());
-    assert(BS.Pointee);
-    return BS.Pointee->Desc;
+    switch (StorageKind) {
+      case Storage::Fn:
+      case Storage::Typeid:
+      case Storage::Dummy:
+        return nullptr;
+      case Storage::Int:
+        return Int.Desc;
+      case Storage::Block:
+        assert(BS.Pointee);
+        return BS.Pointee->Desc;
+    }
+    llvm_unreachable("Unknown clang::interp::Storage enum");
   }
+
+  const VarDecl *getBaseVarDecl() const {
+    if (isDummyPointer())
+      return dyn_cast<VarDecl>(Dummy.Base);
+    return getDeclDesc()->asVarDecl();
+  }
+
   SourceLocation getDeclLoc() const { return getDeclDesc()->getLocation(); }
 
   /// Returns the expression or declaration the pointer has been created for.
@@ -348,6 +435,10 @@ public:
       return QualType(Typeid.TypeInfoType, 0);
     if (isFunctionPointer())
       return Fn.Func->getDecl()->getType();
+    if (isDummyPointer()) {
+      // FIXME: Path.
+      return Dummy.Base->getType();
+    }
 
     if (inPrimitiveArray() && Offset != BS.Base) {
       // Unfortunately, complex and vector types are not array types in clang,
@@ -363,7 +454,12 @@ public:
     return getFieldDesc()->getDataElemType();
   }
 
-  [[nodiscard]] Pointer getDeclPtr() const { return Pointer(BS.Pointee); }
+  [[nodiscard]] Pointer getDeclPtr() const {
+    if (isDummyPointer())
+      return Pointer(Dummy.Base, 0, nullptr);
+    assert(isBlockPointer());
+    return Pointer(BS.Pointee);
+  }
 
   /// Returns the element size of the innermost field.
   size_t elemSize() const {
@@ -386,6 +482,10 @@ public:
   /// Returns the offset into an array.
   unsigned getOffset() const {
     assert(Offset != PastEndMark && "invalid offset");
+    
+    if (isDummyPointer())
+      return Offset;
+
     assert(isBlockPointer());
     if (BS.Base == RootPtrMark)
       return Offset;
@@ -475,14 +575,23 @@ public:
     assert(isTypeidPointer());
     return Typeid;
   }
+  [[nodiscard]] const DummyPointer &asDummyPointer() const {
+    assert(isDummyPointer());
+    return Dummy;
+  }
 
   bool isBlockPointer() const { return StorageKind == Storage::Block; }
   bool isIntegralPointer() const { return StorageKind == Storage::Int; }
   bool isFunctionPointer() const { return StorageKind == Storage::Fn; }
   bool isTypeidPointer() const { return StorageKind == Storage::Typeid; }
+  bool isDummyPointer() const { return StorageKind == Storage::Dummy; }
 
   /// Returns the record descriptor of a class.
-  const Record *getRecord() const { return getFieldDesc()->ElemRecord; }
+  const Record *getRecord() const {
+    if (const Descriptor *FieldDesc = getFieldDesc())
+      return FieldDesc->ElemRecord;
+    return nullptr;
+  }
   /// Returns the element record type, if this is a non-primive array.
   const Record *getElemRecord() const {
     const Descriptor *ElemDesc = getFieldDesc()->ElemDesc;
@@ -540,6 +649,9 @@ public:
         return false;
 
       return Fn.Func->getDecl()->isWeak();
+    }
+    if (isDummyPointer()) {
+      return Dummy.Base->isWeak();
     }
     if (!isBlockPointer())
       return false;
@@ -642,6 +754,10 @@ public:
 
   /// Checks if the index is one past end.
   bool isOnePastEnd() const {
+    if (isDummyPointer()){
+      return Offset == 1;
+    }
+
     if (!isBlockPointer())
       return false;
 
@@ -668,6 +784,8 @@ public:
   /// Checks if the pointer is pointing to a zero-size array.
   bool isZeroSizeArray() const {
     if (isFunctionPointer())
+      return false;
+    if (isDummyPointer())
       return false;
     if (const auto *Desc = getFieldDesc())
       return Desc->isZeroSizeArray();
@@ -888,6 +1006,7 @@ private:
     BlockPointer BS;
     FunctionPointer Fn;
     TypeidPointer Typeid;
+    DummyPointer Dummy;
   };
 };
 
@@ -895,6 +1014,9 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Pointer &P) {
   P.print(OS);
   OS << ' ';
   if (P.isZero())
+    return OS;
+
+  if (!P.isBlockPointer())
     return OS;
 
   if (const Descriptor *D = P.getFieldDesc())

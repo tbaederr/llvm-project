@@ -123,11 +123,14 @@ UnsignedOrNone Program::getOrCreateGlobal(const ValueDecl *VD,
 }
 
 unsigned Program::getOrCreateDummy(const DeclTy &D) {
+  // llvm::errs() <<__PRETTY_FUNCTION__ << '\n';
   assert(D);
   // Dedup blocks since they are immutable and pointers cannot be compared.
   if (auto It = DummyVariables.find(D.getOpaqueValue());
-      It != DummyVariables.end())
+      It != DummyVariables.end()) {
+    // llvm::errs() << "Already created: "<< D.getOpaqueValue() << '\n';
     return It->second;
+  }
 
   QualType QT;
   bool IsWeak = false;
@@ -135,6 +138,7 @@ unsigned Program::getOrCreateDummy(const DeclTy &D) {
     QT = E->getType();
   } else {
     const auto *VD = cast<ValueDecl>(cast<const Decl *>(D));
+    VD->dump();
     IsWeak = VD->isWeak();
     QT = VD->getType();
     if (QT->isPointerOrReferenceType())
@@ -169,6 +173,7 @@ unsigned Program::getOrCreateDummy(const DeclTy &D) {
 }
 
 UnsignedOrNone Program::createGlobal(const ValueDecl *VD, const Expr *Init) {
+  // llvm::errs() <<__PRETTY_FUNCTION__ << '\n';
   bool IsStatic, IsExtern;
   bool IsWeak = VD->isWeak();
   if (const auto *Var = dyn_cast<VarDecl>(VD)) {

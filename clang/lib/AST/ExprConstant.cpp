@@ -1556,6 +1556,7 @@ namespace {
         Designator.addDeclUnchecked(D, Virtual);
     }
     void addUnsizedArray(EvalInfo &Info, const Expr *E, QualType ElemTy) {
+      // llvm::errs() << __FUNCTION__ << ". Entries: " << Designator.Entries.size() << '\n';
       if (!Designator.Entries.empty()) {
         Info.CCEDiag(E, diag::note_constexpr_unsupported_unsized_array);
         Designator.setInvalid();
@@ -10193,6 +10194,7 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
   }
 
   case CK_ArrayToPointerDecay: {
+    // llvm::errs() << "aaa\n";
     if (SubExpr->isGLValue()) {
       if (!evaluateLValue(SubExpr, Result))
         return false;
@@ -10204,6 +10206,7 @@ bool PointerExprEvaluator::VisitCastExpr(const CastExpr *E) {
     }
     // The result is a pointer to the first element of the array.
     auto *AT = Info.Ctx.getAsArrayType(SubExpr->getType());
+    AT->dump();
     if (auto *CAT = dyn_cast<ConstantArrayType>(AT))
       Result.addArray(Info, E, CAT);
     else
@@ -21499,8 +21502,12 @@ bool Expr::EvaluateAsInitializer(APValue &Value, const ASTContext &Ctx,
     if (!InterpCtx.evaluateAsInitializer(Info, VD, this, Value))
       return false;
 
-    return CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
+    bool b= CheckConstantExpression(Info, DeclLoc, DeclTy, Value,
                                    ConstantExprKind::Normal);
+
+    // llvm::errs() << "---- End of EvaluateAsInitializer\n";
+
+    return b;
   } else {
     LValue LVal;
     LVal.set(VD);

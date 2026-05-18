@@ -593,6 +593,10 @@ def GetFnPtr : Opcode {
   let Args = [ArgFunction];
 }
 
+def GetDummyPtr : Opcode {
+  let Args = [ArgVarDecl]; 
+}
+
 def GetIntPtr : Opcode {
   let Types = [AluTypeClass];
   let Args = [ArgDesc];
