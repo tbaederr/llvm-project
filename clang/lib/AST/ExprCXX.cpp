@@ -1779,7 +1779,7 @@ QualType SubstNonTypeTemplateParmExpr::getParameterType(
 
   if (isReferenceParameter())
     return Context.getLValueReferenceType(Type);
-  return Type.getUnqualifiedType();
+  return Type.getUnqualifiedType(Context);
 }
 
 SubstNonTypeTemplateParmPackExpr::SubstNonTypeTemplateParmPackExpr(

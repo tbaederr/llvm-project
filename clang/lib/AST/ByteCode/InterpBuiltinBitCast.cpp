@@ -213,7 +213,8 @@ static bool CheckBitcastType(InterpState &S, CodePtr OpPC, QualType T,
   };
   auto note = [&](int Construct, QualType NoteType, SourceRange NoteRange) {
     S.Note(NoteRange.getBegin(), diag::note_constexpr_bit_cast_invalid_subtype)
-        << NoteType << Construct << T.getUnqualifiedType() << NoteRange;
+        << NoteType << Construct << T.getUnqualifiedType(S.getASTContext())
+        << NoteRange;
     return false;
   };
 

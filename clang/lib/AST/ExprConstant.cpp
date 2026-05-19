@@ -6715,7 +6715,7 @@ static bool HandleDynamicCast(EvalInfo &Info, const ExplicitCastExpr *E,
     Info.FFDiag(E, diag::note_constexpr_dynamic_cast_to_reference_failed)
         << DiagKind << Ptr.Designator.getType(Info.Ctx)
         << Info.Ctx.getCanonicalTagType(DynType->Type)
-        << E->getType().getUnqualifiedType();
+        << E->getType().getUnqualifiedType(Info.Ctx);
     return false;
   };
 
@@ -21078,7 +21078,7 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
     if (!EvaluateVoid(E, Info))
       return false;
   } else if (T->isAtomicType()) {
-    QualType Unqual = T.getAtomicUnqualifiedType();
+    QualType Unqual = T.getAtomicUnqualifiedType(Info.Ctx);
     if (Unqual->isArrayType() || Unqual->isRecordType()) {
       LValue LV;
       APValue &Value = Info.CurrentCall->createTemporary(
@@ -21126,7 +21126,7 @@ static bool EvaluateInPlace(APValue &Result, EvalInfo &Info, const LValue &This,
     else if (T->isRecordType())
       return EvaluateRecord(E, This, Result, Info);
     else if (T->isAtomicType()) {
-      QualType Unqual = T.getAtomicUnqualifiedType();
+      QualType Unqual = T.getAtomicUnqualifiedType(Info.Ctx);
       if (Unqual->isArrayType() || Unqual->isRecordType())
         return EvaluateAtomic(E, &This, Result, Info);
     }

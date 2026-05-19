@@ -3173,7 +3173,7 @@ static std::string FormatFunctionParameter(
     if (!ObjCMethodParam && Param->getIdentifier())
       Result = std::string(Param->getIdentifier()->deuglifiedName());
 
-    QualType Type = Param->getType().getUnqualifiedType();
+    QualType Type = Param->getType().getUnqualifiedType(Param->getASTContext());
 
     if (ObjCMethodParam) {
       Result = Type.getAsString(Policy);
@@ -9090,7 +9090,8 @@ void SemaCodeCompletion::CodeCompleteObjCPropertySynthesizeIvar(
     if (ObjCPropertyDecl *Property = Class->FindPropertyDeclaration(
             PropertyName, ObjCPropertyQueryKind::OBJC_PR_query_instance)) {
       PropertyType =
-          Property->getType().getNonReferenceType().getUnqualifiedType();
+          Property->getType().getNonReferenceType().getUnqualifiedType(
+              Property->getASTContext());
 
       // Give preference to ivars
       Results.setPreferredType(PropertyType);

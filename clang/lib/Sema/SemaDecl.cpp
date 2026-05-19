@@ -9750,7 +9750,8 @@ static bool isOpenCLSizeDependentType(ASTContext &C, QualType Ty) {
   QualType DesugaredTy = Ty;
   do {
     ArrayRef<StringRef> Names(SizeTypeNames);
-    auto Match = llvm::find(Names, DesugaredTy.getUnqualifiedType().getAsString());
+    auto Match =
+        llvm::find(Names, DesugaredTy.getUnqualifiedType(C).getAsString());
     if (Names.end() != Match)
       return true;
 
@@ -13590,7 +13591,7 @@ struct DiagNonTrivalCUnionDefaultInitializeVisitor
 
     if (InNonTrivialUnion)
       S.Diag(RD->getLocation(), diag::note_non_trivial_c_union)
-          << 0 << 0 << QT.getUnqualifiedType() << "";
+          << 0 << 0 << QT.getUnqualifiedType(S.Context) << "";
 
     for (const FieldDecl *FD : RD->fields())
       if (!shouldIgnoreForRecordTriviality(FD))
@@ -13656,7 +13657,7 @@ struct DiagNonTrivalCUnionDestructedTypeVisitor
 
     if (InNonTrivialUnion)
       S.Diag(RD->getLocation(), diag::note_non_trivial_c_union)
-          << 0 << 1 << QT.getUnqualifiedType() << "";
+          << 0 << 1 << QT.getUnqualifiedType(S.Context) << "";
 
     for (const FieldDecl *FD : RD->fields())
       if (!shouldIgnoreForRecordTriviality(FD))
@@ -13721,7 +13722,7 @@ struct DiagNonTrivalCUnionCopyVisitor
 
     if (InNonTrivialUnion)
       S.Diag(RD->getLocation(), diag::note_non_trivial_c_union)
-          << 0 << 2 << QT.getUnqualifiedType() << "";
+          << 0 << 2 << QT.getUnqualifiedType(S.Context) << "";
 
     for (const FieldDecl *FD : RD->fields())
       if (!shouldIgnoreForRecordTriviality(FD))
@@ -17670,7 +17671,7 @@ bool Sema::CheckEnumUnderlyingType(TypeSourceInfo *TI) {
   if (QualSelect)
     Diag(UnderlyingLoc, diag::warn_cv_stripped_in_enum) << *QualSelect;
 
-  T = T.getAtomicUnqualifiedType();
+  T = T.getAtomicUnqualifiedType(Context);
 
   // This doesn't use 'isIntegralType' despite the error message mentioning
   // integral type because isIntegralType would also allow enum types in C.
@@ -18095,7 +18096,8 @@ Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK, SourceLocation KWLoc,
       // ones like _Atomic where it forms a different type.
       if (TypeSourceInfo *TI = dyn_cast<TypeSourceInfo *>(EnumUnderlying);
           TI && TI->getType()->isAtomicType())
-        EnumUnderlying = TI->getType().getAtomicUnqualifiedType().getTypePtr();
+        EnumUnderlying =
+            TI->getType().getAtomicUnqualifiedType(Context).getTypePtr();
 
     } else if (Context.getTargetInfo().getTriple().isWindowsMSVCEnvironment()) {
       // For MSVC ABI compatibility, unfixed enums must use an underlying type
@@ -18525,7 +18527,7 @@ Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK, SourceLocation KWLoc,
           QualType EnumUnderlyingTy;
           if (TypeSourceInfo *TI =
                   dyn_cast_if_present<TypeSourceInfo *>(EnumUnderlying))
-            EnumUnderlyingTy = TI->getType().getUnqualifiedType();
+            EnumUnderlyingTy = TI->getType().getUnqualifiedType(Context);
           else if (const Type *T =
                        dyn_cast_if_present<const Type *>(EnumUnderlying))
             EnumUnderlyingTy = QualType(T, 0);

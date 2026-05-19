@@ -229,7 +229,7 @@ Address AtomicInfo::createTempAlloca() const {
   // alloca pointer element.
   QualType tmpTy = (lvalue.isBitField() && valueSizeInBits > atomicSizeInBits)
                        ? valueTy
-                       : atomicTy.getUnqualifiedType();
+                       : atomicTy.getUnqualifiedType(cgf.getContext());
   Address tempAlloca =
       cgf.createMemTemp(tmpTy, getAtomicAlignment(), loc, "atomic-temp");
 
@@ -1165,7 +1165,7 @@ RValue CIRGenFunction::emitAtomicExpr(AtomicExpr *e) {
     break;
   }
 
-  QualType resultTy = e->getType().getUnqualifiedType();
+  QualType resultTy = e->getType().getUnqualifiedType(getContext());
 
   bool shouldCastToIntPtrTy =
       shouldCastToInt(convertTypeForMem(memTy), e->isCmpXChg());

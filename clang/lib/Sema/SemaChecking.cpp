@@ -1682,7 +1682,7 @@ static bool checkPointerAuthValue(Sema &S, Expr *&Arg, PointerAuthOpKind OpKind,
   // Require the value to have the right range of type.
   QualType ExpectedTy;
   if (AllowsPointer(OpKind) && Arg->getType()->isPointerType()) {
-    ExpectedTy = Arg->getType().getUnqualifiedType();
+    ExpectedTy = Arg->getType().getUnqualifiedType(S.Context);
   } else if (AllowsPointer(OpKind) && Arg->getType()->isNullPtrType()) {
     ExpectedTy = S.Context.VoidPtrTy;
   } else if (AllowsInteger(OpKind) &&
@@ -2562,7 +2562,7 @@ static bool CheckMaskedBuiltinArgs(Sema &S, Expr *MaskArg, Expr *PtrArg,
       (!AllowConst && PointeeTy.isConstQualified()) ||
       (!AllowAS && PointeeTy.hasAddressSpace())) {
     QualType Target =
-        S.Context.getPointerType(PointeeTy.getAtomicUnqualifiedType());
+        S.Context.getPointerType(PointeeTy.getAtomicUnqualifiedType(S.Context));
     return S.Diag(PtrArg->getExprLoc(),
                   diag::err_typecheck_convert_incompatible)
            << PtrTy << Target << /*different qualifiers=*/5
@@ -2610,8 +2610,8 @@ static ExprResult BuiltinMaskedLoad(Sema &S, CallExpr *TheCall) {
   QualType PointeeTy = PtrTy->getPointeeType();
   const VectorType *MaskVecTy = MaskTy->getAs<VectorType>();
 
-  QualType RetTy = S.Context.getExtVectorType(PointeeTy.getUnqualifiedType(),
-                                              MaskVecTy->getNumElements());
+  QualType RetTy = S.Context.getExtVectorType(
+      PointeeTy.getUnqualifiedType(S.Context), MaskVecTy->getNumElements());
   if (TheCall->getNumArgs() == 3) {
     Expr *PassThruArg = TheCall->getArg(2);
     QualType PassThruTy = PassThruArg->getType();
@@ -2652,10 +2652,10 @@ static ExprResult BuiltinMaskedStore(Sema &S, CallExpr *TheCall) {
 
   QualType PointeeTy = PtrTy->getPointeeType();
   const VectorType *MaskVecTy = MaskTy->getAs<VectorType>();
-  QualType MemoryTy = S.Context.getExtVectorType(PointeeTy.getUnqualifiedType(),
-                                                 MaskVecTy->getNumElements());
-  if (!S.Context.hasSameType(ValTy.getUnqualifiedType(),
-                             MemoryTy.getUnqualifiedType()))
+  QualType MemoryTy = S.Context.getExtVectorType(
+      PointeeTy.getUnqualifiedType(S.Context), MaskVecTy->getNumElements());
+  if (!S.Context.hasSameType(ValTy.getUnqualifiedType(S.Context),
+                             MemoryTy.getUnqualifiedType(S.Context)))
     return ExprError(S.Diag(TheCall->getBeginLoc(),
                             diag::err_vec_builtin_incompatible_vector)
                      << TheCall->getDirectCallee() << /*isMorethantwoArgs*/ 2
@@ -2701,8 +2701,8 @@ static ExprResult BuiltinMaskedGather(Sema &S, CallExpr *TheCall) {
                TheCall->getBuiltinCallee())
         << MaskTy << IdxTy);
 
-  QualType RetTy = S.Context.getExtVectorType(PointeeTy.getUnqualifiedType(),
-                                              MaskVecTy->getNumElements());
+  QualType RetTy = S.Context.getExtVectorType(
+      PointeeTy.getUnqualifiedType(S.Context), MaskVecTy->getNumElements());
   if (TheCall->getNumArgs() == 4) {
     Expr *PassThruArg = TheCall->getArg(3);
     QualType PassThruTy = PassThruArg->getType();
@@ -2761,9 +2761,9 @@ static ExprResult BuiltinMaskedScatter(Sema &S, CallExpr *TheCall) {
                TheCall->getBuiltinCallee())
         << MaskTy << ValTy);
 
-  QualType ArgTy = S.Context.getExtVectorType(PointeeTy.getUnqualifiedType(),
-                                              MaskVecTy->getNumElements());
-  if (!S.Context.hasSameType(ValTy.getUnqualifiedType(), ArgTy))
+  QualType ArgTy = S.Context.getExtVectorType(
+      PointeeTy.getUnqualifiedType(S.Context), MaskVecTy->getNumElements());
+  if (!S.Context.hasSameType(ValTy.getUnqualifiedType(S.Context), ArgTy))
     return ExprError(S.Diag(TheCall->getBeginLoc(),
                             diag::err_vec_builtin_incompatible_vector)
                      << TheCall->getDirectCallee() << /*isMoreThanTwoArgs*/ 2
@@ -5250,8 +5250,8 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
                   ValArg->getType()->getAs<PointerType>()) {
             AS = PtrTy->getPointeeType().getAddressSpace();
           }
-          Ty = Context.getPointerType(
-              Context.getAddrSpaceQualType(ValType.getUnqualifiedType(), AS));
+          Ty = Context.getPointerType(Context.getAddrSpaceQualType(
+              ValType.getUnqualifiedType(Context), AS));
         }
         break;
       case 2:
@@ -5480,7 +5480,7 @@ ExprResult Sema::BuiltinAtomicOverloaded(ExprResult TheCallResult) {
   }
 
   // Strip any qualifiers off ValType.
-  ValType = ValType.getUnqualifiedType();
+  ValType = ValType.getUnqualifiedType(Context);
 
   // The majority of builtins return a value, but a few have special return
   // types, so allow them to override appropriately below.
@@ -5828,7 +5828,7 @@ ExprResult Sema::BuiltinNontemporalOverloaded(ExprResult TheCallResult) {
   QualType ValType = pointerType->getPointeeType();
 
   // Strip any qualifiers off ValType.
-  ValType = ValType.getUnqualifiedType();
+  ValType = ValType.getUnqualifiedType(Context);
   if (!ValType->isIntegerType() && !ValType->isAnyPointerType() &&
       !ValType->isBlockPointerType() && !ValType->isFloatingType() &&
       !ValType->isVectorType()) {
@@ -12814,12 +12814,12 @@ static void DiagnoseFloatingImpCast(Sema &S, const Expr *E, QualType T,
   if (PruneWarnings) {
     S.DiagRuntimeBehavior(E->getExprLoc(), E,
                           S.PDiag(DiagID)
-                              << E->getType() << T.getUnqualifiedType()
+                              << E->getType() << T.getUnqualifiedType(S.Context)
                               << PrettySourceValue << PrettyTargetValue
                               << E->getSourceRange() << SourceRange(CContext));
   } else {
     S.Diag(E->getExprLoc(), DiagID)
-        << E->getType() << T.getUnqualifiedType() << PrettySourceValue
+        << E->getType() << T.getUnqualifiedType(S.Context) << PrettySourceValue
         << PrettyTargetValue << E->getSourceRange() << SourceRange(CContext);
   }
 }
@@ -13074,7 +13074,8 @@ static void DiagnoseMixedUnicodeImplicitConversion(Sema &S, const Type *Source,
 
       S.Diag(CC, diag::warn_impcast_unicode_char_type_constant)
           << E->getType() << T
-          << IsSingleCodeUnitCP(E->getType().getUnqualifiedType(), Value)
+          << IsSingleCodeUnitCP(E->getType().getUnqualifiedType(S.Context),
+                                Value)
           << FormatUTFCodeUnitAsCodepoint(Value.getExtValue(), E->getType());
     }
   } else {
@@ -16319,8 +16320,8 @@ static bool isLayoutCompatible(const ASTContext &C, QualType T1, QualType T2) {
   // Two types cv1 T1 and cv2 T2 are layout-compatible types
   // if T1 and T2 are the same type, layout-compatible enumerations (9.7.1),
   // or layout-compatible standard-layout class types (11.4).
-  T1 = T1.getCanonicalType().getUnqualifiedType();
-  T2 = T2.getCanonicalType().getUnqualifiedType();
+  T1 = T1.getCanonicalType().getUnqualifiedType(C);
+  T2 = T2.getCanonicalType().getUnqualifiedType(C);
 
   if (C.hasSameType(T1, T2))
     return true;
@@ -17086,7 +17087,7 @@ ExprResult Sema::BuiltinMatrixColumnMajorLoad(CallExpr *TheCall,
         << PtrExpr->getType();
     ArgError = true;
   } else {
-    ElementTy = PtrTy->getPointeeType().getUnqualifiedType();
+    ElementTy = PtrTy->getPointeeType().getUnqualifiedType(Context);
 
     if (!ConstantMatrixType::isValidElementType(ElementTy, getLangOpts())) {
       Diag(PtrExpr->getBeginLoc(), diag::err_builtin_invalid_arg_type)
@@ -17232,7 +17233,7 @@ ExprResult Sema::BuiltinMatrixColumnMajorStore(CallExpr *TheCall,
       Diag(PtrExpr->getBeginLoc(), diag::err_builtin_matrix_store_to_const);
       ArgError = true;
     }
-    ElementTy = ElementTy.getUnqualifiedType().getCanonicalType();
+    ElementTy = ElementTy.getUnqualifiedType(Context).getCanonicalType();
     if (MatrixTy &&
         !Context.hasSameType(ElementTy, MatrixTy->getElementType())) {
       Diag(PtrExpr->getBeginLoc(),
