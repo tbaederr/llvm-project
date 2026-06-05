@@ -175,6 +175,8 @@ class JumpOpcode : Opcode {
 def Jmp : JumpOpcode;
 // [Bool] -> [], jumps if true.
 def Jt : JumpOpcode;
+// [Bool] -> [], jumps if true. Does NOT count as a step.
+def Jc : JumpOpcode;
 // [Bool] -> [], jumps if false.
 def Jf : JumpOpcode;
 

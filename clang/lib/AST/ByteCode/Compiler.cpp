@@ -6675,7 +6675,7 @@ bool Compiler<Emitter>::visitSwitchStmt(const SwitchStmt *S) {
       // Compare and jump to the case label.
       if (!this->emitEQ(ValueT, S))
         return false;
-      if (!this->jumpTrue(CaseLabels[CS], S))
+      if (!this->jumpCase(CaseLabels[CS], S))
         return false;
     } else {
       assert(!DefaultLabel);

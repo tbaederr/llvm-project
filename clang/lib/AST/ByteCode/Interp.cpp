@@ -62,10 +62,15 @@ static bool Jmp(InterpState &S, CodePtr &PC, int32_t Offset) {
   return S.noteStep(PC);
 }
 
-static bool Jt(InterpState &S, CodePtr &PC, int32_t Offset) {
-  if (S.Stk.pop<bool>()) {
+/// jumpCase - like jumpTrue, but we do not note a step.
+static bool Jc(InterpState &S, CodePtr &PC, int32_t Offset) {
+  if (S.Stk.pop<bool>())
     PC += Offset;
-  }
+  return true;
+}
+
+static bool Jt(InterpState &S, CodePtr &PC, int32_t Offset) {
+  Jc(S, PC, Offset);
   return S.noteStep(PC);
 }
 

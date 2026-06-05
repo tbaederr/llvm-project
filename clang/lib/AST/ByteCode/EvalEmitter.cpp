@@ -161,6 +161,10 @@ bool EvalEmitter::jumpTrue(const LabelTy &Label, SourceInfo SI) {
   return true;
 }
 
+bool EvalEmitter::jumpCase(const LabelTy &Label, SourceInfo SI) {
+  return jumpTrue(Label, SI);
+}
+
 bool EvalEmitter::jumpFalse(const LabelTy &Label, SourceInfo SI) {
   if (isActive()) {
     CurrentSource = SI;

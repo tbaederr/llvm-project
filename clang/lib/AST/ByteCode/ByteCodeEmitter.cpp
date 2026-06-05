@@ -225,6 +225,10 @@ bool ByteCodeEmitter::jumpTrue(const LabelTy &Label, SourceInfo SI) {
   return emitJt(getOffset(Label), SI);
 }
 
+bool ByteCodeEmitter::jumpCase(const LabelTy &Label, SourceInfo SI) {
+  return emitJc(getOffset(Label), SI);
+}
+
 bool ByteCodeEmitter::jumpFalse(const LabelTy &Label, SourceInfo SI) {
   return emitJf(getOffset(Label), SI);
 }

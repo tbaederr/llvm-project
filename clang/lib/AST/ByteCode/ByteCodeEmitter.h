@@ -55,6 +55,7 @@ protected:
 
   /// Emits jumps.
   bool jumpTrue(const LabelTy &Label, SourceInfo SI);
+  bool jumpCase(const LabelTy &Label, SourceInfo SI);
   bool jumpFalse(const LabelTy &Label, SourceInfo SI);
   bool jump(const LabelTy &Label, SourceInfo SI);
   bool fallthrough(const LabelTy &Label);
