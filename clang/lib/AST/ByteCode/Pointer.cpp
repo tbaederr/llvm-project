@@ -16,6 +16,7 @@
 #include "Integral.h"
 #include "InterpBlock.h"
 #include "MemberPointer.h"
+#include "PointerIteration.h"
 #include "PrimType.h"
 #include "Record.h"
 #include "clang/AST/Expr.h"
@@ -652,7 +653,11 @@ void Pointer::activate() const {
         if (!FieldPtr.getInlineDesc()->IsActive)
           activate(FieldPtr);
       }
-      // FIXME: Bases?
+      for (const Record::Base &B : R->bases()) {
+        Pointer BasePtr = P.atField(B.Offset);
+        if (!BasePtr.getInlineDesc()->IsActive)
+          activate(BasePtr);
+      }
     }
   };
 
@@ -666,7 +671,11 @@ void Pointer::activate() const {
         if (FieldPtr.getInlineDesc()->IsActive)
           deactivate(FieldPtr);
       }
-      // FIXME: Bases?
+      for (const Record::Base &B : R->bases()) {
+        Pointer BasePtr = P.atField(B.Offset);
+        if (BasePtr.getInlineDesc()->IsActive)
+          deactivate(BasePtr);
+      }
     }
   };
 
@@ -1050,3 +1059,4 @@ IntPointer IntPointer::baseCast(const ASTContext &ASTCtx,
 
   return {BaseDesc, Value + BaseLayoutOffset.getQuantity()};
 }
+

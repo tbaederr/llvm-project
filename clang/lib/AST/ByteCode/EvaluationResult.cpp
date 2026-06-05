@@ -9,6 +9,7 @@
 #include "EvaluationResult.h"
 #include "InterpState.h"
 #include "Pointer.h"
+#include "PointerIteration.h"
 #include "Record.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -174,14 +175,19 @@ static void collectBlocks(const Pointer &Ptr,
     return;
 
   if (const Record *R = Desc->ElemRecord; R && R->hasPtrField()) {
-
-    for (const Record::Field &F : R->fields()) {
-      if (!isOrHasPtr(F.Desc))
-        continue;
-      Pointer FieldPtr = Ptr.atField(F.Offset);
-      assert(FieldPtr.block() == Ptr.block());
-      collectBlocks(FieldPtr, Blocks);
-    }
+    // Use forEachSubobject to iterate through all fields
+    Ptr.forEachSubobject([&](const Pointer &Sub) {
+      const Descriptor *SubDesc = Sub.getFieldDesc();
+      if (SubDesc && isOrHasPtr(SubDesc)) {
+        assert(Sub.block() == Ptr.block());
+        const Descriptor *D = Sub.getFieldDesc();
+        if (D && D->isPrimitive() && D->getPrimType() == PT_Ptr) {
+          Pointer Pointee = Sub.deref<Pointer>();
+          if (isUsefulPtr(Pointee) && !Blocks.contains(Pointee.block()))
+            collectBlocks(Pointee, Blocks);
+        }
+      }
+    });
   } else if (Desc->isPrimitive() && Desc->getPrimType() == PT_Ptr) {
     Pointer Pointee = Ptr.deref<Pointer>();
     if (isUsefulPtr(Pointee) && !Blocks.contains(Pointee.block()))

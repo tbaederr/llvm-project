@@ -13,6 +13,7 @@
 #include "InterpShared.h"
 #include "InterpStack.h"
 #include "Opcode.h"
+#include "PointerIteration.h"
 #include "PrimType.h"
 #include "Program.h"
 #include "State.h"
@@ -2151,24 +2152,9 @@ bool StartThisLifetime1(InterpState &S, CodePtr OpPC) {
 // FIXME: It might be better to the recursing as part of the generated code for
 // a destructor?
 static void setLifeStateRecurse(const Pointer &Ptr, Lifetime L) {
-  if (const Record *R = Ptr.getRecord()) {
-    Ptr.setLifeState(L);
-    for (const Record::Field &Fi : R->fields())
-      setLifeStateRecurse(Ptr.atField(Fi.Offset), L);
-    return;
-  }
-
-  if (const Descriptor *FieldDesc = Ptr.getFieldDesc();
-      FieldDesc->isCompositeArray()) {
-    // No endLifetime() for primitive array roots.
-    if (Ptr.getFieldDesc()->isPrimitiveArray())
-      assert(Ptr.getLifetime() == Lifetime::Started);
-    for (unsigned I = 0; I != FieldDesc->getNumElems(); ++I)
-      setLifeStateRecurse(Ptr.atIndex(I).narrow(), L);
-    return;
-  }
-
-  Ptr.setLifeState(L);
+  Ptr.forEachSubobject([L](const Pointer &Sub) {
+    Sub.setLifeState(L);
+  });
 }
 
 /// Ends the lifetime of the peek'd pointer.

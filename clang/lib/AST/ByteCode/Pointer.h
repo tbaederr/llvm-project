@@ -855,6 +855,13 @@ public:
   std::optional<size_t>
   computeOffsetForComparison(const ASTContext &ASTCtx) const;
 
+  /// Iterate over all subobjects starting from this pointer.
+  /// Calls the callback function for each subobject pointer.
+  /// The callback should have signature: void(const Pointer&)
+  /// Performance is prioritized - uses stack-based iteration.
+  template <typename Func>
+  void forEachSubobject(Func &&Callback) const;
+
 private:
   friend class Block;
   friend class DeadBlock;
