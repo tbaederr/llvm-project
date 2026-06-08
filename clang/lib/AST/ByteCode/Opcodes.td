@@ -321,6 +321,10 @@ def Null : SuccessOpcode {
   let HasGroup = 1;
 }
 
+def CastAddressSpace : Opcode {
+  let Args = [ArgUint64, ArgTypePtr];
+}
+
 //===----------------------------------------------------------------------===//
 // Pointer generation
 //===----------------------------------------------------------------------===//
@@ -351,6 +355,7 @@ def GetPtrGlobal : OffsetOpcode {
 // [Pointer] -> [Pointer]
 def GetPtrField : OffsetOpcode;
 def GetPtrFieldPop : OffsetOpcode;
+def GetPtrFieldPopL : OffsetOpcode;
 // [] -> [Pointer]
 def GetPtrThisField : OffsetOpcode;
 // [Pointer] -> [Pointer]
@@ -420,6 +425,12 @@ def ArrayElemPtrPop : Opcode {
   let Types = [IntegralTypeClass];
   let HasGroup = 1;
 }
+def ArrayElemPtrPopL : Opcode {
+  let Types = [IntegralTypeClass];
+  let HasGroup = 1;
+}
+
+
 
 def ArrayElemPop : Opcode {
   let Args = [ArgUint32];
@@ -564,6 +575,7 @@ class LoadOpcode : Opcode {
 def Load : LoadOpcode {}
 // [Pointer] -> [Value]
 def LoadPop : LoadOpcode {}
+def LoadPopL : Opcode {}
 
 class StoreOpcode : Opcode {
   let Types = [AllTypeClass];
@@ -617,6 +629,16 @@ def AddOffset : Opcode {
   let Types = [IntegralTypeClass];
   let HasGroup = 1;
 }
+def AddOffsetL : Opcode {
+  let Types = [IntegralTypeClass];
+  let HasGroup = 1;
+}
+
+def GetOpaquePtr : Opcode {
+  let Args = [ArgValueDecl];
+}
+
+
 // [Pointer, Integral] -> [Pointer]
 def SubOffset : Opcode {
   let Types = [IntegralTypeClass];
@@ -644,7 +666,7 @@ def GetFnPtr : SuccessOpcode {
 
 def GetIntPtr : Opcode {
   let Types = [AluTypeClass];
-  let Args = [ArgTypePtr];
+  let Args = [ArgTypePtr, ArgUint64];
   let HasGroup = 1;
 }
 

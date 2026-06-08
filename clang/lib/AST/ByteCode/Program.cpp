@@ -143,14 +143,16 @@ unsigned Program::getOrCreateDummy(DeclTy D, bool IsConstexprUnknown) {
     const auto *VD = cast<ValueDecl>(cast<const Decl *>(D));
     IsWeak = VD->isWeak();
     QT = VD->getType();
-    if (QT->isPointerOrReferenceType())
+
+    if (QT->isReferenceType())
       QT = QT->getPointeeType();
   }
+
   assert(!QT.isNull());
 
   Descriptor *Desc;
   if (OptPrimType T = Ctx.classify(QT))
-    Desc = createDescriptor(D, *T, /*SourceTy=*/nullptr, std::nullopt,
+    Desc = createDescriptor(D, *T, /*SourceTy=*/QT.getTypePtr(), std::nullopt,
                             /*IsConst=*/QT.isConstQualified());
   else
     Desc = createDescriptor(D, QT.getTypePtr(), std::nullopt,
@@ -161,6 +163,8 @@ unsigned Program::getOrCreateDummy(DeclTy D, bool IsConstexprUnknown) {
   Desc->IsConstexprUnknown = IsConstexprUnknown;
 
   assert(Desc);
+
+  // Desc->dump();
 
   // Allocate a block for storage.
   unsigned I = Globals.size();

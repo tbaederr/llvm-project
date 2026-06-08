@@ -45,3 +45,32 @@ void foo2(struct Foo *t) {
 void foo(void *p) {
   int i = __builtin_object_size(&p[2], 3);
 }
+
+struct DynStructVar {
+  char fst[16];
+  char snd[];
+};
+
+static struct DynStructVar D32 = {
+  .fst = {},
+  .snd = { 0, 1, 2, 3, 4, 5, 6 },
+};
+
+// CHECK-LABEL: @test32
+void test32(void) {
+  // CHECK: store i32 23
+  gi = __builtin_object_size(&D32, 0);
+  // CHECK: store i32 23
+  gi = __builtin_object_size(&D32, 1);
+  // CHECK: store i32 23
+  gi = __builtin_object_size(&D32, 2);
+  // CHECK: store i32 23
+  gi = __builtin_object_size(&D32, 3);
+
+  // CHECK: store i32 7
+  gi = __builtin_object_size(&D32.snd[0], 0);
+  // CHECK: store i32 1
+  gi = __builtin_object_size(&D32.snd[6], 0);
+  // CHECK: store i32 0
+  gi = __builtin_object_size(&D32.snd[10], 0);
+}

@@ -1,6 +1,7 @@
 // RUN: %clang_cc1 -fexperimental-new-constant-interpreter -triple x86_64-apple-darwin -emit-llvm -o - %s | FileCheck %s
 // RUN: %clang_cc1                                         -triple x86_64-apple-darwin -emit-llvm -o - %s | FileCheck %s
 
+// CHECK-LABEL: @_Z3foov
 void foo() {
   struct A { char buf[16]; };
   struct B : A {};
@@ -22,6 +23,7 @@ void foo() {
 }
 
 
+// CHECK-LABEL: @_Z4foo2v
 void foo2() {
   struct A { int a; };
   struct B { int b; };
@@ -51,11 +53,13 @@ typedef struct {
   float f;
 } foofoo0_t;
 
+// CHECK-LABEL: @_Z6babar0P9foofoo0_t
 unsigned babar0(foofoo0_t *f) {
   // CHECK: ret i32 0
   return __builtin_object_size(f->c, 1);
 }
 
+// CHECK-LABEL: @_Z5test2v
 void test2() {
   struct A { char buf[16]; };
   struct B : A {};
@@ -90,6 +94,7 @@ void test2() {
   gi = __builtin_object_size(&c->bs[0].buf[0], 3);
 }
 
+// CHECK-LABEL: @_Z5test3v
 void test3() {
   struct A {
     int a;
@@ -110,15 +115,16 @@ void test3() {
 struct A { char buf[16]; };
 struct B : A {};
 struct C { int i; B bs[1]; } *c;
+// CHECK-LABEL: @_Z13globalPointerv
 void globalPointer() {
   int gi;
   // CHECK: call i64 @llvm.objectsize.i64.p0(ptr %{{.*}}, i1 true, i1 true, i1 false)
   gi = __builtin_object_size(&c->bs[0], 2);
 }
 
+// CHECK-LABEL: @_Z11nonPtrParam1C
 void nonPtrParam(C c) {
   int gi;
   // CHECK: store i32 16
   gi = __builtin_object_size(&c.bs[0], 2);
 }
-

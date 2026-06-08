@@ -453,8 +453,12 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
 
   switch (E->getCastKind()) {
   case CK_LValueToRValue: {
-    if (ToLValue && E->getType()->isPointerType())
-      return this->delegate(SubExpr);
+    if (ToLValue && E->getType()->isPointerType()) {
+      assert(!DiscardResult);
+      if (!this->visit(SubExpr))
+        return false;
+      return this->emitLoadPopL(E);
+    }
 
     if (SubExpr->getType().isVolatileQualified())
       return this->emitInvalidCast(CastKind::Volatile, /*Fatal=*/true, E);
@@ -707,7 +711,8 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
     // FIXME: I think the discard is wrong since the int->ptr cast might cause a
     // diagnostic.
     PrimType T = classifyPrim(IntType);
-    if (!this->emitGetIntPtr(T, E->getType().getTypePtr(), E))
+    uint64_t Val = Ctx.getASTContext().getTargetNullPointerValue(E->getType());
+    if (!this->emitGetIntPtr(T, E->getType().getTypePtr(), Val, E))
       return false;
 
     QualType PtrType = E->getType();
@@ -725,9 +730,28 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
   case CK_NonAtomicToAtomic:
   case CK_NoOp:
   case CK_UserDefinedConversion:
-  case CK_AddressSpaceConversion:
   case CK_CPointerToObjCPointerCast:
     return this->delegate(SubExpr);
+
+  case CK_AddressSpaceConversion: {
+    if (E->containsErrors())
+      return false;
+
+    if (!this->visit(SubExpr))
+      return false;
+
+    uint64_t Val;
+    if (E->getType()->isPointerType())
+      Val = Ctx.getASTContext().getTargetNullPointerValue(E->getType());
+    else
+      Val = 0;
+
+    if (!this->emitCastAddressSpace(Val, E->getType().getTypePtr(), E))
+      return false;
+    if (DiscardResult)
+      return this->emitPopPtr(E);
+    return true;
+  }
 
   case CK_BitCast: {
     if (E->containsErrors())
@@ -1523,8 +1547,14 @@ bool Compiler<Emitter>::VisitPointerArithBinOp(const BinaryOperator *E) {
   // result pointer type.
   switch (Op) {
   case BO_Add:
-    if (!this->emitAddOffset(OffsetType, E))
-      return false;
+    if (ToLValue) {
+      if (!this->emitAddOffsetL(OffsetType, E))
+        return false;
+
+    } else {
+      if (!this->emitAddOffset(OffsetType, E))
+        return false;
+    }
     break;
   case BO_Sub:
     if (!this->emitSubOffset(OffsetType, E))
@@ -2280,8 +2310,14 @@ bool Compiler<Emitter>::VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
       return false;
   }
 
-  if (!this->emitArrayElemPtrPop(*IndexT, E))
-    return false;
+  if (ToLValue) {
+    if (!this->emitArrayElemPtrPopL(*IndexT, E))
+      return false;
+
+  } else {
+    if (!this->emitArrayElemPtrPop(*IndexT, E))
+      return false;
+  }
   if (DiscardResult)
     return this->emitPopPtr(E);
 
@@ -2943,6 +2979,9 @@ bool Compiler<Emitter>::VisitMemberExpr(const MemberExpr *E) {
   // Leave a pointer to the field on the stack.
   if (F->Decl->getType()->isReferenceType())
     return this->emitGetFieldPop(PT_Ptr, F->Offset, E) && maybeLoadValue();
+
+  if (ToLValue)
+    return this->emitGetPtrFieldPopL(F->Offset, E) && maybeLoadValue();
   return this->emitGetPtrFieldPop(F->Offset, E) && maybeLoadValue();
 }
 
@@ -8707,6 +8746,11 @@ template <class Emitter>
 bool Compiler<Emitter>::emitDummyPtr(const DeclTy &D, const Expr *E, bool CU) {
   assert(!DiscardResult && "Should've been checked before");
   unsigned DummyID = P.getOrCreateDummy(D, CU);
+
+  if (ToLValue) {
+    if (auto *VD = dyn_cast_if_present<ValueDecl>(D.dyn_cast<const Decl *>()))
+      return this->emitGetOpaquePtr(VD, E);
+  }
 
   if (!this->emitGetPtrGlobal(DummyID, E))
     return false;

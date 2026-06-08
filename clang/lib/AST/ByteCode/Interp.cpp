@@ -1572,10 +1572,7 @@ static bool diagnoseTypeIdField(InterpState &S, CodePtr OpPC,
       Ptr.asTypeidPointer().TypeInfoType->getAsRecordDecl());
   if (!R)
     return false;
-  const Record::Field *Field =
-      llvm::find_if(R->fields(), [=](const Record::Field &F) -> bool {
-        return F.Offset == Offset;
-      });
+  const Record::Field *Field = R->findField(Offset);
   if (!Field)
     return false;
 
@@ -1605,6 +1602,9 @@ static bool getField(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   if (!CheckSubobject(S, OpPC, Ptr, CSK_Field))
     return false;
+
+  // llvm::errs() << __FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << '\n';
 
   if (Ptr.isIntegralPointer()) {
     if (std::optional<IntPointer> IntPtr =
@@ -1644,12 +1644,96 @@ bool GetPtrFieldPop(InterpState &S, CodePtr OpPC, uint32_t Off) {
   return getField(S, OpPC, Ptr, Off);
 }
 
+bool GetPtrFieldPopL(InterpState &S, CodePtr OpPC, uint32_t Off) {
+  // llvm::errs() << __FUNCTION__ << '\n';
+  const auto &Ptr = S.Stk.pop<Pointer>();
+
+  if (Ptr.isOpaquePointer()) {
+    // Ptr.asOpaquePointer().FieldType->dump();
+    // IntPointer IP{Ptr.asOpaquePointer().FieldType, 0, false};
+
+    // if (std::optional<IntPointer> IntPtr =
+    // IP.atOffset(S.Ctx, Off)) {
+
+    // llvm::errs() << "GetFieldPopL WORKED\n";
+    // llvm::errs() << "Offset: "<< IntPtr->Value << '\n';
+    // S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
+    // IntPtr->Ty, IntPtr->Value);
+
+    const Record *R = S.getContext().getRecord(
+        Ptr.asOpaquePointer().getFieldType()->getAsRecordDecl());
+    if (!R)
+      return false;
+
+    const Record::Field *F = R->findField(Off);
+    if (!F)
+      return false;
+
+    PointerPathEntry *NewPath =
+        S.allocPointerPath(Ptr.asOpaquePointer().PathLength + 1);
+    if (Ptr.asOpaquePointer().Path)
+      std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  sizeof(PointerPathEntry) * Ptr.asOpaquePointer().PathLength);
+
+    NewPath[Ptr.asOpaquePointer().PathLength] =
+        PointerPathEntry::field(F->Decl);
+
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType,
+                        F->Decl->getType().getTypePtr(), NewPath,
+                        Ptr.asOpaquePointer().PathLength + 1);
+
+    // S.Stk.push<Pointer>(std::move(*IntPtr));
+    return true;
+    // }
+
+    return false;
+  }
+
+  return getField(S, OpPC, Ptr, Off);
+}
+
 static bool getBase(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
                     uint32_t Off, bool NullOK) {
   if (!NullOK && !CheckNull(S, OpPC, Ptr, CSK_Base))
     return false;
 
   if (!Ptr.isBlockPointer()) {
+
+    if (Ptr.isOpaquePointer()) {
+      const Record *R = S.getContext().getRecord(
+          Ptr.asOpaquePointer()
+              .FieldType->getAsRecordDecl()); // CurType->getAsRecordDecl());
+      assert(R);
+
+      const Record::Base *F = nullptr;
+      for (auto &It : R->bases()) {
+        if (It.Offset == Off) {
+          F = &It;
+          break;
+        }
+      }
+      assert(F);
+
+      unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+      PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+      // llvm::errs() << "NewSize: "<< NewPathLength << '\n';
+      if (Ptr.asOpaquePointer().Path)
+        std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                    sizeof(PointerPathEntry) * (NewPathLength - 1));
+
+      NewPath[NewPathLength - 1] = PointerPathEntry::base(
+          F->Decl); // PointerPathEntry::array(static_cast<uint64_t>(Offset));
+      S.Stk.push<Pointer>(
+          OpaqueTag{}, Ptr.asOpaquePointer().Base,
+          Ptr.asOpaquePointer().ObjectType,
+          S.getASTContext().getCanonicalTagType(F->Decl).getTypePtr(), NewPath,
+          NewPathLength);
+
+      // S.Stk.push<Pointer>(Ptr);
+      return true;
+    }
+
     if (!Ptr.isIntegralPointer())
       return false;
     S.Stk.push<Pointer>(Ptr.asIntPointer().baseCast(S.Ctx, Off));

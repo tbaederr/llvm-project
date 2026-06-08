@@ -2104,6 +2104,7 @@ inline bool GetPtrGlobal(InterpState &S, uint32_t I) {
 /// 2) Pushes Pointer.atField(Off) on the stack
 bool GetPtrField(InterpState &S, CodePtr OpPC, uint32_t Off);
 bool GetPtrFieldPop(InterpState &S, CodePtr OpPC, uint32_t Off);
+bool GetPtrFieldPopL(InterpState &S, CodePtr OpPC, uint32_t Off);
 
 bool GetPtrBase(InterpState &S, CodePtr OpPC, uint32_t Off);
 bool GetPtrBasePop(InterpState &S, CodePtr OpPC, uint32_t Off, bool NullOK);
@@ -2249,6 +2250,47 @@ bool LoadPop(InterpState &S, CodePtr OpPC) {
   if (!Ptr.canDeref(Name))
     return false;
   S.Stk.push<T>(Ptr.deref<T>());
+  return true;
+}
+
+/// Like LoadPop above, but if any of the checks fail, we simply
+/// push the Pointer itself.
+inline bool LoadPopL(InterpState &S, CodePtr OpPC) {
+  const Pointer &Ptr = S.Stk.pop<Pointer>();
+  auto P = S.getEvalStatus().Diag;
+  S.getEvalStatus().Diag = nullptr;
+
+  bool Failed = false;
+  if (!CheckLoad(S, OpPC, Ptr))
+    Failed = true;
+  if (!Ptr.isBlockPointer())
+    Failed = true;
+  if (!Ptr.canDeref(PT_Ptr))
+    Failed = true;
+  S.getEvalStatus().Diag = P;
+
+  if (Failed) {
+    // llvm::errs() << "LoadPopL failed\n";
+    // llvm::errs() << Ptr << '\n';
+    // Ptr.getType()->dump();
+    // Ptr.getType()->getPointeeType()->dump();
+    if (Ptr.isOpaquePointer())
+      S.Stk.push<Pointer>(
+          OpaqueTag{}, Ptr.asOpaquePointer().Base,
+          Ptr.asOpaquePointer().ObjectType,
+          Ptr.asOpaquePointer().getFieldType().getTypePtr());//FieldType->getPointeeType().getTypePtr());
+    else
+      S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asValueDecl(),
+                          Ptr.getDeclDesc()->getType().getTypePtr(),
+                          Ptr.getType()->getPointeeType().getTypePtr());
+    // S.Stk.push<Pointer>(Ptr);
+
+  } else {
+    // llvm::errs() << "LoadPopL WORKED\n";
+    // llvm::errs() << Ptr << '\n';
+
+    S.Stk.push<Pointer>(Ptr.deref<Pointer>());
+  }
   return true;
 }
 
@@ -2651,12 +2693,65 @@ bool AddOffset(InterpState &S, CodePtr OpPC) {
   const T &Offset = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>().expand();
 
+  // llvm::errs() << __FUNCTION__ << ": " << Ptr << '\n';
+
   if (std::optional<Pointer> Result = OffsetHelper<T, ArithOp::Add>(
           S, OpPC, Offset, Ptr, /*IsPointerArith=*/true)) {
     S.Stk.push<Pointer>(Result->narrow());
     return true;
   }
+  // llvm::errs() << "fail\n";
   return false;
+}
+
+inline bool GetOpaquePtr(InterpState &S, CodePtr OpPC, const ValueDecl *VD) {
+  S.Stk.push<Pointer>(OpaqueTag{}, VD);
+  return true;
+}
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
+bool AddOffsetL(InterpState &S, CodePtr OpPC) {
+  const T &Offset = S.Stk.pop<T>();
+  const Pointer &Ptr = S.Stk.pop<Pointer>().expand();
+
+  // llvm::errs() << __FUNCTION__ << ": " << Ptr << '\n';
+
+  if (Ptr.isOpaquePointer()) {
+
+    PointerPathEntry *NewPath = S.allocPointerPath(1);
+    NewPath[0] = PointerPathEntry::array(static_cast<uint64_t>(Offset));
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType,
+                        Ptr.asOpaquePointer().FieldType, NewPath,
+                        1); // NewPathLength);
+
+#if 0
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
+                        Ptr.asOpaquePointer().FieldType,
+                        Ptr.asOpaquePointer().Path,
+                        Ptr.asOpaquePointer().PathLength,
+                        Ptr.getByteOffset() + static_cast<uint64_t>(Offset));
+#endif
+    return true;
+  }
+
+  if (std::optional<Pointer> Result = OffsetHelper<T, ArithOp::Add>(
+          S, OpPC, Offset, Ptr, /*IsPointerArith=*/true)) {
+    S.Stk.push<Pointer>(Result->narrow());
+    return true;
+  }
+
+  // llvm::errs() << "fail\n";
+  // PointerPathEntry *NewPath = S.allocPointerPath(1);
+  // NewPath[0] = PointerPathEntry::array(static_cast<uint64_t>(Offset));
+  // S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
+  // ElemType.getTypePtr(), NewPath, NewPathLength);
+  S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asValueDecl(),
+                      Ptr.getDeclDesc()->getType().getTypePtr(),
+                      Ptr.getType().getTypePtr(), nullptr, 0,
+                      static_cast<uint64_t>(Offset));
+
+  return true;
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
@@ -3147,7 +3242,20 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool Null(InterpState &S, uint64_t Value, const Type *Ty) {
   // FIXME(perf): This is a somewhat often-used function and the value of a
   // null pointer is almost always 0.
-  S.Stk.push<T>(Value, Ty);
+  if constexpr (std::is_same_v<T, Pointer>)
+    S.Stk.push<T>(Value, Ty, /*Offset=*/0, /*IsNull=*/true);
+  else
+    S.Stk.push<T>(Value, Ty);
+  return true;
+}
+
+inline bool CastAddressSpace(InterpState &S, CodePtr OpPC, uint64_t Value,
+                             const Type *Ty) {
+  const Pointer Ptr = S.Stk.pop<Pointer>();
+  if (Ptr.isZero())
+    S.Stk.push<Pointer>(Value, Ty);
+  else
+    S.Stk.push<Pointer>(Ptr);
   return true;
 }
 
@@ -3501,6 +3609,91 @@ inline bool ArrayElemPtrPop(InterpState &S, CodePtr OpPC) {
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
+inline bool ArrayElemPtrPopL(InterpState &S, CodePtr OpPC) {
+  const T &Offset = S.Stk.pop<T>();
+  const Pointer &Ptr = S.Stk.pop<Pointer>();
+  // llvm::errs() << __FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << '\n';
+
+  if (Ptr.isOpaquePointer()) {
+    // llvm::errs() << "arrayelemptrL of opaque pointer!\n";
+    // llvm::errs() << Ptr << '\n';
+    // Ptr.asOpaquePointer().FieldType->dump();
+
+    // unsigned NewOffset = Ptr.getByteOffset();
+    QualType ElemType;
+    if (Ptr.asOpaquePointer().FieldType->isArrayType()) {
+      ElemType = Ptr.asOpaquePointer()
+                     .FieldType->getAsArrayTypeUnsafe()
+                     ->getElementType();
+    } else if (Ptr.asOpaquePointer().FieldType->isRecordType()) {
+      ElemType = QualType(Ptr.asOpaquePointer().FieldType, 0);
+    } else {
+      ElemType = Ptr.asOpaquePointer().getFieldType();//FieldType->getPointeeType();
+    }
+    // ElemType->dump();
+    if (ElemType.isNull())
+      return false;
+    // NewOffset +=
+    // (S.getASTContext().getTypeSizeInChars(ElemType).getQuantity() *
+    // static_cast<uint64_t>(Offset)); llvm::errs() << "NewOffset: " <<
+    // NewOffset<< '\n';
+
+    unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+    PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+    // llvm::errs() << "NewSize: "<< NewPathLength << '\n';
+    if (Ptr.asOpaquePointer().Path)
+      std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  sizeof(PointerPathEntry) * (NewPathLength - 1));
+
+    NewPath[NewPathLength - 1] =
+        PointerPathEntry::array(static_cast<uint64_t>(Offset));
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType, ElemType.getTypePtr(),
+                        NewPath, NewPathLength);
+
+    return true;
+  }
+
+  if (!Ptr.isZero() && !Offset.isZero()) {
+    if (!CheckArray(S, OpPC, Ptr))
+      return false;
+  }
+
+  if (Offset.isZero()) {
+    if (const Descriptor *Desc = Ptr.getFieldDesc();
+        Desc && Desc->isArray() && Ptr.getIndex() == 0) {
+      S.Stk.push<Pointer>(Ptr.atIndex(0).narrow());
+      return true;
+    }
+    S.Stk.push<Pointer>(Ptr.narrow());
+    return true;
+  }
+
+  assert(!Offset.isZero());
+
+  if (std::optional<Pointer> Result =
+          OffsetHelper<T, ArithOp::Add>(S, OpPC, Offset, Ptr)) {
+    S.Stk.push<Pointer>(Result->narrow());
+    return true;
+  }
+
+  // llvm::errs() << "fail, moving to opaque ptr\n";
+  // Ptr.getDeclDesc()->getType()->dump();
+  // Ptr.getType()->dump();
+
+  PointerPathEntry *NewPath = S.allocPointerPath(1);
+  NewPath[0] = PointerPathEntry::array(static_cast<uint64_t>(Offset));
+  // S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
+  // ElemType.getTypePtr(), NewPath, NewPathLength);
+  S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asValueDecl(),
+                      Ptr.getDeclDesc()->getType().getTypePtr(),
+                      Ptr.getType().getTypePtr(), NewPath, 1);
+
+  return true;
+}
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElem(InterpState &S, CodePtr OpPC, uint32_t Index) {
   const Pointer &Ptr = S.Stk.peek<Pointer>();
 
@@ -3569,6 +3762,12 @@ inline bool ArrayDecay(InterpState &S, CodePtr OpPC) {
       return false;
   }
 
+  if (Ptr.isOpaquePointer()) {
+    // llvm::errs()<< "ArrayDecay of Opaque pointer\n";
+    S.Stk.push<Pointer>(Ptr);
+    return true;
+  }
+
   if (Ptr.isRoot() || !Ptr.isUnknownSizeArray()) {
     S.Stk.push<Pointer>(Ptr.atIndex(0).narrow());
     return true;
@@ -3587,7 +3786,8 @@ inline bool GetFnPtr(InterpState &S, const Function *Func) {
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
-inline bool GetIntPtr(InterpState &S, CodePtr OpPC, const Type *Ty) {
+inline bool GetIntPtr(InterpState &S, CodePtr OpPC, const Type *Ty,
+                      uint64_t NullValue) {
   const T &IntVal = S.Stk.pop<T>();
 
   S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_invalid_cast)
@@ -3612,7 +3812,8 @@ inline bool GetIntPtr(InterpState &S, CodePtr OpPC, const Type *Ty) {
           S.P.getFunction((const FunctionDecl *)IntVal.getPtr());
       S.Stk.push<Pointer>(F, IntVal.getOffset());
     } else {
-      S.Stk.push<Pointer>(static_cast<uint64_t>(IntVal), Ty);
+      S.Stk.push<Pointer>(static_cast<uint64_t>(IntVal), Ty, 0,
+                          static_cast<uint64_t>(IntVal) == NullValue);
     }
   } else {
     S.Stk.push<Pointer>(static_cast<uint64_t>(IntVal), Ty);
@@ -3937,7 +4138,8 @@ inline bool AllocCN(InterpState &S, CodePtr OpPC, const Descriptor *ElementDesc,
       return false;
 
     // If this failed and is nothrow, just return a null ptr.
-    S.Stk.push<Pointer>(0, ElementDesc->getType().getTypePtr());
+    S.Stk.push<Pointer>(0, ElementDesc->getType().getTypePtr(), 0,
+                        /*IsNull=*/true);
     return true;
   }
   if (NumElements.isNegative()) {

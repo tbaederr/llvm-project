@@ -70,6 +70,8 @@
 #include <limits>
 #include <optional>
 
+static bool b = false;
+
 #define DEBUG_TYPE "exprconstant"
 
 using namespace clang;
@@ -16605,8 +16607,13 @@ static bool refersToCompleteObject(const LValue &LVal) {
   if (LVal.Designator.Invalid)
     return false;
 
-  if (!LVal.Designator.Entries.empty())
+  if (!LVal.Designator.Entries.empty()) {
+    if (LVal.Designator.isMostDerivedAnUnsizedArray()) {
+      if (b)
+        llvm::errs() << "MOst derived is an unsized array!\n";
+    }
     return LVal.Designator.isMostDerivedAnUnsizedArray();
+  }
 
   if (!LVal.InvalidBase)
     return true;
@@ -16637,11 +16644,13 @@ static bool isUserWritingOffTheEnd(const ASTContext &Ctx, const LValue &LVal) {
     FAMKind StrictFlexArraysLevel =
         Ctx.getLangOpts().getStrictFlexArraysLevel();
 
-    if (Designator.isMostDerivedAnUnsizedArray())
+    if (Designator.isMostDerivedAnUnsizedArray()) {
       return true;
+    }
 
-    if (StrictFlexArraysLevel == FAMKind::Default)
+    if (StrictFlexArraysLevel == FAMKind::Default) {
       return true;
+    }
 
     if (Designator.getMostDerivedArraySize() == 0 &&
         StrictFlexArraysLevel != FAMKind::IncompleteOnly)
@@ -16653,6 +16662,17 @@ static bool isUserWritingOffTheEnd(const ASTContext &Ctx, const LValue &LVal) {
 
     return false;
   };
+
+  if (b) {
+    llvm::errs() << "Invalid Base: " << LVal.InvalidBase << '\n';
+    llvm::errs() << Designator.Entries.size() << " / "
+                 << Designator.MostDerivedPathLength << '\n';
+    llvm::errs() << "MOstderivedisarray: "
+                 << Designator.MostDerivedIsArrayElement << '\n';
+    llvm::errs() << "Flexible: " << isFlexibleArrayMember() << '\n';
+    llvm::errs() << "ObjectEnd: " << isDesignatorAtObjectEnd(Ctx, LVal) << '\n';
+    ;
+  }
 
   return LVal.InvalidBase &&
          Designator.Entries.size() == Designator.MostDerivedPathLength &&
@@ -16679,8 +16699,9 @@ static void addFlexibleArrayMemberInitSize(EvalInfo &Info, const QualType &T,
       T->castAsRecordDecl()->hasFlexibleArrayMember())
     if (const auto *V = LV.getLValueBase().dyn_cast<const ValueDecl *>())
       if (const auto *VD = dyn_cast<VarDecl>(V))
-        if (VD->hasInit())
+        if (VD->hasInit()) {
           Size += VD->getFlexibleArrayInitChars(Info.Ctx);
+        }
 }
 
 /// Helper for tryEvaluateBuiltinObjectSize -- Given an LValue, this will
@@ -16692,35 +16713,54 @@ static void addFlexibleArrayMemberInitSize(EvalInfo &Info, const QualType &T,
 static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
                                unsigned Type, const LValue &LVal,
                                CharUnits &EndOffset) {
+  if (b)
+    llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+
   bool DetermineForCompleteObject = refersToCompleteObject(LVal);
+  if (b)
+    llvm::errs() << "DetermineForCompleteObject: " << DetermineForCompleteObject
+                 << '\n';
 
   auto CheckedHandleSizeof = [&](QualType Ty, CharUnits &Result) {
-    if (Ty.isNull())
+    if (Ty.isNull()) {
+      // llvm::errs()<< "a\n";
       return false;
+    }
 
     Ty = Ty.getNonReferenceType();
 
-    if (Ty->isIncompleteType() || Ty->isFunctionType())
+    if (Ty->isIncompleteType() || Ty->isFunctionType()) {
+      // llvm::errs() << "b\n";
       return false;
+    }
 
     return HandleSizeof(Info, ExprLoc, Ty, Result);
   };
 
+  // llvm::errs() << "Designator invalid: " << LVal.Designator.Invalid << '\n';
   // We want to evaluate the size of the entire object. This is a valid fallback
   // for when Type=1 and the designator is invalid, because we're asked for an
   // upper-bound.
   if (!(Type & 1) || LVal.Designator.Invalid || DetermineForCompleteObject) {
+    if (b)
+      llvm::errs() << "first big if\n";
     // Type=3 wants a lower bound, so we can't fall back to this.
-    if (Type == 3 && !DetermineForCompleteObject)
+    if (Type == 3 && !DetermineForCompleteObject) {
+      if (b)
+        llvm::errs() << "type = 3\n";
       return false;
+    }
 
     llvm::APInt APEndOffset;
     if (isBaseAnAllocSizeCall(LVal.getLValueBase()) &&
         getBytesReturnedByAllocSizeCall(Info.Ctx, LVal, APEndOffset))
       return convertUnsignedAPIntToCharUnits(APEndOffset, EndOffset);
 
-    if (LVal.InvalidBase)
+    if (LVal.InvalidBase) {
+      if (b)
+        llvm::errs() << "LVal has invalid base\n";
       return false;
+    }
 
     QualType BaseTy = getObjectType(LVal.getLValueBase());
     const bool Ret = CheckedHandleSizeof(BaseTy, EndOffset);
@@ -16731,6 +16771,8 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
   // We want to evaluate the size of a subobject.
   const SubobjectDesignator &Designator = LVal.Designator;
 
+  // llvm::errs() << "InvalidBase: " << LVal.InvalidBase << '\n';
+
   // The following is a moderately common idiom in C:
   //
   // struct Foo { int a; char c[1]; };
@@ -16739,6 +16781,8 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
   //
   // In order to not break too much legacy code, we need to support it.
   if (isUserWritingOffTheEnd(Info.Ctx, LVal)) {
+    if (b)
+      llvm::errs() << "Writing off the end!\n";
     // If we can resolve this to an alloc_size call, we can hand that back,
     // because we know for certain how many bytes there are to write to.
     llvm::APInt APEndOffset;
@@ -16749,14 +16793,31 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
     // If we cannot determine the size of the initial allocation, then we can't
     // given an accurate upper-bound. However, we are still able to give
     // conservative lower-bounds for Type=3.
-    if (Type == 1)
+    if (Type == 1) {
+      if (b)
+        llvm::errs() << "WOTE and type == 1\n";
       return false;
+    }
+  } else {
+    if (b)
+      llvm::errs() << "NOT writing off the end\n";
   }
 
   CharUnits BytesPerElem;
-  if (!CheckedHandleSizeof(Designator.MostDerivedType, BytesPerElem))
-    return false;
+  if (!CheckedHandleSizeof(Designator.MostDerivedType, BytesPerElem)) {
+    if (b) {
+      llvm::errs() << "CheckedHandleSizeof failed\n";
+      Designator.MostDerivedType->dump();
+    }
 
+    return false;
+  }
+
+  if (b) {
+    llvm::errs() << "BytesPerElem: " << BytesPerElem.getQuantity() << '\n';
+    llvm::errs() << "MostDerivedType:\n";
+    Designator.MostDerivedType->dump();
+  }
   // According to the GCC documentation, we want the size of the subobject
   // denoted by the pointer. But that's not quite right -- what we actually
   // want is the size of the immediately-enclosing array, if there is one.
@@ -16769,6 +16830,9 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
   } else {
     ElemsRemaining = Designator.isOnePastTheEnd() ? 0 : 1;
   }
+
+  if (b)
+    llvm::errs() << "Elems Remaining: " << ElemsRemaining << '\n';
 
   EndOffset = LVal.getLValueOffset() + BytesPerElem * ElemsRemaining;
   return true;
@@ -16787,6 +16851,10 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
 static std::optional<uint64_t>
 tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
                              bool IsDynamic = false) {
+  if (b) {
+    llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+    llvm::errs() << "DYNAMIC: " << IsDynamic << '\n';
+  }
 
   // Determine the denoted object.
   LValue LVal;
@@ -16801,18 +16869,27 @@ tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
       // It's possible for us to be given GLValues if we're called via
       // Expr::tryEvaluateObjectSize.
       APValue RVal;
-      if (!EvaluateAsRValue(Info, E, RVal))
+      if (!EvaluateAsRValue(Info, E, RVal)) {
+        if (b)
+          llvm::errs() << "AsRValue failed\n";
         return std::nullopt;
+      }
       LVal.setFrom(Info.Ctx, RVal);
     } else if (!EvaluatePointer(ignorePointerCastsAndParens(E), LVal, Info,
-                                /*InvalidBaseOK=*/true))
+                                /*InvalidBaseOK=*/true)) {
+      if (b)
+        llvm::errs() << "EvaluatePointer failed\n";
       return std::nullopt;
+    }
   }
 
   // If we point to before the start of the object, there are no accessible
   // bytes.
-  if (LVal.getLValueOffset().isNegative())
+  if (LVal.getLValueOffset().isNegative()) {
+    if (b)
+      llvm::errs() << "Negative lvalue offset\n";
     return 0;
+  }
 
   // For __builtin_dynamic_object_size on a counted_by-annotated flexible
   // array member, defer to IR generation (emitCountedBySize in CGBuiltin):
@@ -16832,13 +16909,29 @@ tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
   }
 
   CharUnits EndOffset;
-  if (!determineEndOffset(Info, E->getExprLoc(), Type, LVal, EndOffset))
+  if (!determineEndOffset(Info, E->getExprLoc(), Type, LVal, EndOffset)) {
+    if (b)
+      llvm::errs() << "couldn't determine end offset. Returning failure\n";
     return std::nullopt;
+  }
+
+  if (b) {
+    llvm::errs() << "EndOffset: " << EndOffset.getQuantity() << '\n';
+    llvm::errs() << "LValueOffset: " << LVal.getLValueOffset().getQuantity()
+                 << '\n';
+  }
 
   // If we've fallen outside of the end offset, just pretend there's nothing to
   // write to/read from.
-  if (EndOffset <= LVal.getLValueOffset())
+  if (EndOffset <= LVal.getLValueOffset()) {
+    if (b)
+      llvm::errs() << "err-2. Returning 0.\n";
     return 0;
+  }
+
+  if (b)
+    llvm::errs() << "Result: "
+                 << (EndOffset - LVal.getLValueOffset()).getQuantity() << '\n';
   return (EndOffset - LVal.getLValueOffset()).getQuantity();
 }
 
@@ -16975,8 +17068,11 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
             tryEvaluateBuiltinObjectSize(E->getArg(0), Type, Info, IsDynamic))
       return Success(*Size, E);
 
-    if (E->getArg(0)->HasSideEffects(Info.Ctx))
+    if (E->getArg(0)->HasSideEffects(Info.Ctx)) {
+      if (b)
+        llvm::errs() << "Arg0 has side effects\n";
       return Success((Type & 2) ? 0 : -1, E);
+    }
 
     // Expression had no side effects, but we couldn't statically determine the
     // size of the referenced object.
@@ -16984,9 +17080,13 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     case EvaluationMode::ConstantExpression:
     case EvaluationMode::ConstantFold:
     case EvaluationMode::IgnoreSideEffects:
+      if (b)
+        llvm::errs() << " -> Error(E)\n";
       // Leave it to IR generation.
       return Error(E);
     case EvaluationMode::ConstantExpressionUnevaluated:
+      if (b)
+        llvm::errs() << "Success( " << ((Type & 2) ? 0 : -1) << ")\n";
       // Reduce it to a constant now.
       return Success((Type & 2) ? 0 : -1, E);
     }
@@ -22991,14 +23091,34 @@ bool Expr::isPotentialConstantExprUnevaluated(Expr *E,
 
 std::optional<uint64_t> Expr::tryEvaluateObjectSize(const ASTContext &Ctx,
                                                     unsigned Type) const {
-  if (!getType()->isPointerType())
+  if (b) {
+    llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+    this->dumpColor();
+  }
+  if (!getType()->isPointerType()) {
+    if (b)
+      llvm::errs() << "NOT a pointer type\n";
     return std::nullopt;
+  }
 
   Expr::EvalStatus Status;
   EvalInfo Info(Ctx, Status, EvaluationMode::ConstantFold);
-  if (Info.EnableNewConstInterp)
-    return Info.Ctx.getInterpContext().tryEvaluateObjectSize(Info, this, Type);
-  return tryEvaluateBuiltinObjectSize(this, Type, Info);
+  if (Info.EnableNewConstInterp) {
+    auto k = Info.Ctx.getInterpContext().tryEvaluateObjectSize(Info, this, Type,
+                                                               false);
+    if (b)
+      llvm::errs() << "SUCCESS: " << (bool)k << '\n';
+    return k;
+  }
+
+  if (auto p = tryEvaluateBuiltinObjectSize(this, Type, Info)) {
+    if (b)
+      llvm::errs() << "Result: " << *p << '\n';
+    return p;
+  }
+  if (b)
+    llvm::errs() << "Fail\n";
+  return std::nullopt;
 }
 
 static std::optional<uint64_t>
