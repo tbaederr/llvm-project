@@ -121,7 +121,7 @@ class CXXBasePaths {
 
   /// Paths - The actual set of paths that can be taken from the
   /// derived class to the same base class.
-  std::list<CXXBasePath> Paths;
+  llvm::SmallVector<CXXBasePath, 0> Paths;
 
   /// ClassSubobjects - Records the class subobjects for each class
   /// type that we've seen. The first element IsVirtBase says
@@ -168,8 +168,8 @@ class CXXBasePaths {
                      bool LookupInDependent = false);
 
 public:
-  using paths_iterator = std::list<CXXBasePath>::iterator;
-  using const_paths_iterator = std::list<CXXBasePath>::const_iterator;
+  using paths_iterator = llvm::SmallVector<CXXBasePath>::iterator;
+  using const_paths_iterator = llvm::SmallVector<CXXBasePath>::const_iterator;
   using decl_iterator = NamedDecl **;
 
   /// BasePaths - Construct a new BasePaths structure to record the
@@ -186,6 +186,8 @@ public:
 
   CXXBasePath&       front()       { return Paths.front(); }
   const CXXBasePath& front() const { return Paths.front(); }
+  CXXBasePath&       back()       { return Paths.back(); }
+  const CXXBasePath& back() const { return Paths.back(); }
 
   using decl_range = llvm::iterator_range<decl_iterator>;
 

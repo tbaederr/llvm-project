@@ -322,7 +322,7 @@ bool CXXRecordDecl::lookupInBases(BaseMatchesCallback BaseMatches,
   //
   // FIXME: This is an O(N^2) algorithm, but DPG doesn't see an easy
   // way to make it any faster.
-  Paths.Paths.remove_if([&Paths](const CXXBasePath &Path) {
+  llvm::erase_if(Paths.Paths, [&Paths](const CXXBasePath &Path) {
     for (const CXXBasePathElement &PE : Path) {
       if (!PE.Base->isVirtual())
         continue;
