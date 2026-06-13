@@ -153,7 +153,7 @@ template <ShiftDir Dir, typename LT, typename RT>
 bool CheckShift(InterpState &S, CodePtr OpPC, const LT &LHS, const RT &RHS,
                 unsigned Bits) {
   if (RHS.isNegative()) {
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.CCEDiag(Loc, diag::note_constexpr_negative_shift) << RHS.toAPSInt();
     if (!S.noteUndefinedBehavior())
       return false;
@@ -222,7 +222,7 @@ bool CheckDivRem(InterpState &S, CodePtr OpPC, const T &LHS, const T &RHS) {
       APSInt LHSInt = LHS.toAPSInt();
       SmallString<32> Trunc;
       (-LHSInt.extend(LHSInt.getBitWidth() + 1)).toString(Trunc, 10);
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       const Expr *E = S.Current->getExpr(OpPC);
       S.CCEDiag(Loc, diag::note_constexpr_overflow) << Trunc << E->getType();
       return false;
@@ -609,7 +609,7 @@ inline bool Divc(InterpState &S, CodePtr OpPC) {
     unsigned Bits = LHSR.bitWidth();
 
     if (RHSR.isZero() && RHSI.isZero()) {
-      const SourceInfo &E = S.Current->getSource(OpPC);
+      SourceInfo E = S.Current->getSource(OpPC);
       S.FFDiag(E, diag::note_expr_divide_by_zero);
       return false;
     }
@@ -632,7 +632,7 @@ inline bool Divc(InterpState &S, CodePtr OpPC) {
       return false;
 
     if (Den.isZero()) {
-      const SourceInfo &E = S.Current->getSource(OpPC);
+      SourceInfo E = S.Current->getSource(OpPC);
       S.FFDiag(E, diag::note_expr_divide_by_zero);
       return false;
     }
@@ -1228,7 +1228,7 @@ inline bool CmpHelper<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   // Function pointers cannot be compared in an ordered way.
   if (LHS.isFunctionPointer() || RHS.isFunctionPointer() ||
       LHS.isTypeidPointer() || RHS.isTypeidPointer()) {
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_unspecified)
         << LHS.toDiagnosticString(S.getASTContext())
         << RHS.toDiagnosticString(S.getASTContext());
@@ -1241,7 +1241,7 @@ inline bool CmpHelper<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   }
 
   if (!Pointer::hasSameBase(LHS, RHS)) {
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_unspecified)
         << LHS.toDiagnosticString(S.getASTContext())
         << RHS.toDiagnosticString(S.getASTContext());
@@ -1308,7 +1308,7 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
     if (P.isZero())
       continue;
     if (P.isWeak()) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_pointer_weak_comparison)
           << P.toDiagnosticString(S.getASTContext());
       return false;
@@ -1339,7 +1339,7 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   if (LHS.pointsToStringLiteral() && RHS.pointsToStringLiteral() &&
       LHS.getFieldDesc()->asExpr() != RHS.getFieldDesc()->asExpr()) {
     if (arePotentiallyOverlappingStringLiterals(LHS, RHS)) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_literal_comparison)
           << LHS.toDiagnosticString(S.getASTContext())
           << RHS.toDiagnosticString(S.getASTContext());
@@ -1360,14 +1360,14 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   // Otherwise we need to do a bunch of extra checks before returning Unordered.
   if (LHS.isOnePastEnd() && !RHS.isOnePastEnd() && RHS.isBlockPointer() &&
       RHS.getOffset() == 0) {
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_past_end)
         << LHS.toDiagnosticString(S.getASTContext());
     return false;
   }
   if (RHS.isOnePastEnd() && !LHS.isOnePastEnd() && LHS.isBlockPointer() &&
       LHS.getOffset() == 0) {
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_past_end)
         << RHS.toDiagnosticString(S.getASTContext());
     return false;
@@ -1380,19 +1380,19 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
     if (P.pointsToLiteral()) {
       const Expr *E = P.getDeclDesc()->asExpr();
       if (isa<StringLiteral>(E)) {
-        const SourceInfo &Loc = S.Current->getSource(OpPC);
+        SourceInfo Loc = S.Current->getSource(OpPC);
         S.FFDiag(Loc, diag::note_constexpr_literal_comparison);
         return false;
       }
       if (const auto *CE = dyn_cast<CallExpr>(E);
           CE && IsOpaqueConstantCall(CE)) {
-        const SourceInfo &Loc = S.Current->getSource(OpPC);
+        SourceInfo Loc = S.Current->getSource(OpPC);
         S.FFDiag(Loc, diag::note_constexpr_opaque_call_comparison)
             << P.toDiagnosticString(S.getASTContext());
         return false;
       }
     } else if (P.isIntegralPointer()) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_pointer_constant_comparison)
           << LHS.toDiagnosticString(S.getASTContext())
           << RHS.toDiagnosticString(S.getASTContext());
@@ -1401,7 +1401,7 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   }
 
   if (LHS.isUnknownSizeArray() && RHS.isUnknownSizeArray()) {
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_zero_sized)
         << LHS.toDiagnosticString(S.getASTContext())
         << RHS.toDiagnosticString(S.getASTContext());
@@ -1431,7 +1431,7 @@ inline bool CmpHelperEQ<MemberPointer>(InterpState &S, CodePtr OpPC,
   // constant.
   for (const auto &MP : {LHS, RHS}) {
     if (MP.isWeak()) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_mem_pointer_weak_comparison)
           << MP.getMemberFunction();
       return false;
@@ -1454,7 +1454,7 @@ inline bool CmpHelperEQ<MemberPointer>(InterpState &S, CodePtr OpPC,
   for (const auto &MP : {LHS, RHS}) {
     if (const CXXMethodDecl *MD = MP.getMemberFunction();
         MD && MD->isVirtual()) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.CCEDiag(Loc, diag::note_constexpr_compare_virtual_mem_ptr) << MD;
     }
   }
@@ -1479,7 +1479,7 @@ bool CMP3(InterpState &S, CodePtr OpPC, const ComparisonCategoryInfo *CmpInfo) {
   ComparisonCategoryResult CmpResult = LHS.compare(RHS);
   if constexpr (std::is_same_v<T, Pointer>) {
     if (CmpResult == ComparisonCategoryResult::Unordered) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_unspecified)
           << LHS.toDiagnosticString(S.getASTContext())
           << RHS.toDiagnosticString(S.getASTContext());
@@ -2419,7 +2419,7 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
   if (Idx >= Desc->getNumElems()) {
     // CheckRange.
     if (S.getLangOpts().CPlusPlus) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_access_past_end)
           << AK_Assign << S.Current->getRange(OpPC);
     }
@@ -2456,7 +2456,7 @@ bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
   if (Idx >= Desc->getNumElems()) {
     // CheckRange.
     if (S.getLangOpts().CPlusPlus) {
-      const SourceInfo &Loc = S.Current->getSource(OpPC);
+      SourceInfo Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_access_past_end)
           << AK_Assign << S.Current->getRange(OpPC);
     }
@@ -3075,7 +3075,7 @@ static inline bool CastFixedPointIntegral(InterpState &S, CodePtr OpPC) {
 }
 
 static inline bool FnPtrCast(InterpState &S, CodePtr OpPC) {
-  const SourceInfo &E = S.Current->getSource(OpPC);
+  SourceInfo E = S.Current->getSource(OpPC);
   S.CCEDiag(E, diag::note_constexpr_invalid_cast)
       << diag::ConstexprInvalidCastKind::ThisConversionOrReinterpret
       << S.getLangOpts().CPlusPlus << S.Current->getRange(OpPC);
@@ -3102,13 +3102,13 @@ static inline bool PtrPtrCast(InterpState &S, CodePtr OpPC, bool SrcIsVoidPtr) {
           << E->getSubExpr()->getType() << S.getLangOpts().CPlusPlus26
           << Ptr.getType().getCanonicalType() << E->getType()->getPointeeType();
     } else if (!S.getLangOpts().CPlusPlus26) {
-      const SourceInfo &E = S.Current->getSource(OpPC);
+      SourceInfo E = S.Current->getSource(OpPC);
       S.CCEDiag(E, diag::note_constexpr_invalid_cast)
           << diag::ConstexprInvalidCastKind::CastFrom << "'void *'"
           << S.Current->getRange(OpPC);
     }
   } else {
-    const SourceInfo &E = S.Current->getSource(OpPC);
+    SourceInfo E = S.Current->getSource(OpPC);
     S.CCEDiag(E, diag::note_constexpr_invalid_cast)
         << diag::ConstexprInvalidCastKind::ThisConversionOrReinterpret
         << S.getLangOpts().CPlusPlus << S.Current->getRange(OpPC);
@@ -3217,7 +3217,7 @@ inline bool DoShift(InterpState &S, CodePtr OpPC, LT &LHS, RT &RHS,
   if (RHS.isNegative()) {
     // During constant-folding, a negative shift is an opposite shift. Such a
     // shift is not a constant expression.
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.CCEDiag(Loc, diag::note_constexpr_negative_shift) << RHS.toAPSInt();
     if (!S.noteUndefinedBehavior())
       return false;
@@ -3299,7 +3299,7 @@ inline bool DoShiftAP(InterpState &S, CodePtr OpPC, const APSInt &LHS,
   if (RHS.isNegative()) {
     // During constant-folding, a negative shift is an opposite shift. Such a
     // shift is not a constant expression.
-    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    SourceInfo Loc = S.Current->getSource(OpPC);
     S.CCEDiag(Loc, diag::note_constexpr_negative_shift) << RHS; //.toAPSInt();
     if (!S.noteUndefinedBehavior())
       return false;
@@ -3574,7 +3574,7 @@ inline bool ArrayDecay(InterpState &S, CodePtr OpPC) {
     return true;
   }
 
-  const SourceInfo &E = S.Current->getSource(OpPC);
+  SourceInfo E = S.Current->getSource(OpPC);
   S.FFDiag(E, diag::note_constexpr_unsupported_unsized_array);
 
   return false;
@@ -3631,7 +3631,7 @@ bool CopyMemberPtrPath(InterpState &S, CodePtr OpPC, const RecordDecl *Entry,
 /// op is not valid in a constant context.
 
 inline bool Unsupported(InterpState &S, CodePtr OpPC) {
-  const SourceLocation &Loc = S.Current->getLocation(OpPC);
+  SourceLocation Loc = S.Current->getLocation(OpPC);
   S.FFDiag(Loc, diag::note_constexpr_stmt_expr_unsupported)
       << S.Current->getRange(OpPC);
   return false;
@@ -3763,7 +3763,7 @@ inline bool Assume(InterpState &S, CodePtr OpPC) {
     return true;
 
   // Else, diagnose.
-  const SourceLocation &Loc = S.Current->getLocation(OpPC);
+  SourceLocation Loc = S.Current->getLocation(OpPC);
   S.CCEDiag(Loc, diag::note_constexpr_assumption_failed);
   return false;
 }
@@ -3790,7 +3790,7 @@ inline bool CheckNonNullArg(InterpState &S, CodePtr OpPC) {
   if (!Arg.isZero())
     return true;
 
-  const SourceLocation &Loc = S.Current->getLocation(OpPC);
+  SourceLocation Loc = S.Current->getLocation(OpPC);
   S.CCEDiag(Loc, diag::note_non_null_attribute_failed);
 
   return false;
