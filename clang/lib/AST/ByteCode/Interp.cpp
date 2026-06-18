@@ -586,6 +586,9 @@ bool CheckConst(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
     return false;
 
   // FIXME: Try Ptr.getFieldDesc()->IsConst and see perf
+  if (Ptr.getFieldDesc()->IsConst)
+    goto Diagnose;
+
 
   // The This pointer is writable in constructors and destructors,
   // even if isConst() returns true.
@@ -623,6 +626,7 @@ bool CheckConst(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
     break;
   }
 
+Diagnose:
   if (!S.checkingPotentialConstantExpression()) {
     QualType Ty = Ptr.getType();
     if (!Ptr.getFieldDesc()->IsConst)
