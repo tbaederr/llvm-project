@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -triple arm64-apple-ios -std=c++17 -Wno-vla -fsyntax-only -verify -fptrauth-intrinsics %s
+// RUN: %clang_cc1 -triple arm64-apple-ios -std=c++17 -Wno-vla -fsyntax-only -verify -fptrauth-intrinsics %s -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -triple aarch64-linux-gnu -std=c++17 -Wno-vla -fsyntax-only -verify -fptrauth-intrinsics %s
 
 int n;

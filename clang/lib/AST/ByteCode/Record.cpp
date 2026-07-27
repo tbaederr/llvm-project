@@ -50,9 +50,11 @@ bool Record::hasTrivialDtor() const {
 }
 
 const Record::Field *Record::findField(unsigned Offset) const {
-  return llvm::find_if(Fields, [=](const Record::Field &F) -> bool {
+  if (auto It = llvm::find_if(Fields, [=](const Record::Field &F) -> bool {
     return F.Offset == Offset;
-  });
+  }); It != Fields.end())
+    return &*It;
+  return nullptr;
 }
 
 const Record::Base *Record::getBase(const RecordDecl *RD) const {

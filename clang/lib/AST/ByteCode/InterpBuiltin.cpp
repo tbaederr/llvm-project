@@ -157,6 +157,9 @@ static void assignIntegral(InterpState &S, const Pointer &Dest, PrimType ValueT,
 }
 
 static QualType getElemType(const Pointer &P) {
+  if (P.isOpaquePointer())
+    return P.getType();
+
   const Descriptor *Desc = P.getFieldDesc();
   QualType T = Desc->getType();
   if (Desc->isPrimitive())
@@ -1279,10 +1282,10 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
   }
   assert(FirstArgT == PT_Ptr);
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isBlockPointer() && !Ptr.isOpaquePointer())
     return false;
 
-  const ValueDecl *PtrDecl = Ptr.getDeclDesc()->asValueDecl();
+  const ValueDecl *PtrDecl = Ptr.getRootVarDecl();//getDeclDesc()->asValueDecl();
   // We need a pointer for a declaration here.
   if (!PtrDecl) {
     if (BuiltinOp == Builtin::BI__builtin_is_aligned)
@@ -2077,7 +2080,7 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
     return true;
   }
 
-  if (!PtrA.isBlockPointer() || !PtrB.isBlockPointer())
+  if ((!PtrA.isBlockPointer() && !PtrA.isOpaquePointer()) || (!PtrB.isBlockPointer() && !PtrB.isOpaquePointer()))
     return false;
 
   bool IsWide =
@@ -2342,11 +2345,13 @@ static bool interp__builtin_object_size(InterpState &S, CodePtr OpPC,
 
 static bool interp__builtin_is_within_lifetime(InterpState &S, CodePtr OpPC,
                                                const CallExpr *Call) {
+  llvm::errs() << __PRETTY_FUNCTION__ << '\n';
 
   if (!S.inConstantContext())
     return false;
 
   const Pointer &Ptr = S.Stk.pop<Pointer>();
+  llvm::errs() << Ptr << '\n';
 
   auto Error = [&](int Diag) {
     bool CalledFromStd = false;
@@ -2378,7 +2383,7 @@ static bool interp__builtin_is_within_lifetime(InterpState &S, CodePtr OpPC,
       return false;
     if (!CheckMutable(S, OpPC, Ptr))
       return false;
-    if (!CheckDummy(S, OpPC, Ptr.block(), AK_Read))
+    if (!CheckDummy(S, OpPC, Ptr, AK_Read))
       return false;
   }
 

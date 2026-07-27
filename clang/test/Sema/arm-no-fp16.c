@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -triple thumbv7-none-eabi %s -target-feature +neon \
 // RUN:   -target-feature -fp16 \
-// RUN:   -fsyntax-only -verify -Wno-error=implicit-function-declaration
+// RUN:   -fsyntax-only -verify -Wno-error=implicit-function-declaration -fexperimental-new-constant-interpreter
 
 // REQUIRES: aarch64-registered-target || arm-registered-target
 

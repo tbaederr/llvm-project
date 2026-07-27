@@ -41,17 +41,22 @@ bool CheckLive(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
 
 /// Checks if a pointer is a dummy pointer.
 bool CheckDummy(InterpState &S, CodePtr OpPC, const Block *B, AccessKinds AK);
+bool CheckDummy(InterpState &S, CodePtr OpPC, const Pointer &Ptr, AccessKinds AK);
 
 /// Checks if a pointer is in range.
-bool CheckRange(InterpState &S, CodePtr OpPC, PtrView Ptr, AccessKinds AK);
-inline bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
-                       AccessKinds AK) {
-  if (!Ptr.isBlockPointer()) {
-    assert(!Ptr.isOnePastEnd());
-    return true;
-  }
-  return CheckRange(S, OpPC, Ptr.view(), AK);
+bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr, AccessKinds AK);
+inline bool CheckRange(InterpState &S, CodePtr OpPC, PtrView V, AccessKinds AK) {
+  return CheckRange(S, OpPC, Pointer(V), AK);
+
 }
+// inline bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
+                       // AccessKinds AK) {
+  // if (!Ptr.isBlockPointer() && !Ptr.isOpaquePointer()) {
+    // assert(!Ptr.isOnePastEnd());
+    // return true;
+  // }
+  // return CheckRange(S, OpPC, Ptr.view(), AK);
+// }
 
 /// Checks if a field from which a pointer is going to be derived is valid.
 bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr,

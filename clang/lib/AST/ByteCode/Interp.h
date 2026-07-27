@@ -1237,6 +1237,13 @@ inline bool CmpHelper<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   const Pointer &RHS = S.Stk.pop<Pointer>();
   const Pointer &LHS = S.Stk.pop<Pointer>();
 
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs()<< LHS << '\n';
+  // llvm::errs() << RHS << '\n';
+
+
+
   // Function pointers cannot be compared in an ordered way.
   if (LHS.isFunctionPointer() || RHS.isFunctionPointer() ||
       LHS.isTypeidPointer() || RHS.isTypeidPointer()) {
@@ -1287,8 +1294,11 @@ inline bool CmpHelper<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
 
   std::optional<size_t> VL = LHS.computeOffsetForComparison(S.getASTContext());
   std::optional<size_t> VR = RHS.computeOffsetForComparison(S.getASTContext());
-  if (!VL || !VR)
+  // llvm::errs() << *VL << " / " << *VR << '\n';
+  if (!VL || !VR) {
+    // llvm::errs() << "NO comparison offset\n";
     return Invalid(S, OpPC);
+  }
   S.Stk.push<BoolT>(BoolT::from(Fn(Compare(*VL, *VR))));
   return true;
 }
@@ -1309,6 +1319,13 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   using BoolT = PrimConv<PT_Bool>::T;
   const Pointer &RHS = S.Stk.pop<Pointer>();
   const Pointer &LHS = S.Stk.pop<Pointer>();
+
+
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs()<< LHS << '\n';
+  // llvm::errs() << RHS << '\n';
+
 
   if (LHS.isZero() && RHS.isZero()) {
     S.Stk.push<BoolT>(BoolT::from(Fn(ComparisonCategoryResult::Equal)));
@@ -1364,21 +1381,23 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
     std::optional<size_t> B = RHS.computeOffsetForComparison(S.getASTContext());
     if (!A || !B)
       return Invalid(S, OpPC);
-
+    // llvm::errs() << *A << " / " << *B << '\n';
     S.Stk.push<BoolT>(BoolT::from(Fn(Compare(*A, *B))));
     return true;
   }
 
   // Otherwise we need to do a bunch of extra checks before returning Unordered.
-  if (LHS.isOnePastEnd() && !RHS.isOnePastEnd() && RHS.isBlockPointer() &&
-      RHS.getOffset() == 0) {
+  if (LHS.isOnePastEnd() && !RHS.isOnePastEnd()) {
+      // && RHS.isBlockPointer() &&
+      // RHS.getOffset() == 0) {
     const SourceInfo &Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_past_end)
         << LHS.toDiagnosticString(S.getASTContext());
     return false;
   }
-  if (RHS.isOnePastEnd() && !LHS.isOnePastEnd() && LHS.isBlockPointer() &&
-      LHS.getOffset() == 0) {
+  if (RHS.isOnePastEnd() && !LHS.isOnePastEnd()) {
+    // && LHS.isBlockPointer() &&
+      // LHS.getOffset() == 0) {
     const SourceInfo &Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_past_end)
         << RHS.toDiagnosticString(S.getASTContext());
@@ -1509,6 +1528,7 @@ bool CMP3(InterpState &S, CodePtr OpPC, const ComparisonCategoryInfo *CmpInfo) {
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool NE(InterpState &S, CodePtr OpPC) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   return CmpHelperEQ<T>(S, OpPC, [](ComparisonCategoryResult R) {
     return R != ComparisonCategoryResult::Equal;
   });
@@ -1693,12 +1713,17 @@ bool GetFieldPop(InterpState &S, CodePtr OpPC, uint32_t I) {
   // FIXME(postswitch): The isUnknownSizeArray() check here is only needed
   // to keep an invalid sample producing the same diagnostics as the current
   // interpreter.
-  if (!Obj.getFieldDesc()->isRecord() && !Obj.isUnknownSizeArray())
+
+  if (!Obj.isBlockPointer())
     return false;
+
 
   const Pointer &Field = Obj.atField(I);
   if (!CheckLoad(S, OpPC, Field))
     return false;
+  if (!Obj.getFieldDesc()->isRecord() && !Obj.isUnknownSizeArray())
+    return false;
+
   S.Stk.push<T>(Field.deref<T>());
   return true;
 }
@@ -1711,6 +1736,11 @@ bool SetField(InterpState &S, CodePtr OpPC, uint32_t I) {
     return false;
   if (!CheckRange(S, OpPC, Obj, CSK_Field))
     return false;
+  if (!Obj.isBlockPointer())
+    return false;
+
+
+
   const Pointer &Field = Obj.atField(I);
   if (!CheckStore(S, OpPC, Field))
     return false;
@@ -1726,6 +1756,10 @@ bool GetThisField(InterpState &S, CodePtr OpPC, uint32_t I) {
   if (!CheckThis(S, OpPC))
     return false;
   const Pointer &This = S.Current->getThis();
+  if (!This.isBlockPointer())
+    return false;
+
+
   const Pointer &Field = This.atField(I);
   if (!CheckLoad(S, OpPC, Field))
     return false;
@@ -1739,8 +1773,13 @@ bool SetThisField(InterpState &S, CodePtr OpPC, uint32_t I) {
     return false;
   if (!CheckThis(S, OpPC))
     return false;
+
+
+
   const T &Value = S.Stk.pop<T>();
   const Pointer &This = S.Current->getThis();
+  if (!This.isBlockPointer())
+    return false;
   const Pointer &Field = This.atField(I);
   if (!CheckStore(S, OpPC, Field))
     return false;
@@ -2118,6 +2157,36 @@ inline bool GetPtrThisField(InterpState &S, CodePtr OpPC, uint32_t Off) {
   if (!CheckThis(S, OpPC))
     return false;
   const Pointer &This = S.Current->getThis();
+
+  if (This.isOpaquePointer()) {
+    const Pointer &Ptr = This;
+    const Record *R = S.getContext().getRecord(
+        Ptr.asOpaquePointer().getFieldType()->getAsRecordDecl());
+    if (!R)
+      return false;
+
+    const Record::Field *F = R->findField(Off);
+    if (!F)
+      return false;
+
+    PointerPathEntry *NewPath =
+        S.allocPointerPath(Ptr.asOpaquePointer().PathLength + 1);
+    if (Ptr.asOpaquePointer().Path)
+      std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  sizeof(PointerPathEntry) * Ptr.asOpaquePointer().PathLength);
+
+    NewPath[Ptr.asOpaquePointer().PathLength] =
+        PointerPathEntry::field(F->Decl);
+
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType,
+                        F->Decl->getType().getTypePtr(), NewPath,
+                        Ptr.asOpaquePointer().PathLength + 1);
+  return true;
+
+  }
+
+
   S.Stk.push<Pointer>(This.atField(Off));
   return true;
 }
@@ -2183,6 +2252,38 @@ inline bool CheckNull(InterpState &S, CodePtr OpPC) {
 
 inline bool VirtBaseHelper(InterpState &S, const RecordDecl *Decl,
                            const Pointer &Ptr) {
+
+
+  if (Ptr.isOpaquePointer()) {
+      if (!Ptr.asOpaquePointer().getFieldType()->isRecordType()) {
+        S.Stk.push<Pointer>(Ptr);
+        return true;
+        return false;
+      }
+
+      unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+      PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+      if (Ptr.asOpaquePointer().Path)
+        std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                    sizeof(PointerPathEntry) * (NewPathLength - 1));
+
+      NewPath[NewPathLength - 1] = PointerPathEntry::base(
+          Decl, true); // PointerPathEntry::array(static_cast<uint64_t>(Offset));
+      S.Stk.push<Pointer>(
+          OpaqueTag{}, Ptr.asOpaquePointer().Base,
+          Ptr.asOpaquePointer().ObjectType,
+          S.getASTContext().getCanonicalTagType(Decl).getTypePtr(), NewPath,
+          NewPathLength);
+
+      // S.Stk.push<Pointer>(Ptr);
+      return true;
+  }
+
+
+
+
+
+
   if (!Ptr.isBlockPointer())
     return false;
   if (!Ptr.getFieldDesc()->isRecord())
@@ -2693,7 +2794,94 @@ bool AddOffset(InterpState &S, CodePtr OpPC) {
   const T &Offset = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>().expand();
 
-  // llvm::errs() << __FUNCTION__ << ": " << Ptr << '\n';
+  // llvm::errs() << __FUNCTION__ << ": " << Ptr << " + " << Offset << '\n';
+
+
+  if (Ptr.isOpaquePointer()) {
+    // assert(Ptr.asOpaquePointer().PathLength == 0);
+
+    // if (!CheckArray(S, OpPC, Ptr))
+      // return false;
+
+    QualType ArrTy; 
+    OpaquePointer OP = Ptr.asOpaquePointer();
+    if (OP.PathLength > 0){
+      if (OP.path().back().Kind == PointerPathEntry::Array) {
+      // llvm::errs() << "getting the surrounding array\n";
+      ArrTy = OP.getSurroundingArray(S.getASTContext());
+      } else {
+      ArrTy = OP.getFieldType();
+      }
+      // OP = OP.getSurroundingArray();//OpaquePointer{OP.Base, OP.ObjectType, 
+    } else {
+      // ArrTy = OP.getFieldType();
+      ArrTy = OP.getObjectType();
+    }
+
+
+    // llvm::errs() << "array type:\n";
+    // ArrTy->dump();
+
+    // Ptr.asOpaquePointer().FieldType->dump();
+
+    if (!Offset.isZero()) {
+      if (isa<IncompleteArrayType>(ArrTy)) {
+        const SourceInfo &E = S.Current->getSource(OpPC);
+        S.FFDiag(E, diag::note_constexpr_unsized_array_indexed);
+      return false;
+      }
+
+      // if (!CheckArray(S, OpPC, Ptr))
+        // return false;
+    }
+
+
+
+
+
+
+
+
+    if (Offset.toAPSInt()  > 1) {
+      S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_array_index)
+          << Offset.toAPSInt() << /*non-array*/ true << 0;
+      if (S.getLangOpts().CPlusPlus)
+        return false;
+      // return false;
+
+    }
+
+    bool OPE = true;
+
+    unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+    PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+    if (Ptr.asOpaquePointer().Path)
+      std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  sizeof(PointerPathEntry) * Ptr.asOpaquePointer().PathLength);
+
+    NewPath[NewPathLength - 1] = PointerPathEntry::array(static_cast<uint64_t>(Offset));
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType,
+                        Ptr.asOpaquePointer().FieldType, NewPath,
+                         NewPathLength,
+                         OPE);
+
+#if 0
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
+                        Ptr.asOpaquePointer().FieldType,
+                        Ptr.asOpaquePointer().Path,
+                        Ptr.asOpaquePointer().PathLength,
+                        Ptr.getByteOffset() + static_cast<uint64_t>(Offset));
+#endif
+    return true;
+  }
+
+
+
+
+
+
+
 
   if (std::optional<Pointer> Result = OffsetHelper<T, ArithOp::Add>(
           S, OpPC, Offset, Ptr, /*IsPointerArith=*/true)) {
@@ -2705,6 +2893,8 @@ bool AddOffset(InterpState &S, CodePtr OpPC) {
 }
 
 inline bool GetOpaquePtr(InterpState &S, CodePtr OpPC, const ValueDecl *VD) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // VD->dump();
   S.Stk.push<Pointer>(OpaqueTag{}, VD);
   return true;
 }
@@ -2758,6 +2948,69 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool SubOffset(InterpState &S, CodePtr OpPC) {
   const T &Offset = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>().expand();
+
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << '\n';
+
+
+
+  if (Ptr.isOpaquePointer()) {
+    // assert(Ptr.asOpaquePointer().PathLength == 0);
+
+    if (!CheckArray(S, OpPC, Ptr))
+      return false;
+
+    if (Offset.toAPSInt()  > 1) {
+      S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_array_index)
+          << -Offset.toAPSInt() << /*non-array*/ true << 0;
+      if (S.getLangOpts().CPlusPlus)
+        return false;
+      // return false;
+
+    }
+
+
+    unsigned ElemSize = S.getASTContext().getTypeSizeInChars(Ptr.asOpaquePointer().getFieldType()).getQuantity();
+    // Ptr.asOpaquePointer().getFieldType()->dump();
+
+    // unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+    // PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+    // if (Ptr.asOpaquePointer().Path)
+      // std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  // sizeof(PointerPathEntry) * Ptr.asOpaquePointer().PathLength);
+
+    // llvm::errs() << "Suboffset: " << static_cast<int64_t>(Offset) << '\n';
+    // NewPath[NewPathLength - 1] = PointerPathEntry::array(-static_cast<int64_t>(Offset));
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType,
+                        Ptr.asOpaquePointer().FieldType, Ptr.asOpaquePointer().Path,
+                         Ptr.asOpaquePointer().PathLength, Ptr.asOpaquePointer().IsOnePastEnd, 
+                         Ptr.getByteOffset() - (ElemSize * static_cast<int64_t>(Offset)));
+
+#if 0
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
+                        Ptr.asOpaquePointer().FieldType,
+                        Ptr.asOpaquePointer().Path,
+                        Ptr.asOpaquePointer().PathLength,
+                        Ptr.getByteOffset() + static_cast<uint64_t>(Offset));
+#endif
+    return true;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   if (std::optional<Pointer> Result = OffsetHelper<T, ArithOp::Sub>(
           S, OpPC, Offset, Ptr, /*IsPointerArith=*/true)) {
@@ -2851,7 +3104,10 @@ inline bool SubPtr(InterpState &S, CodePtr OpPC, uint32_t ElemSize) {
   }
 
   if (ElemSize == 0) {
-    QualType PtrT = S.getASTContext().getBaseElementType(LHS.getType());
+    QualType PT = LHS.getType();
+    if (PT->isPointerType())
+      PT = PT->getPointeeType();
+    QualType PtrT = S.getASTContext().getBaseElementType(PT);//LHS.getType());
     QualType ArrayTy = S.getASTContext().getConstantArrayType(
         PtrT, APInt::getZero(1), nullptr, ArraySizeModifier::Normal, 0);
     S.FFDiag(S.Current->getSource(OpPC),
@@ -3079,8 +3335,10 @@ bool CastPointerIntegralAPS(InterpState &S, CodePtr OpPC, uint32_t BitWidth);
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool CastPointerIntegral(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-  if (!CheckPointerToIntegralCast(S, OpPC, Ptr, T::bitWidth()))
+  if (!CheckPointerToIntegralCast(S, OpPC, Ptr, T::bitWidth())) {
+    // llvm::errs() << "CheckPointerToIntegralCast failed\n";
     return Invalid(S, OpPC);
+  }
 
   if constexpr (std::is_same_v<T, Boolean>) {
     S.Stk.push<T>(T::from(Ptr.getIntegerRepresentation()));
@@ -3101,6 +3359,8 @@ bool CastPointerIntegral(InterpState &S, CodePtr OpPC) {
         Kind = IntegralKind::BlockAddress;
       }
       S.Stk.push<T>(Kind, PtrVal, /*Offset=*/0);
+    } else if (Ptr.isOpaquePointer()) {
+      S.Stk.push<T>(IntegralKind::Address, Ptr.asOpaquePointer().Base, 0);
     } else if (Ptr.isFunctionPointer()) {
       const void *FuncDecl = Ptr.asFunctionPointer().Func->getDecl();
       S.Stk.push<T>(IntegralKind::FunctionAddress, FuncDecl, /*Offset=*/0);
@@ -3588,6 +3848,114 @@ inline bool ArrayElemPtrPop(InterpState &S, CodePtr OpPC) {
       return false;
   }
 
+
+
+  if (Ptr.isOpaquePointer()) {
+    // llvm::errs() << __PRETTY_FUNCTION__ << "\n";
+    // llvm::errs() << Ptr << " [" << Offset << "]\n";
+
+
+    // llvm::errs() << "Object type:\n"
+      // ;
+    // Ptr.asOpaquePointer().ObjectType->dump();
+    // Ptr.asOpaquePointer().getObjectType()->dump();
+    // llvm::errs() << "arrayelemptrL of opaque pointer!\n";
+    // llvm::errs() << Ptr << '\n';
+    // Ptr.asOpaquePointer().getFieldType()->dump();
+
+
+
+    // QualType T;
+    QualType ArrTy; 
+    OpaquePointer OP = Ptr.asOpaquePointer();
+    if (OP.PathLength > 0){
+      if (OP.path().back().Kind == PointerPathEntry::Array) {
+      // llvm::errs() << "getting the surrounding array\n";
+      ArrTy = OP.getSurroundingArray(S.getASTContext());
+      } else {
+      ArrTy = OP.getFieldType();
+      }
+      // OP = OP.getSurroundingArray();//OpaquePointer{OP.Base, OP.ObjectType, 
+    } else {
+      // ArrTy = OP.getFieldType();
+      ArrTy = OP.getObjectType();
+    }
+
+
+    // llvm::errs() << "array type:\n";
+    // ArrTy->dump();
+
+    // Ptr.asOpaquePointer().FieldType->dump();
+
+    if (!Offset.isZero()) {
+      if (isa<IncompleteArrayType>(ArrTy)) {
+        const SourceInfo &E = S.Current->getSource(OpPC);
+        S.FFDiag(E, diag::note_constexpr_unsized_array_indexed);
+      return false;
+      }
+
+      // if (!CheckArray(S, OpPC, Ptr))
+        // return false;
+    }
+
+    // unsigned NewOffset = Ptr.getByteOffset();
+    QualType ElemType;
+    bool OPE = true;
+    if (ArrTy->isArrayType()) {
+      const auto *AT =
+        // Ptr.asOpaquePointer()
+                     // .FieldType
+                     ArrTy->getAsArrayTypeUnsafe();
+      ElemType =
+        // Ptr.asOpaquePointer()
+                     // .FieldType->getAsArrayTypeUnsafe()
+                     AT
+                     ->getElementType();
+      if (const auto *CAT = dyn_cast<ConstantArrayType>(AT))
+        OPE = static_cast<uint64_t>(Offset) >= CAT->getZExtSize();
+    } else if (ArrTy->isRecordType()) {
+      ElemType = ArrTy;//QualType(Ptr.asOpaquePointer().FieldType, 0);
+    } else {
+      ElemType = ArrTy;//Ptr.asOpaquePointer().getFieldType();//FieldType->getPointeeType();
+    }
+    // ElemType->dump();
+    if (ElemType.isNull())
+      return false;
+    // NewOffset +=
+    // (S.getASTContext().getTypeSizeInChars(ElemType).getQuantity() *
+    // static_cast<uint64_t>(Offset)); llvm::errs() << "NewOffset: " <<
+    // NewOffset<< '\n';
+
+    unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+    PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+    // llvm::errs() << "NewSize: "<< NewPathLength << '\n';
+    if (Ptr.asOpaquePointer().Path)
+      std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  sizeof(PointerPathEntry) * (NewPathLength - 1));
+
+    NewPath[NewPathLength - 1] =
+        PointerPathEntry::array(static_cast<uint64_t>(Offset));
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType, ElemType.getTypePtr(),//S.getASTContext().getPointerType(ElemType).getTypePtr(),
+                        NewPath, NewPathLength, OPE);
+
+    // llvm::errs()<< "Success\n";
+    return true;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   if (Offset.isZero()) {
     if (const Descriptor *Desc = Ptr.getFieldDesc();
         Desc && Desc->isArray() && Ptr.getIndex() == 0) {
@@ -3761,10 +4129,83 @@ inline bool ArrayDecay(InterpState &S, CodePtr OpPC) {
     if (!CheckRange(S, OpPC, Ptr, CSK_ArrayToPointer))
       return false;
   }
+  // llvm::errs() << "----- " << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << '\n';
 
   if (Ptr.isOpaquePointer()) {
-    // llvm::errs()<< "ArrayDecay of Opaque pointer\n";
-    S.Stk.push<Pointer>(Ptr);
+
+    if (Ptr.isUnknownSizeArray()) {
+      if (Ptr.asOpaquePointer().PathLength > 0) {
+      const SourceInfo &E = S.Current->getSource(OpPC);
+      S.FFDiag(E, diag::note_constexpr_unsupported_unsized_array);
+      }
+      // return false;
+    }
+
+#if 0
+    unsigned Offset = 0;
+
+    QualType ElemType;
+    bool OPE = true;
+    if (Ptr.asOpaquePointer().FieldType->isArrayType()) {
+      const auto *AT = Ptr.asOpaquePointer()
+                     .FieldType->getAsArrayTypeUnsafe();
+      ElemType = Ptr.asOpaquePointer()
+                     .FieldType->getAsArrayTypeUnsafe()
+                     ->getElementType();
+      if (const auto *CAT = dyn_cast<ConstantArrayType>(AT))
+        OPE = static_cast<uint64_t>(Offset) >= CAT->getZExtSize();
+    } else if (Ptr.asOpaquePointer().FieldType->isRecordType()) {
+      ElemType = QualType(Ptr.asOpaquePointer().FieldType, 0);
+    } else {
+      ElemType = Ptr.asOpaquePointer().getFieldType();//FieldType->getPointeeType();
+    }
+    // ElemType->dump();
+    if (ElemType.isNull())
+      return false;
+    // NewOffset +=
+    // (S.getASTContext().getTypeSizeInChars(ElemType).getQuantity() *
+    // static_cast<uint64_t>(Offset)); llvm::errs() << "NewOffset: " <<
+    // NewOffset<< '\n';
+
+    unsigned NewPathLength = Ptr.asOpaquePointer().PathLength + 1;
+    PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+    if (Ptr.asOpaquePointer().Path)
+      std::memcpy(NewPath, Ptr.asOpaquePointer().Path,
+                  sizeof(PointerPathEntry) * (NewPathLength - 1));
+
+    NewPath[NewPathLength - 1] =
+        PointerPathEntry::array(static_cast<uint64_t>(Offset));
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType, ElemType.getTypePtr(),
+                        NewPath, NewPathLength, OPE);
+#endif
+
+#if 1
+    QualType ArrTy = QualType(Ptr.asOpaquePointer().FieldType, 0);//getFieldType();
+
+    QualType ElemTy;
+    if (const auto *AT = ArrTy->getAsArrayTypeUnsafe())
+      ElemTy = S.getASTContext().getPointerType(AT->getElementType());
+    else
+      ElemTy = ArrTy;
+
+
+
+    // llvm::errs() << "After decay:\n";
+      // ElemTy->dump();
+
+    S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().Base,
+                        Ptr.asOpaquePointer().ObjectType, ElemTy.getTypePtr(),
+                        Ptr.asOpaquePointer().Path, Ptr.asOpaquePointer().PathLength);
+#endif
+    // llvm::errs() << "Field type after:\n";
+    // ElemTy->dump();
+    // llvm::errs() << "From expr:\n";
+  // S.Current->getExpr(OpPC)->getType()->dump();
+// S.getASTContext().getPointerType(cast<ArrayType>(ArrTy)->getElementType())->dump();
+
+    // S.Stk.push<Pointer>(Ptr);
     return true;
   }
 
@@ -4268,6 +4709,10 @@ inline bool BitCastPrim(InterpState &S, CodePtr OpPC, bool TargetIsUCharOrByte,
 inline bool BitCast(InterpState &S, CodePtr OpPC) {
   Pointer FromPtr = S.Stk.pop<Pointer>();
   Pointer &ToPtr = S.Stk.peek<Pointer>();
+
+
+  if (!FromPtr.isBlockPointer())
+    return false;
 
   const Descriptor *D = FromPtr.getFieldDesc();
   if (D->isPrimitiveArray() && FromPtr.isArrayRoot())

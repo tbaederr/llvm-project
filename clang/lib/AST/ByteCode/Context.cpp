@@ -71,6 +71,7 @@ void Context::isPotentialConstantExprUnevaluated(State &Parent, const Expr *E,
 }
 
 bool Context::evaluateAsRValue(State &Parent, const Expr *E, APValue &Result) {
+  // E->dumpColor();
   ++EvalID;
   bool Recursing = !Stk.empty();
   size_t StackSizeBefore = Stk.size();

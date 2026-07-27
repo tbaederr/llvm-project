@@ -45,7 +45,7 @@ static QualType computeFieldType(const ASTContext &ASTCtx,
     const PointerPathEntry &Entry = OP.Path[I];
     switch (Entry.Kind) {
     case PointerPathEntry::Base:
-      CurType = ASTCtx.getCanonicalTagType(Entry.RD);
+      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
       break;
     case PointerPathEntry::Field:
       CurType = Entry.FD->getType();
@@ -225,7 +225,7 @@ Var typeOfClosestSurroundingVariable(const ASTContext &ASTCtx,
     // llvm::errs() << "Iteration\n";
     switch (Entry.Kind) {
     case PointerPathEntry::Base:
-      CurType = ASTCtx.getCanonicalTagType(Entry.RD);
+      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
       break;
     case PointerPathEntry::Field:
       // llvm::errs() << "FIELD\n";
@@ -271,7 +271,7 @@ static OpaqueArrayData getArrayData(const ASTContext &ASTCtx,
        OP.path().drop_back(OP.path().back().Kind == PointerPathEntry::Array)) {
     switch (Entry.Kind) {
     case PointerPathEntry::Base:
-      CurType = ASTCtx.getCanonicalTagType(Entry.RD);
+      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
       break;
     case PointerPathEntry::Field:
       CurType = Entry.FD->getType();
@@ -280,12 +280,7 @@ static OpaqueArrayData getArrayData(const ASTContext &ASTCtx,
       if (CurType->isRecordType())
         break;
       const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
-      assert(AT);
-      if (const auto *CAT = dyn_cast<ConstantArrayType>(AT)) {
-        CurType = CAT->getElementType();
-      } else {
-        assert(false);
-      }
+      CurType = AT->getElementType();
     }
     }
   }
@@ -406,10 +401,10 @@ computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
 
       const ASTRecordLayout &Layout =
           ASTCtx.getASTRecordLayout(CurType->getAsRecordDecl());
-      Offset += Layout.getBaseClassOffset(cast<CXXRecordDecl>(OP.Path[I].RD))
+      Offset += Layout.getBaseClassOffset(cast<CXXRecordDecl>(OP.Path[I].RD.getPointer()))
                     .getQuantity();
 
-      CurType = ASTCtx.getCanonicalTagType(OP.Path[I].RD);
+      CurType = ASTCtx.getCanonicalTagType(OP.Path[I].RD.getPointer());
     } break;
 
     case PointerPathEntry::Field: {
@@ -491,7 +486,7 @@ static bool pointsToCompleteObject(const Pointer &Ptr,
   for (const PointerPathEntry &Entry : OP.path()) {
     switch (Entry.Kind) {
     case PointerPathEntry::Base:
-      CurType = ASTCtx.getCanonicalTagType(Entry.RD);
+      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
       break;
     case PointerPathEntry::Field:
       CurType = Entry.FD->getType();
@@ -640,10 +635,10 @@ UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
     return std::nullopt;
   }
 
-  if (Ptr.isDummy() && Ptr.getType()->isPointerType()) {
+  // if (Ptr.isDummy() && Ptr.getType()->isPointerType()) {
     // llvm::errs() << "err2\n";
-    return std::nullopt;
-  }
+    // return std::nullopt;
+  // }
 
   // For __builtin_dynamic_object_size on a counted_by-annotated flexible
   // array member, defer to IR generation (emitCountedBySize in CGBuiltin):
@@ -665,7 +660,8 @@ UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
 
   bool InvalidBase = false;
 
-  if (Ptr.isDummy()) {
+  if (Ptr.isDummy() && Ptr.getDeclDesc()) {
+
     if (const VarDecl *VD = Ptr.getDeclDesc()->asVarDecl();
         VD && VD->getType()->isPointerType())
       InvalidBase = true;

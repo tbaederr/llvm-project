@@ -1323,6 +1323,9 @@ bool Compiler<Emitter>::VisitBinaryOperator(const BinaryOperator *E) {
   const Expr *LHS = E->getLHS();
   const Expr *RHS = E->getRHS();
 
+
+
+
   // Handle comma operators. Just discard the LHS
   // and delegate to RHS.
   if (E->isCommaOp()) {
@@ -1406,8 +1409,20 @@ bool Compiler<Emitter>::VisitBinaryOperator(const BinaryOperator *E) {
   if (E->getOpcode() == BO_Assign)
     return this->visitAssignment(LHS, RHS, E);
 
-  if (!visit(LHS) || !visit(RHS))
+  if (!visit(LHS)) {
     return false;
+  }
+
+  if (!visit(RHS)) {
+    return false;
+  }
+
+
+
+  // if (!visit(LHS) || !visit(RHS)) {
+    // llvm::errs() << "LHS/RHS failed\n";
+    // return false;
+  // }
 
   // For languages such as C, cast the result of one
   // of our comparision opcodes to T (which is usually int).
@@ -8354,8 +8369,9 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
       return revisit(VD);
   }
 
-  if (const auto *BD = dyn_cast<BindingDecl>(D))
+  if (const auto *BD = dyn_cast<BindingDecl>(D)) {
     return this->delegate(BD->getBinding());
+  }
 
   // Avoid infinite recursion.
   if (D == InitializingDecl) {
@@ -8747,10 +8763,10 @@ bool Compiler<Emitter>::emitDummyPtr(const DeclTy &D, const Expr *E, bool CU) {
   assert(!DiscardResult && "Should've been checked before");
   unsigned DummyID = P.getOrCreateDummy(D, CU);
 
-  if (ToLValue) {
+  // if (ToLValue) {
     if (auto *VD = dyn_cast_if_present<ValueDecl>(D.dyn_cast<const Decl *>()))
       return this->emitGetOpaquePtr(VD, E);
-  }
+  // }
 
   if (!this->emitGetPtrGlobal(DummyID, E))
     return false;

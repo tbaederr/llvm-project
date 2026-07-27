@@ -20,6 +20,7 @@
 #include "clang/AST/ComparisonCategories.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -374,19 +375,20 @@ struct TypeidPointer {
 struct PointerPathEntry {
   enum { Base, Field, Array } Kind;
   union {
-    uint64_t Index;
+    int64_t Index;
     const FieldDecl *FD;
-    const RecordDecl *RD;
+    // const RecordDecl *RD;
+    llvm::PointerIntPair<const RecordDecl *, 1, bool> RD = {};
   };
 
-  static PointerPathEntry base(const RecordDecl *RD) {
+  static PointerPathEntry base(const RecordDecl *RD, bool Virtual = false) {
     PointerPathEntry E;
     E.Kind = Base;
-    E.RD = RD;
+    E.RD = {RD, Virtual};
     return E;
   }
 
-  static PointerPathEntry array(unsigned Index) {
+  static PointerPathEntry array(int64_t Index) {
     PointerPathEntry E;
     E.Kind = Array;
     E.Index = Index;
@@ -407,13 +409,54 @@ struct OpaquePointer {
   const Type *FieldType = nullptr;
   const PointerPathEntry *Path = nullptr;
   unsigned PathLength = 0;
+  bool IsOnePastEnd = false;
+
   ArrayRef<PointerPathEntry> path() const { return ArrayRef(Path, PathLength); }
+
+
+  QualType getObjectType() const {
+    if (ObjectType->isPointerOrReferenceType())
+      return ObjectType->getPointeeType();
+    return QualType(ObjectType, 0);
+  }
 
   QualType getFieldType() const {
     if (FieldType->isPointerOrReferenceType())
       return FieldType->getPointeeType();
     return QualType(FieldType, 0);
   }
+
+
+
+  QualType getSurroundingArray(const ASTContext &ASTCtx) const {
+    assert(PathLength != 0);
+    assert(Path[PathLength -1].Kind == PointerPathEntry::Array);
+
+    QualType CurType = getObjectType();
+    for (const PointerPathEntry &Entry : path().drop_back(1)) {
+      switch (Entry.Kind) {
+      case PointerPathEntry::Base:
+        CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
+        break;
+      case PointerPathEntry::Field:
+        CurType = Entry.FD->getType();
+        break;
+      case PointerPathEntry::Array: {
+        if (!CurType->isArrayType())
+          break;
+        const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+        assert(AT);
+        CurType = AT->getElementType();
+      }
+      }
+    }
+
+    return CurType;
+
+
+  }
+
+
 };
 struct OpaqueTag {};
 
@@ -477,25 +520,27 @@ public:
     Opaque.Path = nullptr;
     Opaque.PathLength = 0;
     Opaque.Base = Base;
+    Opaque.IsOnePastEnd = false;
   }
   Pointer(OpaqueTag, const ValueDecl *Base, const Type *ObjType,
           const Type *FieldType, const PointerPathEntry *Path,
-          unsigned PathLength, uint64_t Offset = 0)
+          unsigned PathLength, bool OPE = false, uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Opaque) {
     Opaque.ObjectType = ObjType;
     Opaque.FieldType = FieldType;
     Opaque.Path = Path;
     Opaque.PathLength = PathLength;
     Opaque.Base = Base;
+    Opaque.IsOnePastEnd = OPE;
   }
   Pointer(OpaqueTag, const ValueDecl *Base, uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Opaque) {
     Opaque.ObjectType = Base->getType().getTypePtr();
     Opaque.FieldType = Opaque.ObjectType;
-    ;
     Opaque.Path = nullptr;
     Opaque.PathLength = 0;
     Opaque.Base = Base;
+    Opaque.IsOnePastEnd = false;
   }
 
   Pointer(Block *Pointee, unsigned Base, uint64_t Offset);
@@ -509,14 +554,26 @@ public:
   bool operator==(const Pointer &P) const {
     if (P.StorageKind != StorageKind)
       return false;
-    if (isIntegralPointer())
+
+    switch(StorageKind) {
+    case Storage::Int:
       return P.Int.Value == Int.Value && P.Int.Ty == Int.Ty &&
              P.Offset == Offset;
-
-    if (isFunctionPointer())
+    case Storage::Block:
+      return P.view() == view();
+    case Storage::Fn:
       return P.Fn.Func == Fn.Func && P.Offset == Offset;
-
-    return P.view() == view();
+    case Storage::Opaque:
+      if (!(P.Opaque.Base == Opaque.Base && P.Opaque.PathLength == Opaque.PathLength))
+        return false;
+      if (P.Offset != Offset)
+        return false;
+      if (Opaque.PathLength == 0)
+        return true;
+      return std::memcmp(P.Opaque.Path, Opaque.Path, sizeof(PointerPathEntry) * Opaque.PathLength) == 0;
+    default:
+      llvm_unreachable("Unhandled storage kind");
+    }
   }
 
   bool operator!=(const Pointer &P) const { return !(P == *this); }
@@ -714,6 +771,8 @@ public:
   }
   /// Checks if the structure is an array of unknown size.
   bool isUnknownSizeArray() const {
+    if (isOpaquePointer())
+      return isa<IncompleteArrayType>(Opaque.FieldType);
     if (!isBlockPointer())
       return false;
     return getFieldDesc()->isUnknownSizeArray();
@@ -727,9 +786,15 @@ public:
   }
   /// Pointer points directly to a block.
   bool isRoot() const {
-    if (isZero() || !isBlockPointer())
+    if (isZero())
       return true;
-    return view().isRoot();
+    if (isBlockPointer())
+      return view().isRoot();
+    // FIXME: 
+    // if (isOpaquePointer())
+      // return Opaque.PathLength == 0;
+
+    return true;
   }
   /// If this pointer has an InlineDescriptor we can use to initialize.
   bool canBeInitialized() const {
@@ -760,7 +825,10 @@ public:
     return Opaque;
   }
 
-  bool isBlockPointer() const { return StorageKind == Storage::Block; }
+  bool isBlockPointer() const { 
+    // if (isOpaquePointer())
+      // assert(false);
+    return StorageKind == Storage::Block; }
   bool isIntegralPointer() const { return StorageKind == Storage::Int; }
   bool isFunctionPointer() const { return StorageKind == Storage::Fn; }
   bool isTypeidPointer() const { return StorageKind == Storage::Typeid; }
@@ -827,6 +895,9 @@ public:
 
       return Fn.Func->getDecl()->isWeak();
     }
+    if (isOpaquePointer())
+      return Opaque.Base->isWeak();
+
     if (!isBlockPointer())
       return false;
 
@@ -845,6 +916,8 @@ public:
 
   /// Checks if the pointer points to a dummy value.
   bool isDummy() const {
+    if (isOpaquePointer())
+      return true;
     if (!isBlockPointer())
       return false;
     return view().isDummy();
@@ -915,6 +988,12 @@ public:
 
   /// Checks if the index is one past end.
   bool isOnePastEnd() const {
+    if (isOpaquePointer()) {
+      return Opaque.IsOnePastEnd;
+      // PathLength == 1 && 
+        // Opaque.path().back().Kind == PointerPathEntry::Array;
+    }
+
     if (!isBlockPointer())
       return false;
 
@@ -941,6 +1020,8 @@ public:
   /// Checks if the pointer is pointing to a zero-size array.
   bool isZeroSizeArray() const {
     if (isFunctionPointer())
+      return false;
+    if (isOpaquePointer())
       return false;
     if (const auto *Desc = getFieldDesc())
       return Desc->isZeroSizeArray();

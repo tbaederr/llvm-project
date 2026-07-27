@@ -25,6 +25,131 @@
 using namespace clang;
 using namespace clang::interp;
 
+
+
+static QualType pointeeOrSelf(const Type *T) {
+  if (T->isPointerOrReferenceType())
+    return T->getPointeeType();
+  return QualType(T, 0);
+}
+
+
+static std::optional<uint64_t>
+computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
+                       bool UseClosestSurroundingVariable, bool InvalidBase) {
+  const OpaquePointer &OP = Ptr.asOpaquePointer();
+  unsigned Offset = 0;
+
+
+  auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
+    if (const RecordType *RT = T->getAs<RecordType>()) {
+      // We cannot get the type size of a forward declaration.
+      if (!RT->getDecl()->getDefinition())
+        return std::nullopt;
+    }
+    return ASTCtx.getTypeSizeInChars(T).getQuantity();
+  };
+
+
+
+  QualType CurType = pointeeOrSelf(OP.ObjectType);
+  for (unsigned I = 0; I != OP.PathLength; ++I) {
+    const PointerPathEntry &Entry = OP.Path[I];
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base: {
+
+      const ASTRecordLayout &Layout =
+          ASTCtx.getASTRecordLayout(CurType->getAsRecordDecl());
+      bool Virtual = OP.Path[I].RD.getInt();
+      if (Virtual)
+      Offset += Layout.getVBaseClassOffset(cast<CXXRecordDecl>(OP.Path[I].RD.getPointer()))
+                    .getQuantity();
+      else
+      Offset += Layout.getBaseClassOffset(cast<CXXRecordDecl>(OP.Path[I].RD.getPointer()))
+            .getQuantity();
+
+
+      CurType = ASTCtx.getCanonicalTagType(OP.Path[I].RD.getPointer());
+    } break;
+
+    case PointerPathEntry::Field: {
+      const FieldDecl *FD = OP.Path[I].FD;
+      const ASTRecordLayout &Layout =
+          ASTCtx.getASTRecordLayout(FD->getParent());
+      Offset +=
+          ASTCtx.toCharUnitsFromBits(Layout.getFieldOffset(FD->getFieldIndex()))
+              .getQuantity();
+
+      CurType = FD->getType();
+    } break;
+    case PointerPathEntry::Array: {
+      unsigned Index = OP.Path[I].Index;
+      if (!CurType->isArrayType()) { // CurType->isRecordType()) {
+        // llvm::errs() << "array on non-array\n";
+        // llvm::errs() << I << " / " << OP.PathLength - 1 << '\n';
+        // CurType->dump();
+        if (I == 0 && InvalidBase && !isa_and_nonnull<ParmVarDecl>(OP.Base))
+          return std::nullopt;
+        // if (InvalidBase)
+        // return std::nullopt;
+        if (I == OP.PathLength - 1 && UseClosestSurroundingVariable) {
+          return Index * ASTCtx.getTypeSizeInChars(CurType).getQuantity();
+        }
+
+        if (std::optional<size_t> Size = getTypeSize(CurType))
+          Offset += Index * (*Size);
+        else
+          return std::nullopt;
+
+        // Offset += Index * ASTCtx.getTypeSizeInChars(CurType).getQuantity();
+
+        continue;
+      }
+      const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+      assert(AT);
+      if (I == OP.PathLength - 1 && UseClosestSurroundingVariable) {
+        // llvm::errs() << "last path entry is array\n";
+        return Index *
+               ASTCtx.getTypeSizeInChars(AT->getElementType()).getQuantity();
+      }
+
+      if (I == OP.PathLength - 1 && UseClosestSurroundingVariable) {
+        // llvm::errs() << "last path entry is array\n";
+        return Index *
+               ASTCtx.getTypeSizeInChars(AT->getElementType()).getQuantity();
+      }
+
+      Offset +=
+          Index * ASTCtx.getTypeSizeInChars(AT->getElementType()).getQuantity();
+      CurType = AT->getElementType();
+    }
+    }
+  }
+  // llvm::errs() << "After loop\n";
+
+  // if (InvalidBase)
+  // return std::nullopt;
+
+  QualType Ty = CurType.getNonReferenceType();
+
+  if (Ty->isIncompleteType() || Ty->isFunctionType()) {
+    // llvm::errs()<< "AHA!\n";
+    // llvm::errs() << "b\n";
+    return std::nullopt;
+  }
+
+  if (isa<IncompleteArrayType>(CurType))
+    return std::nullopt;
+
+  if (UseClosestSurroundingVariable)
+    return 0;
+
+  return Offset;
+}
+
+
+
+
 Pointer::Pointer(Block *Pointee)
     : Pointer(Pointee, Pointee->getDescriptor()->getMetadataSize(),
               Pointee->getDescriptor()->getMetadataSize()) {}
@@ -213,8 +338,32 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   }
 
   if (isOpaquePointer()) {
-    return APValue(APValue::LValueBase(), CharUnits::Zero(), Path,
-                   /*IsOnePastEnd=*/false, /*IsNullPtr=*/true);
+    CharUnits Offset;
+    if (!Opaque.Base->getType()->isPointerType()) {
+    for (const PointerPathEntry &Entry : Opaque.path().drop_back(isOnePastEnd())) {
+      switch(Entry.Kind) {
+      case PointerPathEntry::Field:
+        Path.push_back(APValue::LValuePathEntry({Entry.FD, false}));
+        break;
+      case PointerPathEntry::Base:
+        Path.push_back(APValue::LValuePathEntry({Entry.RD.getPointer(), Entry.RD.getInt()}));
+        break;
+      case PointerPathEntry::Array:
+        Path.push_back(APValue::LValuePathEntry::ArrayIndex(Entry.Index));
+        break;
+
+      }
+    }
+    }
+
+    auto O = computeOpaquePtrOffset(ASTCtx, *this, false, false);
+    if (O)
+      Offset = CharUnits::fromQuantity(*O);
+
+
+    // llvm::errs() << "APValue path length: " << Path.size()<< '\n';
+    return APValue(Opaque.Base, Offset, Path,
+                   /*IsOnePastEnd=*/isOnePastEnd(), /*IsNullPtr=*/false);
   }
 
   // Build the lvalue base from the block.
@@ -375,7 +524,13 @@ void Pointer::print(llvm::raw_ostream &OS) const {
   }
 }
 
-/// Compute an offset that can be used to compare the pointer to another one
+
+
+
+
+///
+///
+///Compute an offset that can be used to compare the pointer to another one
 /// with the same base. To get accurate results, we basically _have to_ compute
 /// the lvalue offset using the ASTRecordLayout.
 ///
@@ -397,7 +552,10 @@ Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
   case Storage::Opaque:
-    return reinterpret_cast<uintptr_t>(asOpaquePointer().ObjectType) + Offset;
+    if (auto O = computeOpaquePtrOffset(ASTCtx, *this, false, false))
+      return *O + Offset;
+    return std::nullopt;
+    // return reinterpret_cast<uintptr_t>(asOpaquePointer().ObjectType) + Offset;
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
@@ -825,16 +983,42 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
   if (A.isZero() && B.isZero())
     return true;
 
-  if (A.isIntegralPointer() && B.isIntegralPointer())
-    return true;
-  if (A.isFunctionPointer() && B.isFunctionPointer())
-    return true;
-  if (A.isTypeidPointer() && B.isTypeidPointer())
-    return A.asTypeidPointer().TypePtr == B.asTypeidPointer().TypePtr;
+  if (A.StorageKind != B.StorageKind) {
 
-  if (A.StorageKind != B.StorageKind)
+    if (A.isOpaquePointer() && B.isBlockPointer()) {
+      if (!B.block()->getDescriptor()->asVarDecl())
+        return false;
+
+      return A.Opaque.Base->getMostRecentDecl() == B.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
+    }
+
+    if (B.isOpaquePointer() && A.isBlockPointer()) {
+      if (!A.block()->getDescriptor()->asVarDecl())
+        return false;
+      return B.Opaque.Base->getMostRecentDecl() == A.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
+    }
+
+
+
+
+
     return false;
+  }
 
+  switch(A.StorageKind) {
+    case Storage::Int:
+      return true;
+    case Storage::Block:
+      // See below.
+      break;
+    case Storage::Fn:
+      return true;
+    case Storage::Typeid:
+    return A.Typeid.TypePtr == B.Typeid.TypePtr;
+    case Storage::Opaque:
+    // FIXME: Need to allow comparison with block pointers. I think.
+      return A.Opaque.Base->getMostRecentDecl() == B.Opaque.Base->getMostRecentDecl();
+  }
   return A.asBlockPointer().Pointee == B.asBlockPointer().Pointee;
 }
 
@@ -1165,6 +1349,8 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
 const VarDecl *Pointer::getRootVarDecl() const {
   if (isBlockPointer())
     return getDeclDesc()->asVarDecl();
+  if (isOpaquePointer())
+    return cast_if_present<VarDecl>(Opaque.Base);
   return nullptr;
 }
 

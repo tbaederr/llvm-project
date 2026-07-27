@@ -206,6 +206,11 @@ namespace {
     // variable. In that case, look through the reference type.
     Type = getType(Base).getNonReferenceType();
 
+    if (true) {
+    // llvm::errs() << "Path: " <<Path.size() << '\n';
+    // Type->dump();
+    }
+
     for (unsigned I = 0, N = Path.size(); I != N; ++I) {
       if (Type->isArrayType()) {
         const ArrayType *AT = Ctx.getAsArrayType(Type);
@@ -21824,20 +21829,29 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
   if (Info.EnableNewConstInterp) {
     if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, E, Result))
       return false;
+    // llvm::errs() << "Result:\n";
+    // Result.dump();
     return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
                                    ConstantExprKind::Normal);
   }
 
-  if (!::Evaluate(Result, Info, E))
+  if (!::Evaluate(Result, Info, E)) {
+    // llvm::errs() << "fail1\n";
     return false;
+  }
 
   // Implicit lvalue-to-rvalue cast.
   if (E->isGLValue()) {
     LValue LV;
     LV.setFrom(Info.Ctx, Result);
-    if (!handleLValueToRValueConversion(Info, E, E->getType(), LV, Result))
+
+    if (!handleLValueToRValueConversion(Info, E, E->getType(), LV, Result)) {
+    // llvm::errs() << "fail2\n";
       return false;
+    }
   }
+    // llvm::errs() << "Result:\n";
+    // Result.dump();
 
   // Check this core constant expression is a constant expression.
   return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
