@@ -21826,6 +21826,9 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
   if (!CheckLiteralType(Info, E))
     return false;
 
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // E->dumpColor();
+
   if (Info.EnableNewConstInterp) {
     if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, E, Result))
       return false;
@@ -22178,11 +22181,15 @@ bool Expr::EvaluateAsInitializer(const ASTContext &Ctx, const VarDecl *VD,
   SourceLocation DeclLoc = VD->getLocation();
   QualType DeclTy = VD->getType();
 
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // VD->dump();
+
   if (Info.EnableNewConstInterp) {
     auto &InterpCtx = Ctx.getInterpContext();
     if (!InterpCtx.evaluateAsInitializer(Info, VD, this, EStatus.Val))
       return false;
 
+    // EStatus.Val.dump();
     return CheckConstantExpression(Info, DeclLoc, DeclTy, EStatus.Val,
                                    ConstantExprKind::Normal);
   } else {
@@ -22214,6 +22221,8 @@ bool Expr::EvaluateAsInitializer(const ASTContext &Ctx, const VarDecl *VD,
       llvm_unreachable("Unhandled cleanup; missing full expression marker?");
   }
 
+
+  // EStatus.Val.dump();
   return CheckConstantExpression(Info, DeclLoc, DeclTy, EStatus.Val,
                                  ConstantExprKind::Normal) &&
          CheckMemoryLeaks(Info);

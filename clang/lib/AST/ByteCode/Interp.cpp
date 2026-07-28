@@ -100,7 +100,7 @@ static void noteValueLocation(InterpState &S, const Pointer &Ptr) {
   }
 
   if (Ptr.isOpaquePointer())
-    S.Note(Ptr.asOpaquePointer().Base->getLocation(), diag::note_declared_at);
+    S.Note(Ptr.asOpaquePointer().asVarDecl()->getLocation(), diag::note_declared_at);
 
 }
 
@@ -347,8 +347,6 @@ void cleanupAfterFunctionCall(InterpState &S, const Function *Func) {
 }
 
 bool isConstexprUnknown(const Block *B) {
-  if (B->isDummy())
-    return isa_and_nonnull<ParmVarDecl>(B->getDescriptor()->asValueDecl());
   return B->getDescriptor()->IsConstexprUnknown;
 }
 
@@ -886,8 +884,6 @@ bool CheckGlobalLoad(InterpState &S, CodePtr OpPC, const Block *B) {
   if (!B->isAccessible()) {
     if (!CheckExtern(S, OpPC, Pointer(const_cast<Block *>(B))))
       return false;
-    if (!CheckDummy(S, OpPC, B, AK_Read))
-      return false;
     return CheckWeak(S, OpPC, B);
   }
 
@@ -1068,7 +1064,7 @@ bool CheckStore(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
       return false;
     if (!CheckExtern(S, OpPC, Ptr))
       return false;
-    return CheckDummy(S, OpPC, Ptr.block(), AK_Assign);
+    return CheckDummy(S, OpPC, Ptr, AK_Assign);
   }
   if (!WillBeActivated && !CheckLifetime(S, OpPC, Ptr, AK_Assign))
     return false;
@@ -1381,24 +1377,6 @@ bool CheckDummy(InterpState &S, CodePtr OpPC, const Pointer &Ptr, AccessKinds AK
     return true;
 
   const ValueDecl *D = Ptr.getRootVarDecl();//Ptr.asOpaquePointer().Base;//B->getDescriptor()->asValueDecl();
-  if (!D)
-    return false;
-
-  if (AK == AK_Read || AK == AK_Increment || AK == AK_Decrement)
-    return diagnoseUnknownDecl(S, OpPC, D, AK);
-
-  if (AK == AK_Destroy || S.getLangOpts().CPlusPlus14) {
-    const SourceInfo &E = S.Current->getSource(OpPC);
-    S.FFDiag(E, diag::note_constexpr_modify_global);
-  }
-  return false;
-}
-
-bool CheckDummy(InterpState &S, CodePtr OpPC, const Block *B, AccessKinds AK) {
-  if (!B->isDummy())
-    return true;
-
-  const ValueDecl *D = B->getDescriptor()->asValueDecl();
   if (!D)
     return false;
 
@@ -2747,7 +2725,7 @@ static void setLifeStateRecurse(PtrView Ptr, Lifetime L) {
 /// Ends the lifetime of the peek'd pointer.
 bool EndLifetime(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Stk.peek<Pointer>();
-  if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
+  if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr, AK_Destroy))
     return false;
 
   setLifeStateRecurse(Ptr.view().narrow(), Lifetime::Ended);
@@ -2766,7 +2744,7 @@ bool PseudoDtor(InterpState &S, CodePtr OpPC) {
 
 bool MarkDestroyed(InterpState &S, CodePtr OpPC) {
   const auto &Ptr = S.Stk.peek<Pointer>();
-  if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr.block(), AK_Destroy))
+  if (Ptr.isBlockPointer() && !CheckDummy(S, OpPC, Ptr, AK_Destroy))
     return false;
 
   setLifeStateRecurse(Ptr.view().narrow(), Lifetime::Destroyed);
@@ -2794,9 +2772,8 @@ bool CheckNewTypeMismatch(InterpState &S, CodePtr OpPC, const Expr *E,
     return false;
   }
 
-  if (!Ptr.isBlockPointer()){//  && !Ptr.isOpaquePointer())
+  if (!Ptr.isBlockPointer()) {
     return CheckDummy(S, OpPC, Ptr, AK_Construct);
-    return false;
   }
 
   if (!CheckRange(S, OpPC, Ptr, AK_Construct))
@@ -2809,9 +2786,7 @@ bool CheckNewTypeMismatch(InterpState &S, CodePtr OpPC, const Expr *E,
   if (!Ptr.block()->isAccessible()) {
     if (!CheckExtern(S, OpPC, Ptr))
       return false;
-    if (!CheckLive(S, OpPC, Ptr, AK_Construct))
-      return false;
-    return CheckDummy(S, OpPC, Ptr.block(), AK_Construct);
+    return CheckLive(S, OpPC, Ptr, AK_Construct);
   }
   if (!CheckTemporary(S, OpPC, Ptr.block(), AK_Construct))
     return false;

@@ -178,7 +178,7 @@ static void collectBlocks(PtrView Ptr, llvm::SetVector<const Block *> &Blocks,
            P.isDereferencable() && !P.isUnknownSizeArray() && !P.isOnePastEnd();
   };
 
-  if (!Ptr.isLive() || Ptr.isZero() || Ptr.isDummy() ||
+  if (!Ptr.isLive() || Ptr.isZero() ||
       Ptr.isUnknownSizeArray() || Ptr.isOnePastEnd())
     return;
 

@@ -124,62 +124,6 @@ UnsignedOrNone Program::getOrCreateGlobal(const ValueDecl *VD,
   return std::nullopt;
 }
 
-unsigned Program::getOrCreateDummy(DeclTy D, bool IsConstexprUnknown) {
-  assert(D);
-
-  if (const auto *VD = dyn_cast_if_present<VarDecl>(dyn_cast<const Decl *>(D)))
-    D = VD->getFirstDecl();
-
-  // Dedup blocks since they are immutable and pointers cannot be compared.
-  if (auto It = DummyVariables.find(D.getOpaqueValue());
-      It != DummyVariables.end())
-    return It->second;
-
-  QualType QT;
-  bool IsWeak = false;
-  if (const auto *E = dyn_cast<const Expr *>(D)) {
-    QT = E->getType();
-  } else {
-    const auto *VD = cast<ValueDecl>(cast<const Decl *>(D));
-    IsWeak = VD->isWeak();
-    QT = VD->getType();
-
-    if (QT->isReferenceType())
-      QT = QT->getPointeeType();
-  }
-
-  assert(!QT.isNull());
-
-  Descriptor *Desc;
-  if (OptPrimType T = Ctx.classify(QT))
-    Desc = createDescriptor(D, *T, /*SourceTy=*/QT.getTypePtr(), std::nullopt,
-                            /*IsConst=*/QT.isConstQualified());
-  else
-    Desc = createDescriptor(D, QT.getTypePtr(), std::nullopt,
-                            /*IsConst=*/QT.isConstQualified());
-  if (!Desc)
-    Desc = allocateDescriptor(D);
-
-  Desc->IsConstexprUnknown = IsConstexprUnknown;
-
-  assert(Desc);
-
-  // Desc->dump();
-
-  // Allocate a block for storage.
-  unsigned I = Globals.size();
-
-  auto *G = new (Allocator, Desc->getAllocSize())
-      Global(Ctx.getEvalID(), getCurrentDecl(), Desc, /*IsStatic=*/true,
-             /*IsExtern=*/false, IsWeak, /*IsDummy=*/true);
-  G->block()->invokeCtor();
-  assert(G->block()->isDummy());
-
-  Globals.push_back(G);
-  DummyVariables[D.getOpaqueValue()] = I;
-  return I;
-}
-
 UnsignedOrNone Program::createGlobal(const ValueDecl *VD, const Expr *Init,
                                      bool IsConstexprUnknown) {
   bool IsStatic, IsExtern;
@@ -208,15 +152,6 @@ UnsignedOrNone Program::createGlobal(const ValueDecl *VD, const Expr *Init,
 
   for (const Decl *Redecl = VD->getPreviousDecl(); Redecl;
        Redecl = Redecl->getPreviousDecl()) {
-    // If this redecl was registered as a dummy variable, it is now a proper
-    // global variable and points to the block we just created.
-    if (auto DummyIt = DummyVariables.find(Redecl);
-        DummyIt != DummyVariables.end()) {
-      Global *Dummy = Globals[DummyIt->second];
-      Dummy->block()->movePointersTo(NewGlobal->block());
-      Globals[DummyIt->second] = NewGlobal;
-      DummyVariables.erase(DummyIt);
-    }
     // If the redeclaration hasn't been registered yet at all, we just set its
     // global index to Idx. If it has been registered yet, it might have
     // pointers pointing to it and we need to transfer those pointers to the new

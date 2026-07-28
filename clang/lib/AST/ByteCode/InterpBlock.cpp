@@ -136,7 +136,7 @@ void Block::removePointers() {
 
 DeadBlock::DeadBlock(DeadBlock *&Root, Block *Blk)
     : Root(Root), B(~0u, Blk->Desc, Blk->isExtern(), Blk->IsStatic,
-                    Blk->isWeak(), Blk->isDummy(), /*IsDead=*/true) {
+                    Blk->isWeak(), /*IsDead=*/true) {
   // Add the block to the chain of dead blocks.
   if (Root)
     Root->Prev = this;

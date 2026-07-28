@@ -71,6 +71,7 @@ def ArgDesc : ArgType { let Name = "const Descriptor *"; }
 def ArgPrimType : ArgType { let Name = "PrimType"; }
 def ArgEnumDecl : ArgType { let Name = "const EnumDecl *"; }
 def ArgTypePtr : ArgType { let Name = "const Type *"; }
+def ArgDeclOrExpr : ArgType { let Name = "DeclOrExpr"; }
 
 //===----------------------------------------------------------------------===//
 // Classes of types instructions operate on.
@@ -635,7 +636,7 @@ def AddOffsetL : Opcode {
 }
 
 def GetOpaquePtr : Opcode {
-  let Args = [ArgValueDecl];
+  let Args = [ArgDeclOrExpr];
 }
 
 

@@ -87,9 +87,6 @@ public:
   UnsignedOrNone getOrCreateGlobal(const ValueDecl *VD,
                                    const Expr *Init = nullptr);
 
-  /// Returns or creates a dummy value for unknown declarations.
-  unsigned getOrCreateDummy(DeclTy D, bool IsConstexprUnknown = false);
-
   /// Creates a global and returns its index.
   UnsignedOrNone createGlobal(const ValueDecl *VD, const Expr *Init,
                               bool IsConstexprUnknown = false);
@@ -222,9 +219,6 @@ private:
 
   /// Mapping from decls to record metadata.
   llvm::DenseMap<const RecordDecl *, Record *> Records;
-
-  /// Dummy parameter to generate pointers from.
-  llvm::DenseMap<const void *, unsigned> DummyVariables;
 
   /// Creates a new descriptor.
   template <typename... Ts> Descriptor *allocateDescriptor(Ts &&...Args) {

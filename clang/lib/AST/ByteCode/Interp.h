@@ -438,6 +438,11 @@ bool Sub(InterpState &S, CodePtr OpPC) {
   const T &LHS = S.Stk.pop<T>();
   const unsigned Bits = RHS.bitWidth() + 1;
 
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << LHS << '\n';
+  // llvm::errs() << RHS << '\n';
+
   if constexpr (isIntegralOrPointer<T>()) {
     // Handle (int)&&a - (int)&&b.
     // Both operands should be integrals that point to labels and the result is
@@ -460,6 +465,7 @@ bool Sub(InterpState &S, CodePtr OpPC) {
           RHSAddrExpr->getLabel()->getDeclContext())
         return Invalid(S, OpPC);
 
+      // llvm::errs() << " -> " << LHSAddrExpr << " / " << RHSAddrExpr << '\n';
       S.Stk.push<T>(LHSAddrExpr, RHSAddrExpr);
       return true;
     }
@@ -1409,7 +1415,7 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
     if (P.isZero())
       continue;
     if (P.pointsToLiteral()) {
-      const Expr *E = P.getDeclDesc()->asExpr();
+      const Expr *E = P.getRootExpr();//ggetDeclDesc()->asExpr();
       if (isa<StringLiteral>(E)) {
         const SourceInfo &Loc = S.Current->getSource(OpPC);
         S.FFDiag(Loc, diag::note_constexpr_literal_comparison);
@@ -2381,7 +2387,7 @@ inline bool LoadPopL(InterpState &S, CodePtr OpPC) {
           Ptr.asOpaquePointer().ObjectType,
           Ptr.asOpaquePointer().getFieldType().getTypePtr());//FieldType->getPointeeType().getTypePtr());
     else
-      S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asValueDecl(),
+      S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asVarDecl(),
                           Ptr.getDeclDesc()->getType().getTypePtr(),
                           Ptr.getType()->getPointeeType().getTypePtr());
     // S.Stk.push<Pointer>(Ptr);
@@ -2892,10 +2898,10 @@ bool AddOffset(InterpState &S, CodePtr OpPC) {
   return false;
 }
 
-inline bool GetOpaquePtr(InterpState &S, CodePtr OpPC, const ValueDecl *VD) {
+inline bool GetOpaquePtr(InterpState &S, CodePtr OpPC, DeclOrExpr DOE) {
   // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   // VD->dump();
-  S.Stk.push<Pointer>(OpaqueTag{}, VD);
+  S.Stk.push<Pointer>(OpaqueTag{}, DOE);
   return true;
 }
 
@@ -2936,7 +2942,7 @@ bool AddOffsetL(InterpState &S, CodePtr OpPC) {
   // NewPath[0] = PointerPathEntry::array(static_cast<uint64_t>(Offset));
   // S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
   // ElemType.getTypePtr(), NewPath, NewPathLength);
-  S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asValueDecl(),
+  S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asVarDecl(),
                       Ptr.getDeclDesc()->getType().getTypePtr(),
                       Ptr.getType().getTypePtr(), nullptr, 0,
                       static_cast<uint64_t>(Offset));
@@ -3071,6 +3077,10 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool SubPtr(InterpState &S, CodePtr OpPC, uint32_t ElemSize) {
   const Pointer &LHS = S.Stk.pop<Pointer>().expand();
   const Pointer &RHS = S.Stk.pop<Pointer>().expand();
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << LHS << '\n';
+  // llvm::errs() << RHS << '\n';
 
   if (LHS.pointsToLabel() || RHS.pointsToLabel()) {
     if constexpr (isIntegralOrPointer<T>()) {
@@ -3335,6 +3345,11 @@ bool CastPointerIntegralAPS(InterpState &S, CodePtr OpPC, uint32_t BitWidth);
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool CastPointerIntegral(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
+
+
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  // llvm::errs() << Ptr << '\n';
+
   if (!CheckPointerToIntegralCast(S, OpPC, Ptr, T::bitWidth())) {
     // llvm::errs() << "CheckPointerToIntegralCast failed\n";
     return Invalid(S, OpPC);
@@ -3360,7 +3375,26 @@ bool CastPointerIntegral(InterpState &S, CodePtr OpPC) {
       }
       S.Stk.push<T>(Kind, PtrVal, /*Offset=*/0);
     } else if (Ptr.isOpaquePointer()) {
-      S.Stk.push<T>(IntegralKind::Address, Ptr.asOpaquePointer().Base, 0);
+
+
+      IntegralKind Kind = IntegralKind::Address;
+      const void *PtrVal;
+      if (const Expr *E = Ptr.asOpaquePointer().asExpr()) {
+        PtrVal = E;
+        if (isa<AddrLabelExpr>(E))
+          Kind = IntegralKind::LabelAddress;
+      } else {
+        PtrVal = Ptr.asOpaquePointer().asVarDecl();//Ptr.getDeclDesc()->asDecl();
+      }
+
+      // llvm::errs() << "Kind: " << (int)Kind << '\n';
+
+      S.Stk.push<T>(Kind, PtrVal, /*Offset=*/0);
+      // S.Stk.push<T>(IntegralKind::Address, Ptr.asOpaquePointer().Base, 0);
+
+
+
+
     } else if (Ptr.isFunctionPointer()) {
       const void *FuncDecl = Ptr.asFunctionPointer().Func->getDecl();
       S.Stk.push<T>(IntegralKind::FunctionAddress, FuncDecl, /*Offset=*/0);
@@ -4054,7 +4088,7 @@ inline bool ArrayElemPtrPopL(InterpState &S, CodePtr OpPC) {
   NewPath[0] = PointerPathEntry::array(static_cast<uint64_t>(Offset));
   // S.Stk.push<Pointer>(OpaqueTag{}, Ptr.asOpaquePointer().ObjectType,
   // ElemType.getTypePtr(), NewPath, NewPathLength);
-  S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asValueDecl(),
+  S.Stk.push<Pointer>(OpaqueTag{}, Ptr.getDeclDesc()->asVarDecl(),
                       Ptr.getDeclDesc()->getType().getTypePtr(),
                       Ptr.getType().getTypePtr(), NewPath, 1);
 

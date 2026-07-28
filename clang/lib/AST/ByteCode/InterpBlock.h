@@ -46,27 +46,23 @@ private:
   static constexpr uint8_t ExternFlag = 1 << 0;
   static constexpr uint8_t DeadFlag = 1 << 1;
   static constexpr uint8_t WeakFlag = 1 << 2;
-  static constexpr uint8_t DummyFlag = 1 << 3;
 
 public:
   /// Creates a new block.
   Block(unsigned EvalID, UnsignedOrNone DeclID, const Descriptor *Desc,
-        bool IsStatic = false, bool IsExtern = false, bool IsWeak = false,
-        bool IsDummy = false)
+        bool IsStatic = false, bool IsExtern = false, bool IsWeak = false)
       : Desc(Desc), DeclID(DeclID), EvalID(EvalID), IsStatic(IsStatic) {
     assert(Desc);
     AccessFlags |= (ExternFlag * IsExtern);
     AccessFlags |= (WeakFlag * IsWeak);
-    AccessFlags |= (DummyFlag * IsDummy);
   }
 
   Block(unsigned EvalID, const Descriptor *Desc, bool IsStatic = false,
-        bool IsExtern = false, bool IsWeak = false, bool IsDummy = false)
+        bool IsExtern = false, bool IsWeak = false)
       : Desc(Desc), EvalID(EvalID), IsStatic(IsStatic) {
     assert(Desc);
     AccessFlags |= (ExternFlag * IsExtern);
     AccessFlags |= (WeakFlag * IsWeak);
-    AccessFlags |= (DummyFlag * IsDummy);
   }
 
   /// Returns the block's descriptor.
@@ -81,7 +77,6 @@ public:
   bool isTemporary() const { return Desc->IsTemporary; }
   bool isWeak() const { return AccessFlags & WeakFlag; }
   bool isDynamic() const { return (DynAllocId != std::nullopt); }
-  bool isDummy() const { return AccessFlags & DummyFlag; }
   bool isDead() const { return AccessFlags & DeadFlag; }
   /// Returns the size of the block.
   unsigned getSize() const { return Desc->getAllocSize(); }
@@ -170,13 +165,12 @@ private:
   friend class Program;
 
   Block(unsigned EvalID, const Descriptor *Desc, bool IsExtern, bool IsStatic,
-        bool IsWeak, bool IsDummy, bool IsDead)
+        bool IsWeak, bool IsDead)
       : Desc(Desc), EvalID(EvalID), IsStatic(IsStatic) {
     assert(Desc);
     AccessFlags |= (ExternFlag * IsExtern);
     AccessFlags |= (DeadFlag * IsDead);
     AccessFlags |= (WeakFlag * IsWeak);
-    AccessFlags |= (DummyFlag * IsDummy);
   }
 
   /// To be called by DynamicAllocator.

@@ -23,6 +23,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
 #include "llvm/Support/raw_ostream.h"
+#include "DeclOrExpr.h"
 
 namespace clang {
 namespace interp {
@@ -43,7 +44,6 @@ struct PtrView {
 
   bool isZero() const { return !Pointee; }
   bool isLive() const { return Pointee && !Pointee->isDead(); }
-  bool isDummy() const { return Pointee && Pointee->isDummy(); }
   bool isActive() const { return isRoot() || getInlineDesc()->IsActive; }
   bool isArrayRoot() const { return inArray() && Offset == Base; }
   bool isElementPastEnd() const { return Offset == PastEndMark; }
@@ -404,12 +404,18 @@ struct PointerPathEntry {
 };
 
 struct OpaquePointer {
-  const ValueDecl *Base = nullptr;
+  DeclOrExpr Base = nullptr;
+  // const ValueDecl *Base = nullptr;
   const Type *ObjectType = nullptr;
   const Type *FieldType = nullptr;
   const PointerPathEntry *Path = nullptr;
   unsigned PathLength = 0;
   bool IsOnePastEnd = false;
+
+  bool isExpr() const { return Base.isExpr(); }
+  const Expr *asExpr() const { return Base.asExpr(); }
+  bool isVarDecl() const { return Base.isVarDecl(); }
+  const VarDecl *asVarDecl() const { return Base.asVarDecl(); }
 
   ArrayRef<PointerPathEntry> path() const { return ArrayRef(Path, PathLength); }
 
@@ -512,7 +518,7 @@ public:
     Typeid.TypePtr = TypePtr;
     Typeid.TypeInfoType = TypeInfoType;
   }
-  Pointer(OpaqueTag, const ValueDecl *Base, const Type *ObjType,
+  Pointer(OpaqueTag, DeclOrExpr Base, const Type *ObjType,
           const Type *FieldType, uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Opaque) {
     Opaque.ObjectType = ObjType;
@@ -522,7 +528,7 @@ public:
     Opaque.Base = Base;
     Opaque.IsOnePastEnd = false;
   }
-  Pointer(OpaqueTag, const ValueDecl *Base, const Type *ObjType,
+  Pointer(OpaqueTag, DeclOrExpr Base, const Type *ObjType,
           const Type *FieldType, const PointerPathEntry *Path,
           unsigned PathLength, bool OPE = false, uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Opaque) {
@@ -533,9 +539,13 @@ public:
     Opaque.Base = Base;
     Opaque.IsOnePastEnd = OPE;
   }
-  Pointer(OpaqueTag, const ValueDecl *Base, uint64_t Offset = 0)
+  Pointer(OpaqueTag, DeclOrExpr Base, uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Opaque) {
-    Opaque.ObjectType = Base->getType().getTypePtr();
+    if (const auto *VD = Base.asVarDecl())
+      Opaque.ObjectType = VD->getType().getTypePtr();
+    else
+      Opaque.ObjectType = Base.asExpr()->getType().getTypePtr();
+    // Opaque.ObjectType = Base->getType().getTypePtr();
     Opaque.FieldType = Opaque.ObjectType;
     Opaque.Path = nullptr;
     Opaque.PathLength = 0;
@@ -723,6 +733,7 @@ public:
   }
 
   const VarDecl *getRootVarDecl() const;
+  const Expr *getRootExpr() const;
 
   [[nodiscard]] Pointer getDeclPtr() const { return Pointer(BS.Pointee); }
 
@@ -896,7 +907,7 @@ public:
       return Fn.Func->getDecl()->isWeak();
     }
     if (isOpaquePointer())
-      return Opaque.Base->isWeak();
+      return Opaque.isVarDecl() && Opaque.asVarDecl()->isWeak();//Opaque.Base->isWeak();
 
     if (!isBlockPointer())
       return false;
@@ -916,11 +927,7 @@ public:
 
   /// Checks if the pointer points to a dummy value.
   bool isDummy() const {
-    if (isOpaquePointer())
-      return true;
-    if (!isBlockPointer())
-      return false;
-    return view().isDummy();
+    return  isOpaquePointer();
   }
 
   /// Checks if an object or a subfield is mutable.
@@ -1180,8 +1187,8 @@ public:
   bool pointsToLabel() const;
   /// Returns the AddrLabelExpr the Pointer points to, if any.
   const AddrLabelExpr *getPointedToLabel() const {
-    if (const Descriptor *Desc = getDeclDesc())
-      return dyn_cast_if_present<AddrLabelExpr>(Desc->asExpr());
+    if (const Expr *E = getRootExpr())
+      return dyn_cast<AddrLabelExpr>(E);
     return nullptr;
   }
 
@@ -1268,8 +1275,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Pointer &P) {
   } else if (P.isBlockPointer() && P.isArrayRoot())
     OS << " arrayroot";
 
-  if (P.isBlockPointer() && P.block() && P.block()->isDummy())
-    OS << " dummy";
   if (!P.isLive())
     OS << " dead";
   if (P.isBlockPointer() && P.isBaseClass())

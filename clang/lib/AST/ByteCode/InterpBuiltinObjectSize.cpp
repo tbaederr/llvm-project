@@ -212,7 +212,7 @@ Var typeOfClosestSurroundingVariable(const ASTContext &ASTCtx,
   if (OP.path().back().Kind != PointerPathEntry::Array)
     return {computeFieldType(ASTCtx, OP), nullptr};
 
-  const VarDecl *Base = cast<VarDecl>(OP.Base);
+  const VarDecl *Base = OP.asVarDecl();//cast<const VarDecl*>(OP.Base);
   QualType CurType = pointeeOrSelf(OP.ObjectType);
   // assert(ASTCtx.hasSameUnqualifiedType(Init->getType(), CurType));
 
@@ -423,7 +423,7 @@ computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
         // llvm::errs() << "array on non-array\n";
         // llvm::errs() << I << " / " << OP.PathLength - 1 << '\n';
         // CurType->dump();
-        if (I == 0 && InvalidBase && !isa_and_nonnull<ParmVarDecl>(OP.Base))
+        if (I == 0 && InvalidBase && !isa_and_nonnull<ParmVarDecl>(OP.Base.asVarDecl()))
           return std::nullopt;
         // if (InvalidBase)
         // return std::nullopt;
@@ -512,7 +512,7 @@ static bool pointsToCompleteObject(const Pointer &Ptr,
 /// Returns the size of the whole variable the pointer points to, including the
 /// size of potential flexible array members at the end.
 size_t sizeOfWholeVariable(const ASTContext &ASTCtx, const OpaquePointer &OP) {
-  const VarDecl *Base = cast<VarDecl>(OP.Base);
+  const VarDecl *Base = OP.asVarDecl();//cast<VarDecl>(OP.Base);
   QualType T = Base->getType();
   if (T->isPointerType())
     T = T->getPointeeType();
@@ -597,7 +597,7 @@ static unsigned computeOpaqueSize(const ASTContext &ASTCtx, const Pointer &Ptr,
   if (b)
     llvm::errs() << "TypeSize: " << TypeSize << '\n';
 
-  const ValueDecl *Base = OP.Base;
+  const VarDecl *Base = OP.asVarDecl();
   if (!Base)
     return TypeSize;
 

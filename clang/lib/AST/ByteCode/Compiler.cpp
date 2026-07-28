@@ -8761,25 +8761,12 @@ bool Compiler<Emitter>::emitDestructionPop(const Descriptor *Desc,
 template <class Emitter>
 bool Compiler<Emitter>::emitDummyPtr(const DeclTy &D, const Expr *E, bool CU) {
   assert(!DiscardResult && "Should've been checked before");
-  unsigned DummyID = P.getOrCreateDummy(D, CU);
-
   // if (ToLValue) {
-    if (auto *VD = dyn_cast_if_present<ValueDecl>(D.dyn_cast<const Decl *>()))
+    if (auto *VD = dyn_cast_if_present<VarDecl>(D.dyn_cast<const Decl *>()))
       return this->emitGetOpaquePtr(VD, E);
+
+    return this->emitGetOpaquePtr(cast<const Expr *>(D), E);
   // }
-
-  if (!this->emitGetPtrGlobal(DummyID, E))
-    return false;
-  if (E->getType()->isVoidType())
-    return true;
-
-  // Convert the dummy pointer to another pointer type if we have to.
-  if (PrimType PT = classifyPrim(E); PT != PT_Ptr) {
-    if (isPtrType(PT))
-      return this->emitDecayPtr(PT_Ptr, PT, E);
-    return false;
-  }
-  return true;
 }
 
 template <class Emitter>

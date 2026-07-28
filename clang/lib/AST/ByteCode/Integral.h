@@ -199,6 +199,7 @@ public:
   }
 
   APValue toAPValue(const ASTContext &) const {
+    llvm::errs() << __PRETTY_FUNCTION__ << '\n';
     switch (Kind) {
     case IntegralKind::Address: {
       return APValue((const ValueDecl *)Ptr.P,

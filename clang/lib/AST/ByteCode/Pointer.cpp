@@ -88,7 +88,7 @@ computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
         // llvm::errs() << "array on non-array\n";
         // llvm::errs() << I << " / " << OP.PathLength - 1 << '\n';
         // CurType->dump();
-        if (I == 0 && InvalidBase && !isa_and_nonnull<ParmVarDecl>(OP.Base))
+        if (I == 0 && InvalidBase && !isa_and_nonnull<ParmVarDecl>(OP.Base.asVarDecl()))
           return std::nullopt;
         // if (InvalidBase)
         // return std::nullopt;
@@ -339,7 +339,8 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
 
   if (isOpaquePointer()) {
     CharUnits Offset;
-    if (!Opaque.Base->getType()->isPointerType()) {
+    APValue::LValueBase Base;
+    if (!Opaque.Base.getType()->isPointerType()) {
     for (const PointerPathEntry &Entry : Opaque.path().drop_back(isOnePastEnd())) {
       switch(Entry.Kind) {
       case PointerPathEntry::Field:
@@ -361,8 +362,13 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
       Offset = CharUnits::fromQuantity(*O);
 
 
+    if (const Expr *E = Opaque.asExpr())
+      return APValue(E, Offset, Path,
+                     /*IsOnePastEnd=*/isOnePastEnd(), /*IsNullPtr=*/false);
+
+
     // llvm::errs() << "APValue path length: " << Path.size()<< '\n';
-    return APValue(Opaque.Base, Offset, Path,
+    return APValue(Opaque.asVarDecl(), Offset, Path,
                    /*IsOnePastEnd=*/isOnePastEnd(), /*IsNullPtr=*/false);
   }
 
@@ -518,7 +524,7 @@ void Pointer::print(llvm::raw_ostream &OS) const {
        << "}";
     break;
   case Storage::Opaque:
-    OS << "(Opaque) { Base: " << Opaque.Base << ", " << Opaque.ObjectType
+    OS << "(Opaque) { Base: " << Opaque.Base.getOpaqueValue() << ", " << Opaque.ObjectType
        << ", " << Opaque.FieldType << " Length: " << Opaque.PathLength;
     OS << "} + " << Offset;
   }
@@ -989,13 +995,13 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
       if (!B.block()->getDescriptor()->asVarDecl())
         return false;
 
-      return A.Opaque.Base->getMostRecentDecl() == B.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
+      return A.Opaque.asVarDecl()->getMostRecentDecl() == B.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
     }
 
     if (B.isOpaquePointer() && A.isBlockPointer()) {
       if (!A.block()->getDescriptor()->asVarDecl())
         return false;
-      return B.Opaque.Base->getMostRecentDecl() == A.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
+      return B.Opaque.asVarDecl()->getMostRecentDecl() == A.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
     }
 
 
@@ -1016,8 +1022,9 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
     case Storage::Typeid:
     return A.Typeid.TypePtr == B.Typeid.TypePtr;
     case Storage::Opaque:
-    // FIXME: Need to allow comparison with block pointers. I think.
-      return A.Opaque.Base->getMostRecentDecl() == B.Opaque.Base->getMostRecentDecl();
+    if (A.Opaque.Base.isExpr())
+      return A.Opaque.Base == B.Opaque.Base;
+    return A.Opaque.asVarDecl()->getMostRecentDecl() == B.Opaque.asVarDecl()->getMostRecentDecl();
   }
   return A.asBlockPointer().Pointee == B.asBlockPointer().Pointee;
 }
@@ -1070,13 +1077,13 @@ bool Pointer::elemsOfSameArray(const Pointer &A, const Pointer &B) {
 }
 
 bool Pointer::pointsToLiteral() const {
-  if (isZero() || !isBlockPointer())
+  if (isZero() || !(isBlockPointer() || isOpaquePointer()))
     return false;
 
-  if (block()->isDynamic())
+  if (isDynamic())//block()->isDynamic())
     return false;
 
-  const Expr *E = block()->getDescriptor()->asExpr();
+  const Expr *E = getRootExpr();//block()->getDescriptor()->asExpr();
   return E && !isa<MaterializeTemporaryExpr, StringLiteral>(E);
 }
 
@@ -1092,10 +1099,10 @@ bool Pointer::pointsToStringLiteral() const {
 }
 
 bool Pointer::pointsToLabel() const {
-  if (isZero() || !isBlockPointer())
+  if (isZero() || !(isBlockPointer() || isOpaquePointer()))
     return false;
 
-  if (const Expr *E = BS.Pointee->getDescriptor()->asExpr())
+  if (const Expr *E = getRootExpr())//BS.Pointee->getDescriptor()->asExpr())
     return isa<AddrLabelExpr>(E);
   return false;
 }
@@ -1159,7 +1166,7 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
       Ty = AT->getValueType();
 
     // Invalid pointers.
-    if (Ptr.isDummy() || !Ptr.isLive() || Ptr.isPastEnd())
+    if (!Ptr.isLive() || Ptr.isPastEnd())
       return false;
 
     // Primitives should never end up here.
@@ -1350,9 +1357,19 @@ const VarDecl *Pointer::getRootVarDecl() const {
   if (isBlockPointer())
     return getDeclDesc()->asVarDecl();
   if (isOpaquePointer())
-    return cast_if_present<VarDecl>(Opaque.Base);
+    return Opaque.asVarDecl();
   return nullptr;
 }
+
+const Expr *Pointer::getRootExpr() const {
+  if (isBlockPointer())
+    return getDeclDesc()->asExpr();
+  if (isOpaquePointer())
+    return Opaque.asExpr();
+  return nullptr;
+}
+
+
 
 std::optional<IntPointer> IntPointer::atOffset(const interp::Context &Ctx,
                                                unsigned Offset) const {
