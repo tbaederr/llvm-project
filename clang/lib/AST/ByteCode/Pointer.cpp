@@ -25,6 +25,19 @@
 using namespace clang;
 using namespace clang::interp;
 
+// Helper to check if a RecordDecl can be passed to
+// ASTContext::getRecordLayout().
+static bool validRecordDecl(const RecordDecl *D) {
+  D = D->getDefinition();
+  return D && !D->isInvalidDecl() && D->isCompleteDefinition();
+}
+// Same but for types.
+static bool validType(QualType T) {
+  if (const RecordDecl *RD = T->getAsRecordDecl())
+    return validRecordDecl(RD);
+  return true;
+}
+
 Pointer::Pointer(Block *Pointee)
     : Pointer(Pointee, Pointee->getDescriptor()->getMetadataSize(),
               Pointee->getDescriptor()->getMetadataSize()) {}
@@ -59,6 +72,9 @@ Pointer::Pointer(const Pointer &P)
   case Storage::Typeid:
     Typeid = P.Typeid;
     break;
+  case Storage::Opaque:
+    Opaque = P.Opaque;
+    break;
   }
 }
 
@@ -77,6 +93,9 @@ Pointer::Pointer(Pointer &&P) : Offset(P.Offset), StorageKind(P.StorageKind) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::Opaque:
+    Opaque = P.Opaque;
     break;
   }
 }
@@ -127,6 +146,10 @@ Pointer &Pointer::operator=(const Pointer &P) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::Opaque:
+    Opaque = P.Opaque;
+    break;
   }
   return *this;
 }
@@ -166,6 +189,10 @@ Pointer &Pointer::operator=(Pointer &&P) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::Opaque:
+    Opaque = P.Opaque;
+    break;
   }
   return *this;
 }
@@ -198,6 +225,10 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
                    /*OnePastTheEnd=*/false, /*IsNull=*/false);
   }
 
+  if (isOpaquePointer())
+    return APValue(APValue::LValueBase(Opaque.Base), CharUnits::Zero(), Path,
+                   /*IsOnePastEnd=*/Opaque.isOnePastEnd(), /*IsNullPtr=*/false);
+
   // Build the lvalue base from the block.
   const Descriptor *Desc = getDeclDesc();
   APValue::LValueBase Base;
@@ -219,7 +250,7 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   auto getFieldOffset = [&](const FieldDecl *FD) -> CharUnits {
     // This shouldn't happen, but if it does, don't crash inside
     // getASTRecordLayout.
-    if (FD->getParent()->isInvalidDecl())
+    if (!validRecordDecl(FD->getParent()))
       return CharUnits::Zero();
     const ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(FD->getParent());
     unsigned FieldIndex = FD->getFieldIndex();
@@ -347,6 +378,12 @@ void Pointer::print(llvm::raw_ostream &OS) const {
     OS << "(Typeid) { " << (const void *)asTypeidPointer().TypePtr << ", "
        << (const void *)asTypeidPointer().TypeInfoType << " + " << Offset
        << "}";
+    break;
+  case Storage::Opaque:
+    OS << "(Opaque) { Base: " << Opaque.Base << ", "
+       << Opaque.FieldType.getPointer() << " Length: " << Opaque.PathLength
+       << ". PastEnd: " << Opaque.isOnePastEnd();
+    OS << "} + " << Offset;
   }
 }
 
@@ -371,14 +408,13 @@ Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+  case Storage::Opaque:
+    return reinterpret_cast<uintptr_t>(asOpaquePointer().Base) + Offset;
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
-    if (const RecordType *RT = T->getAs<RecordType>()) {
-      // We cannot get the type size of a forward declaration.
-      if (!RT->getDecl()->getDefinition())
-        return std::nullopt;
-    }
+    if (!validType(T))
+      return std::nullopt;
     return ASTCtx.getTypeSizeInChars(T).getQuantity();
   };
 
@@ -449,14 +485,13 @@ Pointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+  case Storage::Opaque:
+    return Opaque.computeLayoutOffset(ASTCtx);
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
-    if (const RecordType *RT = T->getAs<RecordType>()) {
-      // We cannot get the type size of a forward declaration.
-      if (!RT->getDecl()->getDefinition())
-        return std::nullopt;
-    }
+    if (!validType(T))
+      return std::nullopt;
     return ASTCtx.getTypeSizeInChars(T).getQuantity();
   };
 
@@ -1136,6 +1171,8 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
 const VarDecl *Pointer::getRootVarDecl() const {
   if (isBlockPointer())
     return getDeclDesc()->asVarDecl();
+  if (isOpaquePointer())
+    return dyn_cast<VarDecl>(Opaque.Base);
   return nullptr;
 }
 
@@ -1195,4 +1232,173 @@ IntPointer IntPointer::baseCast(const interp::Context &Ctx,
   QualType T = RD->getASTContext().getTagType(ElaboratedTypeKeyword::None,
                                               std::nullopt, RD, false);
   return {T.getTypePtr(), Value + BaseLayoutOffset.getQuantity()};
+}
+
+std::optional<size_t>
+OpaquePointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
+  size_t Offset = 0;
+  QualType CurType = getObjectType();
+  for (const PointerPathEntry &Entry : path()) {
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base: {
+      const RecordDecl *RD = CurType->getAsRecordDecl();
+      if (!validRecordDecl(RD))
+        return std::nullopt;
+
+      const ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(RD);
+      Offset += Layout.getBaseClassOffset(Entry.RD.getPointer()).getQuantity();
+
+      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
+    } break;
+
+    case PointerPathEntry::Field: {
+      const FieldDecl *FD = Entry.FD;
+      const RecordDecl *RD = FD->getParent();
+      if (!validRecordDecl(RD))
+        return std::nullopt;
+
+      const ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(RD);
+      Offset +=
+          ASTCtx.toCharUnitsFromBits(Layout.getFieldOffset(FD->getFieldIndex()))
+              .getQuantity();
+
+      CurType = FD->getType();
+    } break;
+    case PointerPathEntry::Array:
+    case PointerPathEntry::NegativeArray: {
+      bool Add = (Entry.Kind == PointerPathEntry::Array);
+      uint64_t Index = Entry.Index;
+      if (!CurType->isArrayType()) {
+        if (Add)
+          Offset += Index * ASTCtx.getTypeSizeInChars(CurType).getQuantity();
+        else
+          Offset -= Index * ASTCtx.getTypeSizeInChars(CurType).getQuantity();
+        continue;
+      }
+      const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+      assert(AT);
+      QualType ElemTy = AT->getElementType();
+      if (!validType(ElemTy) || isa<VariableArrayType>(AT))
+        return std::nullopt;
+      if (Add)
+        Offset += Index * ASTCtx.getTypeSizeInChars(ElemTy).getQuantity();
+      else
+        Offset -= Index * ASTCtx.getTypeSizeInChars(ElemTy).getQuantity();
+      CurType = AT->getElementType();
+    } break;
+    }
+  }
+
+  return Offset;
+}
+
+QualType OpaquePointer::getSurroundingArray() const {
+  if (PathLength == 0)
+    return getObjectType();
+  if (Path[PathLength - 1].Kind != PointerPathEntry::Array)
+    return getFieldType();
+
+  assert(Path[PathLength - 1].Kind == PointerPathEntry::Array);
+  assert(isArrayElement());
+
+  QualType CurType = getObjectType();
+  for (const PointerPathEntry &Entry : path().drop_back(1)) {
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base:
+      CurType = Entry.RD.getPointer()->getASTContext().getCanonicalTagType(
+          Entry.RD.getPointer());
+      break;
+    case PointerPathEntry::Field:
+      CurType = Entry.FD->getType();
+      break;
+    case PointerPathEntry::Array:
+    case PointerPathEntry::NegativeArray:
+      if (!CurType->isArrayType())
+        break;
+      CurType = CurType->getAsArrayTypeUnsafe()->getElementType();
+    }
+  }
+  return CurType;
+}
+
+/// Check if the pointer has offset 0.
+// As an optimization, don't actually compute the offset.
+bool OpaquePointer::isRoot() const {
+  QualType CurType = getObjectType();
+  for (const PointerPathEntry &Entry : path()) {
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base:
+      if (Entry.RD.getInt())
+        return false;
+      CurType = Entry.RD.getPointer()->getASTContext().getCanonicalTagType(
+          Entry.RD.getPointer());
+      break;
+    case PointerPathEntry::Field:
+      if (!Entry.FD->getParent()->isUnion() && Entry.FD->getFieldIndex() != 0)
+        return false;
+      CurType = Entry.FD->getType();
+      break;
+    case PointerPathEntry::Array:
+      if (Entry.Index != 0)
+        return false;
+      if (!CurType->isArrayType())
+        continue;
+      CurType = CurType->getAsArrayTypeUnsafe()->getElementType();
+      break;
+    case PointerPathEntry::NegativeArray:
+      return false;
+    }
+  }
+  return true;
+}
+
+bool OpaquePointer::isUnknownSizeArray() const {
+  QualType FieldType = getFieldType();
+
+  if (isArrayElement())
+    FieldType = getSurroundingArray();
+
+  bool Result = false;
+  // If the field type is an IncompleteArrayType, we still need to check the
+  // base to see if this array is a flexible array member _and_ has actually
+  // been initialized by data we know the size of.
+  if (isa<IncompleteArrayType>(FieldType)) {
+    const VarDecl *Base = cast<VarDecl>(this->Base);
+    if (!Base || !Base->getType()->isRecordType() || !Base->hasInit())
+      Result = true;
+    else
+      Result = !Base->hasFlexibleArrayInit(Base->getASTContext());
+  } else if (isa<VariableArrayType>(FieldType))
+    Result = true;
+
+  return Result;
+}
+
+/// This is used in Pointer::isOnePastEnd(). We cannot read from such pointers.
+/// We can of course never read from opaque pointers anyway but we diagnose
+/// one-past-the-end pointers differently.
+///
+/// In contrast, OpaquePointer::isOnePastEnd() only uses the past-end bit. That
+/// is used for the APValue conversion.
+bool OpaquePointer::isOnePastEndOrElementPastEnd() const {
+  if (isOnePastEnd())
+    return true;
+
+  if (PathLength == 0)
+    return false;
+
+  if (Path[PathLength - 1].Kind != PointerPathEntry::Array)
+    return false;
+
+  QualType ArrTy = getSurroundingArray();
+  if (!ArrTy->isArrayType())
+    return false;
+  // FIXME: Flexible array members?
+  if (const auto *CAT =
+          dyn_cast<ConstantArrayType>(ArrTy->getAsArrayTypeUnsafe())) {
+    if (Path[PathLength - 1].Index >= CAT->getZExtSize())
+      return true;
+  }
+
+  return false;
 }
