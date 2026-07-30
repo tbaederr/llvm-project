@@ -370,7 +370,66 @@ struct TypeidPointer {
   const Type *TypeInfoType;
 };
 
-enum class Storage { Int, Block, Fn, Typeid };
+struct PointerPathEntry {
+  enum { Base, Field, Array } Kind;
+  union {
+    int64_t Index;
+    const FieldDecl *FD;
+    llvm::PointerIntPair<const CXXRecordDecl *, 1, bool> RD = {};
+  };
+
+  static PointerPathEntry base(const CXXRecordDecl *RD, bool Virtual = false) {
+    PointerPathEntry E;
+    E.Kind = Base;
+    E.RD = {RD, Virtual};
+    return E;
+  }
+
+  static PointerPathEntry array(int64_t Index) {
+    PointerPathEntry E;
+    E.Kind = Array;
+    E.Index = Index;
+    return E;
+  }
+
+  static PointerPathEntry field(const FieldDecl *FD) {
+    PointerPathEntry E;
+    E.Kind = Field;
+    E.FD = FD;
+    return E;
+  }
+};
+
+struct OpaquePointer {
+  const ValueDecl *Base = nullptr;
+  // FieldType and IsOnePastEnd bit.
+  llvm::PointerIntPair<const Type *, 1, bool> FieldType = {};
+  const PointerPathEntry *Path = nullptr;
+  unsigned PathLength = 0;
+
+  ArrayRef<PointerPathEntry> path() const { return ArrayRef(Path, PathLength); }
+
+  QualType getObjectType() const {
+    QualType T = Base->getType();
+    if (T->isPointerOrReferenceType())
+      return T->getPointeeType();
+    return T;
+  }
+
+  QualType getFieldType() const {
+    if (FieldType.getPointer()->isPointerOrReferenceType())
+      return FieldType.getPointer()->getPointeeType();
+    return QualType(FieldType.getPointer(), 0);
+  }
+
+  /// If this is pointing to an array element, return the array.
+  QualType getSurroundingArray(const ASTContext &ASTCtx) const;
+
+  bool isOnePastEnd() const { return FieldType.getInt(); }
+};
+struct OpaqueTag {};
+
+enum class Storage { Int, Block, Fn, Typeid, Opaque };
 
 /// A pointer to a memory block, live or dead.
 ///
@@ -419,6 +478,30 @@ public:
       : Offset(Offset), StorageKind(Storage::Typeid) {
     Typeid.TypePtr = TypePtr;
     Typeid.TypeInfoType = TypeInfoType;
+  }
+  Pointer(OpaqueTag, const ValueDecl *Base, const Type *FieldType,
+          uint64_t Offset = 0)
+      : Offset(Offset), StorageKind(Storage::Opaque) {
+    Opaque.FieldType = {FieldType, /*IsOnePastEnd=*/false};
+    Opaque.Path = nullptr;
+    Opaque.PathLength = 0;
+    Opaque.Base = Base;
+  }
+  Pointer(OpaqueTag, const ValueDecl *Base, const Type *FieldType,
+          const PointerPathEntry *Path, unsigned PathLength, bool OPE = false,
+          uint64_t Offset = 0)
+      : Offset(Offset), StorageKind(Storage::Opaque) {
+    Opaque.FieldType = {FieldType, OPE};
+    Opaque.Path = Path;
+    Opaque.PathLength = PathLength;
+    Opaque.Base = Base;
+  }
+  Pointer(OpaqueTag, const ValueDecl *Base, uint64_t Offset = 0)
+      : Offset(Offset), StorageKind(Storage::Opaque) {
+    Opaque.FieldType = {Base->getType().getTypePtr(), /*IsOnePastEnd=*/false};
+    Opaque.Path = nullptr;
+    Opaque.PathLength = 0;
+    Opaque.Base = Base;
   }
 
   Pointer(Block *Pointee, unsigned Base, uint64_t Offset);
@@ -514,6 +597,7 @@ public:
     case Storage::Fn:
       return !Fn.Func;
     case Storage::Typeid:
+    case Storage::Opaque:
       return false;
     }
     llvm_unreachable("Unknown clang::interp::Storage enum");
@@ -581,6 +665,8 @@ public:
       return Fn.Func->getDecl()->getType();
     case Storage::Typeid:
       return QualType(Typeid.TypeInfoType, 0);
+    case Storage::Opaque:
+      return QualType(Opaque.FieldType.getPointer(), 0);
     }
     llvm_unreachable("Unhandled StorageKind");
   }
@@ -675,11 +761,16 @@ public:
     assert(isTypeidPointer());
     return Typeid;
   }
+  [[nodiscard]] const OpaquePointer &asOpaquePointer() const {
+    assert(isOpaquePointer());
+    return Opaque;
+  }
 
   bool isBlockPointer() const { return StorageKind == Storage::Block; }
   bool isIntegralPointer() const { return StorageKind == Storage::Int; }
   bool isFunctionPointer() const { return StorageKind == Storage::Fn; }
   bool isTypeidPointer() const { return StorageKind == Storage::Typeid; }
+  bool isOpaquePointer() const { return StorageKind == Storage::Opaque; }
 
   /// Returns the record descriptor of a class.
   const Record *getRecord() const {
@@ -1072,6 +1163,7 @@ private:
     BlockPointer BS;
     FunctionPointer Fn;
     TypeidPointer Typeid;
+    OpaquePointer Opaque;
   };
 };
 
