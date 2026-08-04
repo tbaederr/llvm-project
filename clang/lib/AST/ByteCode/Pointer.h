@@ -371,9 +371,9 @@ struct TypeidPointer {
 };
 
 struct PointerPathEntry {
-  enum { Base, Field, Array } Kind;
+  enum { Base, Field, Array, NegativeArray } Kind;
   union {
-    int64_t Index;
+    uint64_t Index;
     const FieldDecl *FD;
     llvm::PointerIntPair<const CXXRecordDecl *, 1, bool> RD = {};
   };
@@ -391,7 +391,12 @@ struct PointerPathEntry {
     E.Index = Index;
     return E;
   }
-
+  static PointerPathEntry negativeArray(int64_t Index) {
+    PointerPathEntry E;
+    E.Kind = NegativeArray;
+    E.Index = Index;
+    return E;
+  }
   static PointerPathEntry field(const FieldDecl *FD) {
     PointerPathEntry E;
     E.Kind = Field;
@@ -399,13 +404,18 @@ struct PointerPathEntry {
     return E;
   }
 };
+static_assert(sizeof(PointerPathEntry) == (sizeof(void*) * 2));
 
 struct OpaquePointer {
   const ValueDecl *Base = nullptr;
-  // FieldType and IsOnePastEnd bit.
-  llvm::PointerIntPair<const Type *, 1, bool> FieldType = {};
+  // FieldType and IsOnePastEnd / IsConstexprUnknown bits.
+  llvm::PointerIntPair<const Type *, 2, unsigned> FieldType = {};
   const PointerPathEntry *Path = nullptr;
   unsigned PathLength = 0;
+
+  OpaquePointer withPath(const PointerPathEntry *Path) const {
+    return OpaquePointer{Base, FieldType, Path, PathLength};
+  }
 
   ArrayRef<PointerPathEntry> path() const { return ArrayRef(Path, PathLength); }
 
@@ -422,10 +432,16 @@ struct OpaquePointer {
     return QualType(FieldType.getPointer(), 0);
   }
 
+  QualType computeBackingType() const;
+  bool isUnknownSizeArray() const;
+  bool isRoot() const;
+
   /// If this is pointing to an array element, return the array.
   QualType getSurroundingArray(const ASTContext &ASTCtx) const;
 
-  bool isOnePastEnd() const { return FieldType.getInt(); }
+  bool isOnePastEnd() const { return FieldType.getInt() & 1u; }
+  bool isOnePastEndOrElementPastEnd() const;
+  bool isConstexprUnknown() const { return FieldType.getInt() & 2u; }
 };
 struct OpaqueTag {};
 
@@ -489,20 +505,24 @@ public:
   }
   Pointer(OpaqueTag, const ValueDecl *Base, const Type *FieldType,
           const PointerPathEntry *Path, unsigned PathLength, bool OPE = false,
-          uint64_t Offset = 0)
+          uint64_t Offset = 0, bool CU = false)
       : Offset(Offset), StorageKind(Storage::Opaque) {
-    Opaque.FieldType = {FieldType, OPE};
+    Opaque.FieldType = {FieldType, 0u | (OPE) | (CU * 2u)};
     Opaque.Path = Path;
     Opaque.PathLength = PathLength;
     Opaque.Base = Base;
   }
-  Pointer(OpaqueTag, const ValueDecl *Base, uint64_t Offset = 0)
+  Pointer(OpaqueTag, const ValueDecl *Base, bool ConstexprUnknown,
+          uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Opaque) {
-    Opaque.FieldType = {Base->getType().getTypePtr(), /*IsOnePastEnd=*/false};
+    Opaque.FieldType = {Base->getType().getTypePtr(),
+                        ConstexprUnknown ? 2u : 0u};
     Opaque.Path = nullptr;
     Opaque.PathLength = 0;
     Opaque.Base = Base;
   }
+  Pointer(OpaquePointer OP, uint64_t Offset = 0)
+      : Offset(Offset), StorageKind(Storage::Opaque), Opaque(OP) {}
 
   Pointer(Block *Pointee, unsigned Base, uint64_t Offset);
   explicit Pointer(PtrView V) : Pointer(V.Pointee, V.Base, V.Offset) {}
@@ -515,14 +535,27 @@ public:
   bool operator==(const Pointer &P) const {
     if (P.StorageKind != StorageKind)
       return false;
-    if (isIntegralPointer())
+    switch (StorageKind) {
+    case Storage::Int:
       return P.Int.Value == Int.Value && P.Int.Ty == Int.Ty &&
              P.Offset == Offset;
-
-    if (isFunctionPointer())
+    case Storage::Block:
+      return P.view() == view();
+    case Storage::Fn:
       return P.Fn.Func == Fn.Func && P.Offset == Offset;
-
-    return P.view() == view();
+    case Storage::Typeid:
+      llvm_unreachable("typeid in operator==?");
+    case Storage::Opaque:
+      if (!(P.Opaque.Base == Opaque.Base &&
+            P.Opaque.PathLength == Opaque.PathLength))
+        return false;
+      if (P.Offset != Offset)
+        return false;
+      if (Opaque.PathLength == 0)
+        return true;
+      return std::memcmp(P.Opaque.Path, Opaque.Path,
+                         sizeof(PointerPathEntry) * Opaque.PathLength) == 0;
+    }
   }
 
   bool operator!=(const Pointer &P) const { return !(P == *this); }
@@ -627,6 +660,12 @@ public:
   }
   SourceLocation getDeclLoc() const { return getDeclDesc()->getLocation(); }
 
+  bool singleWord() const {
+    if (!isOpaquePointer())
+      return true;
+    return Opaque.PathLength != 0;
+  }
+
   /// Returns the expression or declaration the pointer has been created for.
   DeclOrExpr getSource() const {
     if (isBlockPointer())
@@ -646,7 +685,7 @@ public:
 
   /// Accessors for information about the innermost field.
   const Descriptor *getFieldDesc() const {
-    if (isIntegralPointer())
+    if (!isBlockPointer())
       return nullptr;
 
     if (isRoot())
@@ -666,12 +705,14 @@ public:
     case Storage::Typeid:
       return QualType(Typeid.TypeInfoType, 0);
     case Storage::Opaque:
-      return QualType(Opaque.FieldType.getPointer(), 0);
+      return Opaque.getFieldType();
+      // return QualType(Opaque.FieldType.getPointer(), 0);
     }
     llvm_unreachable("Unhandled StorageKind");
   }
 
   const VarDecl *getRootVarDecl() const;
+  const Expr *getRootExpr() const;
 
   [[nodiscard]] Pointer getDeclPtr() const { return Pointer(BS.Pointee); }
 
@@ -720,6 +761,14 @@ public:
   }
   /// Checks if the structure is an array of unknown size.
   bool isUnknownSizeArray() const {
+    if (isOpaquePointer())
+      return Opaque.isUnknownSizeArray();
+    // {
+    // if (isa<IncompleteArrayType, VariableArrayType>(Opaque.getObjectType()))
+    // return true;
+    // return isa<IncompleteArrayType,
+    // VariableArrayType>(Opaque.getFieldType());
+    // }
     if (!isBlockPointer())
       return false;
     return getFieldDesc()->isUnknownSizeArray();
@@ -733,8 +782,13 @@ public:
   }
   /// Pointer points directly to a block.
   bool isRoot() const {
-    if (isZero() || !isBlockPointer())
+    if (isZero())
       return true;
+    if (isOpaquePointer())
+      return Opaque.isRoot();
+    if (!isBlockPointer())
+      return true;
+
     return view().isRoot();
   }
   /// If this pointer has an InlineDescriptor we can use to initialize.
@@ -833,6 +887,9 @@ public:
 
       return Fn.Func->getDecl()->isWeak();
     }
+    if (isOpaquePointer())
+      return Opaque.Base->isWeak();
+
     if (!isBlockPointer())
       return false;
 
@@ -852,7 +909,7 @@ public:
   /// Checks if the pointer points to a dummy value.
   bool isDummy() const {
     if (!isBlockPointer())
-      return false;
+      return isOpaquePointer();
     return view().isDummy();
   }
 
@@ -860,6 +917,8 @@ public:
   bool isConst() const {
     if (isIntegralPointer())
       return true;
+    if (!isBlockPointer())
+      return false;
     return view().isConst();
   }
   bool isConstInMutable() const {
@@ -890,6 +949,8 @@ public:
       return Int.Value + Offset;
     if (isTypeidPointer())
       return reinterpret_cast<uintptr_t>(Typeid.TypePtr) + Offset;
+    if (isOpaquePointer())
+      return Offset;
     if (isOnePastEnd())
       return PtrView::PastEndMark;
     return Offset;
@@ -921,6 +982,8 @@ public:
 
   /// Checks if the index is one past end.
   bool isOnePastEnd() const {
+    if (isOpaquePointer())
+      return Opaque.isOnePastEndOrElementPastEnd();
     if (!isBlockPointer())
       return false;
 
@@ -948,6 +1011,8 @@ public:
   bool isZeroSizeArray() const {
     if (isFunctionPointer())
       return false;
+    if (isOpaquePointer())
+      return false; // FIXME: Can actually happen I think?
     if (const auto *Desc = getFieldDesc())
       return Desc->isZeroSizeArray();
     return false;
@@ -987,6 +1052,8 @@ public:
   }
 
   bool isConstexprUnknown() const {
+    if (isOpaquePointer())
+      return Opaque.isConstexprUnknown();
     if (!isBlockPointer())
       return false;
     return getDeclDesc()->IsConstexprUnknown;
@@ -1120,7 +1187,7 @@ public:
   computeOffsetForComparison(const ASTContext &ASTCtx) const;
   /// Compute the pointer offset as given by the ASTRecordLayout.
   /// Returns the result in bytes.
-  std::optional<size_t> computeLayoutOffset(const ASTContext &ASTCtx) const;
+  std::optional<ssize_t> computeLayoutOffset(const ASTContext &ASTCtx) const;
 
 private:
   friend class Block;

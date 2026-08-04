@@ -11961,8 +11961,13 @@ static std::optional<IntRange> TryGetExprRange(ASTContext &C, const Expr *E,
 
   // Try a full evaluation first.
   Expr::EvalResult result;
-  if (E->EvaluateAsRValue(result, C, InConstantContext))
+  if (E->EvaluateAsRValue(result, C, InConstantContext)) {
+    // E->dumpColor();
+    // llvm::errs() << "RESULT: ";
+    // result.Val.dump();
+
     return GetValueRange(result.Val, GetExprType(E), MaxWidth);
+  }
 
   // I think we only want to look through implicit casts here; if the
   // user has an explicit widening cast, we should treat the value as

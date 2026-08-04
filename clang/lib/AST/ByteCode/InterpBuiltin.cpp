@@ -157,6 +157,9 @@ static void assignIntegral(InterpState &S, const Pointer &Dest, PrimType ValueT,
 }
 
 static QualType getElemType(const Pointer &P) {
+  if (P.isOpaquePointer())
+    return P.getType();
+
   const Descriptor *Desc = P.getFieldDesc();
   QualType T = Desc->getType();
   if (Desc->isPrimitive())
@@ -383,7 +386,7 @@ static bool interp__builtin_strlen(InterpState &S, CodePtr OpPC,
   if (!StrPtr.isBlockPointer())
     return false;
 
-  if (!CheckDummy(S, OpPC, StrPtr.block(), AK_Read))
+  if (!CheckDummy(S, OpPC, StrPtr, AK_Read))
     return false;
 
   if (!StrPtr.getFieldDesc()->isPrimitiveArray())
@@ -1279,10 +1282,10 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
   }
   assert(FirstArgT == PT_Ptr);
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isBlockPointer() && !Ptr.isOpaquePointer())
     return false;
 
-  const ValueDecl *PtrDecl = Ptr.getDeclDesc()->asValueDecl();
+  const VarDecl *PtrDecl = Ptr.getRootVarDecl();
   // We need a pointer for a declaration here.
   if (!PtrDecl) {
     if (BuiltinOp == Builtin::BI__builtin_is_aligned)
@@ -1294,10 +1297,19 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
     return false;
   }
 
-  // For one-past-end pointers, we can't call getIndex() since it asserts.
-  // Use getNumElems() instead which gives the correct index for past-end.
-  unsigned PtrOffset =
-      Ptr.isElementPastEnd() ? Ptr.getNumElems() : Ptr.getIndex();
+  unsigned PtrOffset;
+  if (Ptr.isBlockPointer()) {
+    // For one-past-end pointers, we can't call getIndex() since it asserts.
+    // Use getNumElems() instead which gives the correct index for past-end.
+    PtrOffset = Ptr.isElementPastEnd() ? Ptr.getNumElems() : Ptr.getIndex();
+
+  } else {
+    if (std::optional<size_t> PtrOff =
+            Ptr.computeLayoutOffset(S.getASTContext()))
+      PtrOffset = *PtrOff;
+    else
+      return false;
+  }
   CharUnits BaseAlignment = S.getASTContext().getDeclAlign(PtrDecl);
   CharUnits PtrAlign =
       BaseAlignment.alignmentAtOffset(CharUnits::fromQuantity(PtrOffset));
@@ -1345,8 +1357,52 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
         CharUnits::fromQuantity(BuiltinOp == Builtin::BI__builtin_align_down
                                     ? llvm::alignDown(PtrOffset, Alignment64)
                                     : llvm::alignTo(PtrOffset, Alignment64));
+    if (Ptr.isBlockPointer()) {
+      S.Stk.push<Pointer>(Ptr.atIndex(NewOffset.getQuantity()));
+      return true;
+    }
+    assert(Ptr.isOpaquePointer());
 
-    S.Stk.push<Pointer>(Ptr.atIndex(NewOffset.getQuantity()));
+    const OpaquePointer &OP = Ptr.asOpaquePointer();
+
+    QualType ArrTy;
+    if (OP.PathLength > 0) {
+      if (OP.path().back().Kind == PointerPathEntry::Array) {
+        ArrTy = OP.getSurroundingArray(S.getASTContext());
+      } else {
+        ArrTy = OP.getFieldType();
+      }
+    } else {
+      ArrTy = OP.getObjectType();
+    }
+
+    QualType ElemType;
+    bool PastEnd = false;
+    if (ArrTy->isArrayType()) {
+      const auto *AT = ArrTy->getAsArrayTypeUnsafe();
+      ElemType = AT->getElementType();
+      if (const auto *CAT = dyn_cast<ConstantArrayType>(AT))
+        PastEnd = NewOffset.getQuantity() >= CAT->getSExtSize();
+    } else if (ArrTy->isRecordType()) {
+      ElemType = ArrTy;
+    } else {
+      ElemType = ArrTy;
+    }
+
+    unsigned NewPathLength = OP.PathLength + 1;
+    if (OP.PathLength != 0 &&
+        OP.Path[OP.PathLength - 1].Kind == PointerPathEntry::Array)
+      NewPathLength--;
+
+    PointerPathEntry *NewPath = S.allocPointerPath(NewPathLength);
+    if (OP.Path)
+      std::memcpy(NewPath, OP.Path,
+                  sizeof(PointerPathEntry) * (NewPathLength - 1));
+
+    NewPath[NewPathLength - 1] =
+        PointerPathEntry::array(NewOffset.getQuantity());
+    S.Stk.push<Pointer>(OpaqueTag{}, OP.Base, ElemType.getTypePtr(), NewPath,
+                        NewPathLength, PastEnd);
     return true;
   }
 
@@ -1377,11 +1433,11 @@ static bool interp__builtin_assume_aligned(InterpState &S, CodePtr OpPC,
   CharUnits Align = CharUnits::fromQuantity(Alignment.getZExtValue());
 
   // If there is a base object, then it must have the correct alignment.
-  if (Ptr.isBlockPointer()) {
+  if (Ptr.isBlockPointer() || Ptr.isOpaquePointer()) {
     CharUnits BaseAlignment;
-    if (const auto *VD = Ptr.getDeclDesc()->asValueDecl())
+    if (const auto *VD = Ptr.getRootVarDecl())
       BaseAlignment = S.getASTContext().getDeclAlign(VD);
-    else if (const auto *E = Ptr.getDeclDesc()->asExpr())
+    else if (const auto *E = Ptr.getRootExpr())
       BaseAlignment = GetAlignOfExpr(S.getASTContext(), E, UETT_AlignOf);
 
     if (BaseAlignment < Align) {
@@ -1397,7 +1453,7 @@ static bool interp__builtin_assume_aligned(InterpState &S, CodePtr OpPC,
   if (ExtraOffset)
     AVOffset -= CharUnits::fromQuantity(ExtraOffset->getZExtValue());
   if (AVOffset.alignTo(Align) != AVOffset) {
-    if (Ptr.isBlockPointer())
+    if (Ptr.isBlockPointer() || Ptr.isOpaquePointer())
       S.CCEDiag(Call->getArg(0),
                 diag::note_constexpr_baa_insufficient_alignment)
           << 1 << AVOffset.getQuantity() << Align.getQuantity();
@@ -2077,7 +2133,8 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
     return true;
   }
 
-  if (!PtrA.isBlockPointer() || !PtrB.isBlockPointer())
+  if ((!PtrA.isBlockPointer() && !PtrA.isOpaquePointer()) ||
+      (!PtrB.isBlockPointer() && !PtrB.isOpaquePointer()))
     return false;
 
   bool IsWide =
@@ -2378,14 +2435,14 @@ static bool interp__builtin_is_within_lifetime(InterpState &S, CodePtr OpPC,
       return false;
     if (!CheckMutable(S, OpPC, Ptr))
       return false;
-    if (!CheckDummy(S, OpPC, Ptr.block(), AK_Read))
+    if (!CheckDummy(S, OpPC, Ptr, AK_Read))
       return false;
   }
 
   // Check if we're currently running an initializer.
   if (S.initializingBlock(Ptr.block()))
     return Error(2);
-  if (S.EvaluatingDecl && Ptr.getDeclDesc()->asVarDecl() == S.EvaluatingDecl)
+  if (S.EvaluatingDecl && Ptr.getRootVarDecl() == S.EvaluatingDecl)
     return Error(2);
 
   pushInteger(S, Result, Call->getType());

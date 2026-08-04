@@ -109,3 +109,17 @@ void testflex() {
 }
 
 
+// CHECK-LABEL: @vlas
+void vlas(int size) {
+  char z[size];
+
+  int gi;
+  // CHECK: call i64 @llvm.objectsize.i64.p0(ptr {{.*}}, i1 false, i1 true, i1 false)
+  gi = __builtin_object_size(z, 0);
+  // CHECK: call i64 @llvm.objectsize.i64.p0(ptr {{.*}}, i1 false, i1 true, i1 false)
+  gi = __builtin_object_size(z, 1);
+  // CHECK: call i64 @llvm.objectsize.i64.p0(ptr {{.*}}, i1 true, i1 true, i1 false)
+  gi = __builtin_object_size(z, 2);
+  // CHECK: store i32 0
+  gi = __builtin_object_size(z, 3);
+}

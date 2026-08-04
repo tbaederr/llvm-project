@@ -7387,6 +7387,7 @@ ExprResult Sema::CheckTemplateArgument(NamedDecl *Param, QualType ParamType,
     setDeductionArg(ArgResult.get());
 
     if (Value.isLValue()) {
+
       APValue::LValueBase Base = Value.getLValueBase();
       auto *VD = const_cast<ValueDecl *>(Base.dyn_cast<const ValueDecl *>());
       //   For a non-type template-parameter of pointer or reference type,

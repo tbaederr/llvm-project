@@ -2259,9 +2259,28 @@ bool Compiler<Emitter>::VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
   // side is the base.
   bool Success = true;
   for (const Expr *SubExpr : {LHS, RHS}) {
-    if (!this->visit(SubExpr)) {
-      Success = false;
-      continue;
+
+    if (false && SubExpr == Base) {
+      // llvm::errs() << "BASE:\n";
+      // Base->dumpColor();
+      if (const auto *Decay = dyn_cast<CastExpr>(SubExpr);
+          Decay && Decay->getCastKind() == CK_ArrayToPointerDecay) {
+        if (!this->visit(Decay->getSubExpr())) {
+          Success = false;
+          continue;
+        }
+      } else {
+        if (!this->visit(SubExpr)) {
+          Success = false;
+          continue;
+        }
+      }
+
+    } else {
+      if (!this->visit(SubExpr)) {
+        Success = false;
+        continue;
+      }
     }
 
     // Expand the base if this is a subscript on a
@@ -7919,11 +7938,16 @@ bool Compiler<Emitter>::VisitUnaryOperator(const UnaryOperator *E) {
     if (!Ctx.getLangOpts().CPlusPlus) {
       const Expr *Sub = SubExpr->IgnoreParens();
       if (const auto *Deref = dyn_cast<UnaryOperator>(Sub);
-          Deref && Deref->getOpcode() == UO_Deref)
-        return this->delegate(Deref->getSubExpr());
+          Deref && Deref->getOpcode() == UO_Deref) {
+        if (DiscardResult)
+          return this->discard(Deref->getSubExpr());
+        return this->visit(Deref->getSubExpr()) && this->emitAddrOf(E);
+      }
     }
     // We should already have a pointer when we get here.
-    return this->delegate(SubExpr);
+    if (DiscardResult)
+      return this->discard(SubExpr);
+    return this->delegate(SubExpr) && this->emitAddrOf(E);
   case UO_Deref: // *x
     if (DiscardResult)
       return this->discard(SubExpr);
@@ -8712,10 +8736,10 @@ template <class Emitter>
 bool Compiler<Emitter>::emitDummyPtr(DeclOrExpr D, const Expr *E, bool CU) {
   assert(!DiscardResult && "Should've been checked before");
 
-  if (ToLValue) {
+  // if (ToLValue) {
     if (const auto *VD = D.asValueDecl())
-      return this->emitGetOpaquePtr(VD, E);
-  }
+      return this->emitGetOpaquePtr(VD, CU, E);
+  // }
 
   unsigned DummyID = P.getOrCreateDummy(D, CU);
   if (!this->emitGetPtrGlobal(DummyID, E))
