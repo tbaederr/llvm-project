@@ -157,6 +157,9 @@ static void assignIntegral(InterpState &S, const Pointer &Dest, PrimType ValueT,
 }
 
 static QualType getElemType(const Pointer &P) {
+  if (P.isOpaquePointer())
+    return P.getType();
+
   const Descriptor *Desc = P.getFieldDesc();
   QualType T = Desc->getType();
   if (Desc->isPrimitive())
@@ -383,7 +386,7 @@ static bool interp__builtin_strlen(InterpState &S, CodePtr OpPC,
   if (!StrPtr.isBlockPointer())
     return false;
 
-  if (!CheckDummy(S, OpPC, StrPtr.block(), AK_Read))
+  if (!CheckDummy(S, OpPC, StrPtr, AK_Read))
     return false;
 
   if (!StrPtr.getFieldDesc()->isPrimitiveArray())
@@ -1279,10 +1282,10 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
   }
   assert(FirstArgT == PT_Ptr);
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isBlockPointer() && !Ptr.isOpaquePointer())
     return false;
 
-  const ValueDecl *PtrDecl = Ptr.getDeclDesc()->asValueDecl();
+  const VarDecl *PtrDecl = Ptr.getRootVarDecl();
   // We need a pointer for a declaration here.
   if (!PtrDecl) {
     if (BuiltinOp == Builtin::BI__builtin_is_aligned)
@@ -2077,7 +2080,7 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
     return true;
   }
 
-  if (!PtrA.isBlockPointer() || !PtrB.isBlockPointer())
+  if ((!PtrA.isBlockPointer() && !PtrA.isOpaquePointer()) || (!PtrB.isBlockPointer() && !PtrB.isOpaquePointer()))
     return false;
 
   bool IsWide =
@@ -2378,14 +2381,14 @@ static bool interp__builtin_is_within_lifetime(InterpState &S, CodePtr OpPC,
       return false;
     if (!CheckMutable(S, OpPC, Ptr))
       return false;
-    if (!CheckDummy(S, OpPC, Ptr.block(), AK_Read))
+    if (!CheckDummy(S, OpPC, Ptr, AK_Read))
       return false;
   }
 
   // Check if we're currently running an initializer.
   if (S.initializingBlock(Ptr.block()))
     return Error(2);
-  if (S.EvaluatingDecl && Ptr.getDeclDesc()->asVarDecl() == S.EvaluatingDecl)
+  if (S.EvaluatingDecl && Ptr.getRootVarDecl() == S.EvaluatingDecl)
     return Error(2);
 
   pushInteger(S, Result, Call->getType());

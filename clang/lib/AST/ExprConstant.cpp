@@ -16753,13 +16753,17 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
     // If we cannot determine the size of the initial allocation, then we can't
     // given an accurate upper-bound. However, we are still able to give
     // conservative lower-bounds for Type=3.
-    if (Type == 1)
+    if (Type == 1) {
       return false;
+    }
+  } else {
   }
 
   CharUnits BytesPerElem;
-  if (!CheckedHandleSizeof(Designator.MostDerivedType, BytesPerElem))
+  if (!CheckedHandleSizeof(Designator.MostDerivedType, BytesPerElem)) {
     return false;
+  }
+
 
   // According to the GCC documentation, we want the size of the subobject
   // denoted by the pointer. But that's not quite right -- what we actually
@@ -16791,7 +16795,6 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
 static std::optional<uint64_t>
 tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
                              bool IsDynamic = false) {
-
   // Determine the denoted object.
   LValue LVal;
   {
@@ -16805,12 +16808,15 @@ tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
       // It's possible for us to be given GLValues if we're called via
       // Expr::tryEvaluateObjectSize.
       APValue RVal;
-      if (!EvaluateAsRValue(Info, E, RVal))
+      if (!EvaluateAsRValue(Info, E, RVal)) {
         return std::nullopt;
+      }
       LVal.setFrom(Info.Ctx, RVal);
+
     } else if (!EvaluatePointer(ignorePointerCastsAndParens(E), LVal, Info,
-                                /*InvalidBaseOK=*/true))
+                                /*InvalidBaseOK=*/true)) {
       return std::nullopt;
+    }
   }
 
   // If we point to before the start of the object, there are no accessible
@@ -16836,8 +16842,9 @@ tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
   }
 
   CharUnits EndOffset;
-  if (!determineEndOffset(Info, E->getExprLoc(), Type, LVal, EndOffset))
+  if (!determineEndOffset(Info, E->getExprLoc(), Type, LVal, EndOffset)) {
     return std::nullopt;
+  }
 
   // If we've fallen outside of the end offset, just pretend there's nothing to
   // write to/read from.

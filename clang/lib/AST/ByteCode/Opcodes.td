@@ -328,6 +328,10 @@ class OffsetOpcode : Opcode {
   let Args = [ArgUint32];
 }
 
+def AddrOf : Opcode {
+
+}
+
 // [] -> [Pointer]
 def GetPtrLocal : OffsetOpcode {
   bit HasCustomEval = 1;

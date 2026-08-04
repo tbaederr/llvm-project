@@ -515,14 +515,25 @@ public:
   bool operator==(const Pointer &P) const {
     if (P.StorageKind != StorageKind)
       return false;
-    if (isIntegralPointer())
+    switch(StorageKind) {
+      case Storage::Int:
       return P.Int.Value == Int.Value && P.Int.Ty == Int.Ty &&
              P.Offset == Offset;
-
-    if (isFunctionPointer())
+      case Storage::Block:
+      return P.view() == view();
+      case Storage::Fn:
       return P.Fn.Func == Fn.Func && P.Offset == Offset;
-
-    return P.view() == view();
+      case Storage::Typeid:
+      llvm_unreachable("typeid in operator==?");
+      case Storage::Opaque:
+            if (!(P.Opaque.Base == Opaque.Base && P.Opaque.PathLength == Opaque.PathLength))
+        return false;
+      if (P.Offset != Offset)
+        return false;
+      if (Opaque.PathLength == 0)
+        return true;
+      return std::memcmp(P.Opaque.Path, Opaque.Path, sizeof(PointerPathEntry) * Opaque.PathLength) == 0;
+    }
   }
 
   bool operator!=(const Pointer &P) const { return !(P == *this); }
@@ -646,7 +657,7 @@ public:
 
   /// Accessors for information about the innermost field.
   const Descriptor *getFieldDesc() const {
-    if (isIntegralPointer())
+    if (!isBlockPointer())
       return nullptr;
 
     if (isRoot())
@@ -720,6 +731,8 @@ public:
   }
   /// Checks if the structure is an array of unknown size.
   bool isUnknownSizeArray() const {
+    if (isOpaquePointer())
+      return false;//isa<IncompleteArrayType>(Opaque.getFieldType());
     if (!isBlockPointer())
       return false;
     return getFieldDesc()->isUnknownSizeArray();
@@ -733,8 +746,13 @@ public:
   }
   /// Pointer points directly to a block.
   bool isRoot() const {
-    if (isZero() || !isBlockPointer())
+    if (isZero())
       return true;
+    if (isOpaquePointer())
+      return Opaque.PathLength == 0;
+    if (!isBlockPointer())
+      return true;
+
     return view().isRoot();
   }
   /// If this pointer has an InlineDescriptor we can use to initialize.
@@ -833,6 +851,9 @@ public:
 
       return Fn.Func->getDecl()->isWeak();
     }
+    if (isOpaquePointer())
+      return Opaque.Base->isWeak();
+
     if (!isBlockPointer())
       return false;
 
@@ -852,7 +873,7 @@ public:
   /// Checks if the pointer points to a dummy value.
   bool isDummy() const {
     if (!isBlockPointer())
-      return false;
+      return isOpaquePointer();
     return view().isDummy();
   }
 
@@ -860,6 +881,8 @@ public:
   bool isConst() const {
     if (isIntegralPointer())
       return true;
+    if (isOpaquePointer())
+      return false;
     return view().isConst();
   }
   bool isConstInMutable() const {
@@ -921,6 +944,8 @@ public:
 
   /// Checks if the index is one past end.
   bool isOnePastEnd() const {
+    if (isOpaquePointer())
+      return Opaque.isOnePastEnd();
     if (!isBlockPointer())
       return false;
 
@@ -948,6 +973,8 @@ public:
   bool isZeroSizeArray() const {
     if (isFunctionPointer())
       return false;
+    if (isOpaquePointer())
+      return false; // FIXME: Can actually happen I think?
     if (const auto *Desc = getFieldDesc())
       return Desc->isZeroSizeArray();
     return false;

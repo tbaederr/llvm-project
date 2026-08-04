@@ -7945,11 +7945,16 @@ bool Compiler<Emitter>::VisitUnaryOperator(const UnaryOperator *E) {
     if (!Ctx.getLangOpts().CPlusPlus) {
       const Expr *Sub = SubExpr->IgnoreParens();
       if (const auto *Deref = dyn_cast<UnaryOperator>(Sub);
-          Deref && Deref->getOpcode() == UO_Deref)
-        return this->delegate(Deref->getSubExpr());
+          Deref && Deref->getOpcode() == UO_Deref) {
+        if (DiscardResult)
+          return this->discard(Deref->getSubExpr());
+        return this->visit(Deref->getSubExpr()) && this->emitAddrOf(E);
+      }
     }
     // We should already have a pointer when we get here.
-    return this->delegate(SubExpr);
+    if (DiscardResult)
+        return this->discard(SubExpr);
+    return this->delegate(SubExpr) && this->emitAddrOf(E);
   case UO_Deref: // *x
     if (DiscardResult)
       return this->discard(SubExpr);

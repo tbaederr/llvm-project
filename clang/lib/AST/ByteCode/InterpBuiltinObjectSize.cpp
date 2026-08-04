@@ -199,7 +199,7 @@ static bool isUserWritingOffTheEnd(const ASTContext &ASTCtx,
   // We're pointing to the last field in the full object.
   // CurType is now the most derived type.
   if (!CurType->isArrayType())
-    return false;
+    return true;
 
   if (isa<IncompleteArrayType>(CurType))
     return true;
@@ -286,10 +286,13 @@ computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
     return Offset - *SurroundingArrayOffset;
 
   QualType Ty = CurType.getNonReferenceType();
-
   if (UseClosestSurroundingVariable &&
       (Ty->isIncompleteType() || Ty->isFunctionType()))
     return std::nullopt;
+
+  if (isa<VariableArrayType>(Ty))
+    return std::nullopt;
+
 
   if (OP.PathLength == 1 && OP.path().back().Kind == PointerPathEntry::Field &&
       isa<IncompleteArrayType>(CurType)) {
@@ -413,8 +416,10 @@ UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
 
       if (InvalidBase)
         return std::nullopt;
-    }
 
+      if (OP.getObjectType()->isIncompleteType() || OP.getObjectType()->isFunctionType())
+        return std::nullopt;
+    }
     *Offset += Ptr.getByteOffset();
 
     if (*Offset > *FullSize)
