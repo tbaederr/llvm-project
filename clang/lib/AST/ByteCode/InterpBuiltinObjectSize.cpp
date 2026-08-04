@@ -199,7 +199,7 @@ static bool isUserWritingOffTheEnd(const ASTContext &ASTCtx,
   // We're pointing to the last field in the full object.
   // CurType is now the most derived type.
   if (!CurType->isArrayType())
-    return false;
+    return true;
 
   if (isa<IncompleteArrayType>(CurType))
     return true;
@@ -274,7 +274,7 @@ computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
       const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
       assert(AT);
       QualType ElemTy = AT->getElementType();
-      if (!validType(ElemTy))
+      if (!validType(ElemTy) || isa<VariableArrayType>(AT))
         return std::nullopt;
       Offset += Index * ASTCtx.getTypeSizeInChars(ElemTy).getQuantity();
       CurType = AT->getElementType();
@@ -286,9 +286,11 @@ computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
     return Offset - *SurroundingArrayOffset;
 
   QualType Ty = CurType.getNonReferenceType();
-
   if (UseClosestSurroundingVariable &&
       (Ty->isIncompleteType() || Ty->isFunctionType()))
+    return std::nullopt;
+
+  if (isa<VariableArrayType>(Ty))
     return std::nullopt;
 
   if (OP.PathLength == 1 && OP.path().back().Kind == PointerPathEntry::Field &&
@@ -360,6 +362,7 @@ namespace interp {
 UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
                                          unsigned Kind, Pointer &Ptr,
                                          const Expr *E, bool IsDynamic) {
+
   if (Ptr.isZero())
     return std::nullopt;
 
@@ -387,6 +390,7 @@ UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
     if (!Offset)
       return std::nullopt;
 
+    // llvm::errs() << "OffsetIsNegative: " << OffsetIsNegative << '\n';
     if (OffsetIsNegative)
       return 0u;
 
@@ -405,7 +409,6 @@ UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
       if (FD && FD->getType()->isCountAttributedType())
         return std::nullopt;
     }
-
     if (!UseClosestSurroundingVariable || DetermineForCompleteObject) {
       // Kind=3 wants a lower bound, so we can't fall back to this.
       if (Kind == 3 && !DetermineForCompleteObject)
@@ -413,15 +416,20 @@ UnsignedOrNone evaluateBuiltinObjectSize(const ASTContext &ASTCtx,
 
       if (InvalidBase)
         return std::nullopt;
+
+      QualType ObjectTy = OP.getObjectType();
+      if (ObjectTy->isIncompleteType() || isa<VariableArrayType>(ObjectTy) ||
+          ObjectTy->isFunctionType())
+        return std::nullopt;
     }
-
     *Offset += Ptr.getByteOffset();
-
-    if (*Offset > *FullSize)
-      return 0u;
 
     if (Kind == 1 && InvalidBase && isUserWritingOffTheEnd(ASTCtx, OP))
       return std::nullopt;
+
+    if (*Offset > *FullSize) {
+      return 0u;
+    }
 
     assert(*Offset <= *FullSize);
     return static_cast<unsigned>(*FullSize - *Offset);

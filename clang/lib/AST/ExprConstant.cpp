@@ -2541,6 +2541,8 @@ static bool CheckEvaluationResult(CheckEvaluationResultKind CERK,
 
   if (Value.isLValue() &&
       CERK == CheckEvaluationResultKind::ConstantExpression) {
+    // llvm::errs() << "LValue: ";
+    // Value.dump();
     LValue LVal;
     LVal.setFrom(Info.Ctx, Value);
     return CheckLValueConstantExpression(Info, DiagLoc, Type, LVal, Kind,
@@ -5638,7 +5640,13 @@ static bool EvaluateInitForDeclOfReferenceType(EvalInfo &Info,
   // Because a null pointer value or a pointer past the end of an object
   // does not point to an object, a reference in a well-defined program cannot
   // refer to such things;
+  // APValue V;
+  // Result.moveInto(V);
+  // V.dump();
+  // llvm::errs() << "Designator: " << Result.Designator.isOnePastTheEnd() <<
+  // '\n';
   if (!Result.Designator.Invalid && Result.Designator.isOnePastTheEnd()) {
+
     Info.FFDiag(Init, diag::note_constexpr_access_past_end) << AK_Dereference;
     return false;
   }
@@ -10683,6 +10691,8 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       return false;
     CharUnits BaseAlignment = getBaseAlignment(Info, Result);
     CharUnits PtrAlign = BaseAlignment.alignmentAtOffset(Result.Offset);
+    // llvm::errs() << "PtrAlign: " << PtrAlign.getQuantity() << '\n';
+    // llvm::errs() << "BaseAlignment: " << BaseAlignment.getQuantity() << '\n';
     // For align_up/align_down, we can return the same value if the alignment
     // is known to be greater or equal to the requested value.
     if (PtrAlign.getQuantity() >= Alignment)
@@ -16706,6 +16716,7 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
                                unsigned Type, const LValue &LVal,
                                CharUnits &EndOffset) {
   bool DetermineForCompleteObject = refersToCompleteObject(LVal);
+  llvm::errs() << "DFCO: " << DetermineForCompleteObject << '\n';
 
   auto CheckedHandleSizeof = [&](QualType Ty, CharUnits &Result) {
     if (Ty.isNull())
@@ -16737,6 +16748,7 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
 
     QualType BaseTy = getObjectType(LVal.getLValueBase());
     const bool Ret = CheckedHandleSizeof(BaseTy, EndOffset);
+    llvm::errs() << "Size from base type: " << EndOffset.getQuantity() << '\n';
     addFlexibleArrayMemberInitSize(Info, BaseTy, LVal, EndOffset);
     return Ret;
   }
@@ -16762,13 +16774,17 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
     // If we cannot determine the size of the initial allocation, then we can't
     // given an accurate upper-bound. However, we are still able to give
     // conservative lower-bounds for Type=3.
-    if (Type == 1)
+    if (Type == 1) {
       return false;
+    }
+  } else {
   }
 
   CharUnits BytesPerElem;
-  if (!CheckedHandleSizeof(Designator.MostDerivedType, BytesPerElem))
+  if (!CheckedHandleSizeof(Designator.MostDerivedType, BytesPerElem)) {
+    // llvm::errs() << "sizeof failed\n";
     return false;
+  }
 
   // According to the GCC documentation, we want the size of the subobject
   // denoted by the pointer. But that's not quite right -- what we actually
@@ -16783,6 +16799,9 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
     ElemsRemaining = Designator.isOnePastTheEnd() ? 0 : 1;
   }
 
+  llvm::errs() << "Lvalue offset: " << LVal.getLValueOffset().getQuantity()
+               << '\n';
+  llvm::errs() << "Remaining: " << ElemsRemaining << '\n';
   EndOffset = LVal.getLValueOffset() + BytesPerElem * ElemsRemaining;
   return true;
 }
@@ -16796,7 +16815,9 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
 static std::optional<uint64_t>
 tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
                              bool IsDynamic = false) {
-
+  llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  E->dumpColor();
+  llvm::errs() << "Type: " << Type << '\n';
   // Determine the denoted object.
   LValue LVal;
   {
@@ -16810,18 +16831,25 @@ tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
       // It's possible for us to be given GLValues if we're called via
       // Expr::tryEvaluateObjectSize.
       APValue RVal;
-      if (!EvaluateAsRValue(Info, E, RVal))
+      if (!EvaluateAsRValue(Info, E, RVal)) {
+        // llvm::errs() << "rval failed\n";
         return std::nullopt;
+      }
       LVal.setFrom(Info.Ctx, RVal);
+
     } else if (!EvaluatePointer(ignorePointerCastsAndParens(E), LVal, Info,
-                                /*InvalidBaseOK=*/true))
+                                /*InvalidBaseOK=*/true)) {
+      // llvm::errs() << "EvaluatePointer failed\n";
       return std::nullopt;
+    }
   }
 
   // If we point to before the start of the object, there are no accessible
   // bytes.
-  if (LVal.getLValueOffset().isNegative())
+  if (LVal.getLValueOffset().isNegative()) {
+    // llvm::errs() << "lvlaue offset is negative\n";
     return 0;
+  }
 
   // For __builtin_dynamic_object_size on a counted_by-annotated flexible
   // array member, defer to IR generation (emitCountedBySize in CGBuiltin):
@@ -16841,13 +16869,18 @@ tryEvaluateBuiltinObjectSize(const Expr *E, unsigned Type, EvalInfo &Info,
   }
 
   CharUnits EndOffset;
-  if (!determineEndOffset(Info, E->getExprLoc(), Type, LVal, EndOffset))
+  if (!determineEndOffset(Info, E->getExprLoc(), Type, LVal, EndOffset)) {
+    llvm::errs() << "DOE failed\n";
     return std::nullopt;
+  }
 
   // If we've fallen outside of the end offset, just pretend there's nothing to
   // write to/read from.
-  if (EndOffset <= LVal.getLValueOffset())
+  if (EndOffset <= LVal.getLValueOffset()) {
     return 0;
+  }
+  llvm::errs() << "RESULT: "
+               << (EndOffset - LVal.getLValueOffset()).getQuantity() << '\n';
   return (EndOffset - LVal.getLValueOffset()).getQuantity();
 }
 
@@ -19223,6 +19256,13 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
 
     if (!EvaluatePointer(E->getRHS(), RHSValue, Info) || !LHSOK)
       return false;
+
+    // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+    // APValue V;
+    // LHSValue.moveInto(V);
+    // V.dump();
+    // RHSValue.moveInto(V);
+    // V.dump();
 
     // Reject differing bases from the normal codepath; we special-case
     // comparisons to null.
@@ -21733,6 +21773,7 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
   if (Info.EnableNewConstInterp) {
     if (!Info.Ctx.getInterpContext().evaluateAsRValue(Info, E, Result))
       return false;
+    // Result.dump();
     return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
                                    ConstantExprKind::Normal);
   }
@@ -21747,6 +21788,12 @@ static bool EvaluateAsRValue(EvalInfo &Info, const Expr *E, APValue &Result) {
     if (!handleLValueToRValueConversion(Info, E, E->getType(), LV, Result))
       return false;
   }
+
+  // Result.dump();
+
+  // if (Result.getInt() == 2147483648) {
+  // assert(false);
+  // }
 
   // Check this core constant expression is a constant expression.
   return CheckConstantExpression(Info, E->getExprLoc(), E->getType(), Result,
@@ -21864,6 +21911,13 @@ static bool EvaluateAsFixedPoint(const Expr *E, Expr::EvalResult &ExprResult,
 /// will be applied to the result.
 bool Expr::EvaluateAsRValue(EvalResult &Result, const ASTContext &Ctx,
                             bool InConstantContext) const {
+
+  {
+    // ColorScope SC(llvm::errs(), true, {llvm::raw_ostream::RED, true});
+    // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  }
+  // this->dumpColor();
+
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsRValue");
@@ -21983,6 +22037,12 @@ static bool EvaluateDestruction(const ASTContext &Ctx, APValue::LValueBase Base,
 
 bool Expr::EvaluateAsConstantExpr(EvalResult &Result, const ASTContext &Ctx,
                                   ConstantExprKind Kind) const {
+  {
+    // ColorScope SC(llvm::errs(), true, {llvm::raw_ostream::RED, true});
+    // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  }
+  // this->dumpColor();
+
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
   bool IsConst;

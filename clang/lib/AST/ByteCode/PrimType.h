@@ -131,10 +131,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 template <typename T> constexpr bool needsAlloc() {
   return std::is_same_v<T, IntegralAP<false>> ||
          std::is_same_v<T, IntegralAP<true>> || std::is_same_v<T, Floating> ||
-         std::is_same_v<T, MemberPointer>;
+         std::is_same_v<T, Pointer> || std::is_same_v<T, MemberPointer>;
 }
 constexpr bool needsAlloc(PrimType T) {
-  return T == PT_IntAP || T == PT_IntAPS || T == PT_Float || T == PT_MemberPtr;
+  return T == PT_IntAP || T == PT_IntAPS || T == PT_Float ||
+         T == PT_MemberPtr || T == PT_Ptr;
 }
 
 template <typename T> constexpr bool isIntegralOrPointer() {
@@ -300,6 +301,7 @@ static inline bool aligned(const void *P) {
       TYPE_SWITCH_CASE(PT_Float, B)                                            \
       TYPE_SWITCH_CASE(PT_IntAP, B)                                            \
       TYPE_SWITCH_CASE(PT_IntAPS, B)                                           \
+      TYPE_SWITCH_CASE(PT_Ptr, B)                                              \
       TYPE_SWITCH_CASE(PT_MemberPtr, B)                                        \
     default:;                                                                  \
     }                                                                          \

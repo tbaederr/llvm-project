@@ -21,6 +21,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/AST/TypeBase.h"
 
 using namespace clang;
 using namespace clang::interp;
@@ -184,8 +185,114 @@ Pointer &Pointer::operator=(Pointer &&P) {
   return *this;
 }
 
+// Helper to check if a RecordDecl can be passed to
+// ASTContext::getRecordLayout().
+static bool validRecordDecl(const RecordDecl *D) {
+  D = D->getDefinition();
+  return D && !D->isInvalidDecl() && D->isCompleteDefinition();
+}
+
+// Same but for types.
+static bool validType(QualType T) {
+  if (const RecordDecl *RD = T->getAsRecordDecl())
+    return validRecordDecl(RD);
+  return true;
+}
+
+static std::optional<int64_t>
+computeOpaquePtrOffset(const ASTContext &ASTCtx, const Pointer &Ptr,
+                       bool UseClosestSurroundingVariable,
+                       bool &OffsetIsNegative) {
+  const OpaquePointer &OP = Ptr.asOpaquePointer();
+
+  int64_t Offset = 0;
+  std::optional<int64_t> SurroundingArrayOffset;
+  QualType CurType = OP.getObjectType();
+  for (const PointerPathEntry &Entry : OP.path()) {
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base: {
+      const RecordDecl *RD = CurType->getAsRecordDecl();
+      if (!validRecordDecl(RD))
+        return std::nullopt;
+
+      const ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(RD);
+      if (Entry.RD.getInt())
+        Offset +=
+            Layout.getVBaseClassOffset(Entry.RD.getPointer()).getQuantity();
+      else
+        Offset +=
+            Layout.getBaseClassOffset(Entry.RD.getPointer()).getQuantity();
+
+      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
+    } break;
+
+    case PointerPathEntry::Field: {
+      const FieldDecl *FD = Entry.FD;
+      const RecordDecl *RD = FD->getParent();
+      if (!validRecordDecl(RD))
+        return std::nullopt;
+
+      const ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(RD);
+      Offset +=
+          ASTCtx.toCharUnitsFromBits(Layout.getFieldOffset(FD->getFieldIndex()))
+              .getQuantity();
+      // llvm::errs() << "Field += " <<
+      // ASTCtx.toCharUnitsFromBits(Layout.getFieldOffset(FD->getFieldIndex()))
+      // .getQuantity() << '\n';
+
+      CurType = FD->getType();
+    } break;
+    case PointerPathEntry::Array: {
+      // llvm::errs() << "Array!\n";
+      int64_t Index = Entry.Index;
+      // llvm::errs() << "Index: " << Index << '\n';
+      // CurType->dump();
+      if (Index < 0)
+        OffsetIsNegative = true;
+      SurroundingArrayOffset = Offset;
+      if (!CurType->isArrayType()) {
+        Offset += Index * ASTCtx.getTypeSizeInChars(CurType).getQuantity();
+        continue;
+      }
+      const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+      assert(AT);
+      QualType ElemTy = AT->getElementType();
+      // ElemTy->dump();
+      if (!validType(ElemTy))
+        return std::nullopt;
+      // llvm::errs() << "Offset += " << Index << " * "
+                   // << ASTCtx.getTypeSizeInChars(ElemTy).getQuantity() << '\n';
+
+      Offset += Index * ASTCtx.getTypeSizeInChars(ElemTy).getQuantity();
+      CurType = AT->getElementType();
+    }
+    }
+  }
+
+  if (UseClosestSurroundingVariable && SurroundingArrayOffset)
+    return Offset - *SurroundingArrayOffset;
+
+  QualType Ty = CurType.getNonReferenceType();
+
+  if (UseClosestSurroundingVariable &&
+      (Ty->isIncompleteType() || Ty->isFunctionType()))
+    return std::nullopt;
+
+  if (OP.PathLength == 1 && OP.path().back().Kind == PointerPathEntry::Field &&
+      isa<IncompleteArrayType>(CurType)) {
+    return Offset;
+  }
+
+  if (UseClosestSurroundingVariable)
+    return 0;
+
+  return Offset;
+}
+
 APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   llvm::SmallVector<APValue::LValuePathEntry, 5> Path;
+  llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  llvm::errs() << *this << '\n';
 
   if (isZero())
     return APValue(APValue::LValueBase(), CharUnits::Zero(), Path,
@@ -213,8 +320,36 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   }
 
   if (isOpaquePointer()) {
-    return APValue(APValue::LValueBase(), CharUnits::Zero(), Path,
-                   /*IsOnePastEnd=*/false, /*IsNullPtr=*/true);
+    CharUnits Offset;
+    if (!Opaque.Base->getType()->isPointerType()) {
+      for (const PointerPathEntry &Entry : Opaque.path()) {
+        // for (const PointerPathEntry &Entry :
+        // Opaque.path().drop_back(isOnePastEnd())) {
+        switch (Entry.Kind) {
+        case PointerPathEntry::Field:
+          Path.push_back(APValue::LValuePathEntry({Entry.FD, false}));
+          break;
+        case PointerPathEntry::Base:
+          Path.push_back(APValue::LValuePathEntry(
+              {Entry.RD.getPointer(), Entry.RD.getInt()}));
+          break;
+        case PointerPathEntry::Array:
+          Path.push_back(APValue::LValuePathEntry::ArrayIndex(Entry.Index));
+          break;
+        }
+      }
+    }
+    bool OffsetNegative = false;
+    auto O = computeOpaquePtrOffset(ASTCtx, *this, false, OffsetNegative);
+    if (O) {
+      // llvm::errs() << "Computed offset: " << *O << '\n';
+      // if (!isOnePastEnd())
+        Offset = CharUnits::fromQuantity(*O + getByteOffset());
+      // else
+        // Offset = CharUnits::fromQuantity(*O);
+    }
+    return APValue(Opaque.Base, Offset, Path,
+                   /*IsOnePastEnd=*/isOnePastEnd(), /*IsNullPtr=*/false);
   }
 
   // Build the lvalue base from the block.
@@ -396,8 +531,15 @@ Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
-  case Storage::Opaque:
-    return reinterpret_cast<uintptr_t>(asOpaquePointer().Base) + Offset;
+  case Storage::Opaque: {
+    bool OffsetNegative = false;
+    if (auto O = computeOpaquePtrOffset(ASTCtx, *this, false, OffsetNegative)) {
+      // if (!isOnePastEnd())
+      return *O + Offset;
+      return *O;
+    }
+    return std::nullopt;
+  }
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
@@ -464,7 +606,7 @@ Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
   return Result;
 }
 
-std::optional<size_t>
+std::optional<ssize_t>
 Pointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
   switch (StorageKind) {
   case Storage::Int:
@@ -476,8 +618,12 @@ Pointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
-  case Storage::Opaque:
-    return reinterpret_cast<uintptr_t>(asOpaquePointer().Base) + Offset;
+  case Storage::Opaque: {
+    bool OffsetNegative = false;
+    if (auto O = computeOpaquePtrOffset(ASTCtx, *this, false, OffsetNegative))
+      return *O + Offset;
+    return std::nullopt;
+  }
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
@@ -825,15 +971,41 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
   if (A.isZero() && B.isZero())
     return true;
 
-  if (A.isIntegralPointer() && B.isIntegralPointer())
-    return true;
-  if (A.isFunctionPointer() && B.isFunctionPointer())
-    return true;
-  if (A.isTypeidPointer() && B.isTypeidPointer())
-    return A.asTypeidPointer().TypePtr == B.asTypeidPointer().TypePtr;
+  if (A.StorageKind != B.StorageKind) {
 
-  if (A.StorageKind != B.StorageKind)
+    if (A.isOpaquePointer() && B.isBlockPointer()) {
+      if (!B.block()->getDescriptor()->asVarDecl())
+        return false;
+
+      return A.Opaque.Base->getMostRecentDecl() ==
+             B.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
+    }
+
+    if (B.isOpaquePointer() && A.isBlockPointer()) {
+      if (!A.block()->getDescriptor()->asVarDecl())
+        return false;
+      return B.Opaque.Base->getMostRecentDecl() ==
+             A.block()->getDescriptor()->asVarDecl()->getMostRecentDecl();
+    }
+
     return false;
+  }
+
+  switch (A.StorageKind) {
+  case Storage::Int:
+    return true;
+  case Storage::Block:
+    // See below.
+    break;
+  case Storage::Fn:
+    return true;
+  case Storage::Typeid:
+    return A.asTypeidPointer().TypePtr == B.asTypeidPointer().TypePtr;
+  case Storage::Opaque:
+    return A.asOpaquePointer().Base->getMostRecentDecl() ==
+           B.asOpaquePointer().Base->getMostRecentDecl();
+    break;
+  }
 
   return A.asBlockPointer().Pointee == B.asBlockPointer().Pointee;
 }
@@ -1148,6 +1320,9 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
   if (isZero() || isIntegralPointer())
     return toAPValue(ASTCtx);
 
+  if (!isBlockPointer())
+    return std::nullopt;
+
   // Just load primitive types.
   if (OptPrimType T = Ctx.classify(ResultType)) {
     if (!canDeref(*T))
@@ -1165,6 +1340,15 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
 const VarDecl *Pointer::getRootVarDecl() const {
   if (isBlockPointer())
     return getDeclDesc()->asVarDecl();
+  if (isOpaquePointer())
+    return dyn_cast<VarDecl>(Opaque.Base);
+  return nullptr;
+}
+
+const Expr *Pointer::getRootExpr() const {
+  if (isBlockPointer())
+    return getDeclDesc()->asExpr();
+  // FIXME: Opaque pointers.
   return nullptr;
 }
 
@@ -1227,14 +1411,18 @@ IntPointer IntPointer::baseCast(const interp::Context &Ctx,
 }
 
 QualType OpaquePointer::getSurroundingArray(const ASTContext &ASTCtx) const {
-  assert(PathLength != 0);
+
+  if (PathLength == 0 || Path[PathLength - 1].Kind != PointerPathEntry::Array)
+    return getObjectType();
+
   assert(Path[PathLength - 1].Kind == PointerPathEntry::Array);
 
   QualType CurType = getObjectType();
   for (const PointerPathEntry &Entry : path().drop_back(1)) {
     switch (Entry.Kind) {
     case PointerPathEntry::Base:
-      CurType = ASTCtx.getCanonicalTagType(Entry.RD.getPointer());
+      CurType = Entry.RD.getPointer()->getASTContext().getCanonicalTagType(
+          Entry.RD.getPointer());
       break;
     case PointerPathEntry::Field:
       CurType = Entry.FD->getType();
@@ -1249,4 +1437,146 @@ QualType OpaquePointer::getSurroundingArray(const ASTContext &ASTCtx) const {
     }
   }
   return CurType;
+}
+
+QualType OpaquePointer::computeBackingType() const {
+  QualType CurType = getObjectType();
+  for (const PointerPathEntry &Entry : path()) {
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base:
+      CurType = Entry.RD.getPointer()->getASTContext().getCanonicalTagType(
+          Entry.RD.getPointer());
+      break;
+    case PointerPathEntry::Field:
+      CurType = Entry.FD->getType();
+      break;
+    case PointerPathEntry::Array: {
+      if (!CurType->isArrayType())
+        break;
+      const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+      assert(AT);
+      CurType = AT->getElementType();
+    }
+    }
+  }
+
+  return CurType;
+}
+
+bool OpaquePointer::isUnknownSizeArray() const {
+  QualType FieldType = getFieldType();
+
+  {
+    // ColorScope SC(llvm::errs(), true, {llvm::raw_ostream::BLUE, true});
+    // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  }
+  // FieldType->dump();
+
+  if (PathLength != 0 && Path[PathLength - 1].Kind == PointerPathEntry::Array) {
+    QualType CurType = getObjectType();
+    for (const PointerPathEntry &Entry : path().drop_back(1)) {
+      switch (Entry.Kind) {
+      case PointerPathEntry::Base:
+        CurType = Entry.RD.getPointer()->getASTContext().getCanonicalTagType(
+            Entry.RD.getPointer());
+        break;
+      case PointerPathEntry::Field:
+        CurType = Entry.FD->getType();
+        break;
+      case PointerPathEntry::Array: {
+        if (!CurType->isArrayType())
+          break;
+        const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+        assert(AT);
+        CurType = AT->getElementType();
+      }
+      }
+    }
+
+    FieldType = CurType;
+  }
+
+  // FieldType->dump();
+
+  bool Result = false;
+
+  // If the field type is an IncompleteArrayType, we still need to check the
+  // base to see if this array is a flexible array member _and_ has actually
+  // been initialized by data we know the size of.
+
+  if (isa<IncompleteArrayType>(FieldType)) {
+    const VarDecl *Base = cast<VarDecl>(this->Base);
+    if (!Base || !Base->getType()->isRecordType() || !Base->hasInit())
+      Result = true;
+    else
+      Result = !Base->hasFlexibleArrayInit(Base->getASTContext());
+  } else if (isa<VariableArrayType>(FieldType))
+    Result = true;
+
+  // llvm::errs() << " >> " << Result << '\n';
+  return Result;
+
+  return false;
+}
+
+bool OpaquePointer::isRoot() const {
+
+  QualType CurType = getObjectType();
+  for (const PointerPathEntry &Entry : path()) {
+    switch (Entry.Kind) {
+    case PointerPathEntry::Base:
+      CurType = Entry.RD.getPointer()->getASTContext().getCanonicalTagType(
+          Entry.RD.getPointer());
+      break;
+    case PointerPathEntry::Field:
+      if (Entry.FD->getFieldIndex() != 0)
+        return false;
+      CurType = Entry.FD->getType();
+
+      break;
+    case PointerPathEntry::Array: {
+
+      if (Entry.Index != 0)
+        return false;
+
+      if (!CurType->isArrayType())
+        continue;
+
+      const ArrayType *AT = CurType->getAsArrayTypeUnsafe();
+      assert(AT);
+      CurType = AT->getElementType();
+    }
+    }
+  }
+
+  return true;
+}
+
+/// This is used in Pointer::isOnePastEnd(). We cannot read from such pointers.
+/// We can of course never read from opaque pointers anyway but we diagnose
+/// one-past-the-end pointers differently.
+///
+/// In contrast, OpaquePointer::isOnePastEnd() only uses the past-end bit. That
+/// is used for the APValue conversion.
+bool OpaquePointer::isOnePastEndOrElementPastEnd() const {
+  if (isOnePastEnd())
+    return true;
+
+  if (PathLength == 0)
+    return false;
+
+  if (Path[PathLength - 1].Kind != PointerPathEntry::Array)
+    return false;
+
+  QualType ArrTy = getSurroundingArray(Base->getASTContext());
+  if (!ArrTy->isArrayType())
+    return false;
+  // FIXME: Flexible array members?
+  if (const auto *CAT =
+          dyn_cast<ConstantArrayType>(ArrTy->getAsArrayTypeUnsafe())) {
+    if (Path[PathLength - 1].Index >= CAT->getSExtSize())
+      return true;
+  }
+
+  return false;
 }

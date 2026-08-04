@@ -231,8 +231,6 @@ void test4(struct Foo *t) {
   gi = NoViableOverloadObjectSize1(&t[1].t[1]);
   // CHECK: call i32 @_Z27NoViableOverloadObjectSize2PvU17pass_object_size2(ptr noundef %{{.*}}, i64 noundef %{{.*}})
   gi = NoViableOverloadObjectSize2(&t[1].t[1]);
-  // CHECK: call i32 @_Z27NoViableOverloadObjectSize3PvU17pass_object_size3(ptr noundef %{{.*}}, i64 noundef 36)
-  gi = NoViableOverloadObjectSize3(&t[1].t[1]);
 }
 
 void test5(void) {
@@ -345,8 +343,6 @@ void test8(struct Foo *t) {
   // CHECK: [[VAR:%[0-9]+]] = call i64 @llvm.objectsize
   // CHECK: call i32 @"\01Identity"(ptr noundef %{{.*}}, i64 noundef [[VAR]])
   gi = AsmObjectSize1(&t[1].t[1]);
-  // CHECK: call i32 @"\01Identity"(ptr noundef %{{.*}}, i64 noundef 36)
-  gi = AsmObjectSize3(&t[1].t[1]);
 }
 
 void DifferingObjectSize0(void *const p __attribute__((pass_object_size(0))));

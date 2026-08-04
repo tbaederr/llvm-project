@@ -328,6 +328,8 @@ class OffsetOpcode : Opcode {
   let Args = [ArgUint32];
 }
 
+def AddrOf : Opcode;
+
 // [] -> [Pointer]
 def GetPtrLocal : OffsetOpcode {
   bit HasCustomEval = 1;
@@ -620,7 +622,7 @@ def AddOffset : Opcode {
 }
 
 def GetOpaquePtr : SuccessOpcode {
-  let Args = [ArgValueDecl];
+  let Args = [ArgValueDecl, ArgBool];
 }
 
 // [Pointer, Integral] -> [Pointer]

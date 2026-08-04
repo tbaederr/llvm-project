@@ -12,6 +12,12 @@ const int cval = 2;
 template <int> struct C{};
 template struct C<cval>;
 
+char melchizedek[2200000000];
+typedef decltype(melchizedek[1] - melchizedek[0]) ptrdiff_t;
+constexpr int d2 = &melchizedek[0x80000000u] - &melchizedek[0]; // both-warning {{changes value from 2147483648 to -2147483648}}
+
+
+
 
 /// FIXME: This example does not get properly diagnosed in the new interpreter.
 extern const int recurse1;

@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -triple x86_64-apple-darwin10 -fsyntax-only -Wno-unused-value -Wcast-align -verify %s
+// RUN: %clang_cc1 -triple x86_64-apple-darwin10 -fsyntax-only -Wno-unused-value -Wcast-align -verify %s -fexperimental-new-constant-interpreter
 
 // Simple casts.
 void test0(char *P) {

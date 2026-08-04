@@ -28,6 +28,9 @@ static_assert(number != 10, ""); // both-error{{failed}} \
 static_assert(__objc_yes, "");
 static_assert(!__objc_no, "");
 
+int kk[3];
+static_assert(kk + 3 == &kk[3], "");
+
 static_assert((long long)0x00000000FFFF0000 == 4294901760, "");
 
 constexpr bool b = number;
