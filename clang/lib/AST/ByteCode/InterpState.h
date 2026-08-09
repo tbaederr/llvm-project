@@ -13,6 +13,7 @@
 #ifndef LLVM_CLANG_AST_INTERP_INTERPSTATE_H
 #define LLVM_CLANG_AST_INTERP_INTERPSTATE_H
 
+#include "ByteCode/Pointer.h"
 #include "Context.h"
 #include "DynamicAllocator.h"
 #include "Floating.h"
@@ -130,8 +131,15 @@ public:
   PointerPathEntry *allocPointerPath(unsigned Length,
                                      const PointerPathEntry *OldPP) {
     assert(Length != 0);
+
+    if (Length < OpaquePointer::MinAllocation && OldPP) {
+      return const_cast<PointerPathEntry*>(OldPP);
+    }
+
+
+    unsigned L = std::max(Length, OpaquePointer::MinAllocation);
     auto *PP = reinterpret_cast<PointerPathEntry *>(
-        this->allocate(Length * sizeof(PointerPathEntry)));
+        this->allocate(L * sizeof(PointerPathEntry)));
     if (OldPP)
       std::memcpy(PP, OldPP, sizeof(PointerPathEntry) * Length);
     return PP;
@@ -141,8 +149,16 @@ public:
   PointerPathEntry *extendPointerPath(unsigned NewLength,
                                       const PointerPathEntry *OldPP,
                                       PointerPathEntry NewEntry) {
+
+                                                                     if (NewLength < OpaquePointer::MinAllocation && OldPP) {
+
+                                                                       const_cast<PointerPathEntry*>(OldPP)[NewLength - 1] = NewEntry;
+                                                                       return const_cast<PointerPathEntry*>(OldPP);
+                                                                     }
+
+                                                                     unsigned L = std::max(NewLength, OpaquePointer::MinAllocation);
     auto *PP = reinterpret_cast<PointerPathEntry *>(
-        this->allocate(NewLength * sizeof(PointerPathEntry)));
+        this->allocate(L * sizeof(PointerPathEntry)));
     if (OldPP)
       std::memcpy(PP, OldPP, sizeof(PointerPathEntry) * (NewLength - 1));
     PP[NewLength - 1] = NewEntry;

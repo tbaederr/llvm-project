@@ -408,6 +408,7 @@ struct PointerPathEntry {
 };
 
 struct OpaquePointer {
+  static constexpr unsigned MinAllocation = 4;
   const ValueDecl *Base = nullptr;
   // FieldType and IsOnePastEnd/IsConstexprUnknown bits.
   llvm::PointerIntPair<const Type *, 2, unsigned> FieldType = {};
