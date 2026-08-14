@@ -209,17 +209,24 @@ bool Context::evaluateStringRepr(State &Parent, const Expr *SizeExpr,
     }
 
     if (!Ptr.isLive() || !Ptr.isInitialized() || Ptr.isUnknownSizeArray() ||
-        !Ptr.getFieldDesc()->isPrimitiveArray())
+        !Ptr.inArray())
+      // !Ptr.getFieldDesc()->isPrimitiveArray())
       return false;
 
     // Must be char.
-    if (Ptr.getFieldDesc()->getElemDataSize() != 1 /*bytes*/)
+    if (Ptr.isBlockPointer() &&
+        Ptr.getFieldDesc()->getElemDataSize() != 1 /*bytes*/)
       return false;
 
+    if (Ptr.isStringPointer() && !Ptr.asStringPointer().Lit->isOrdinary())
+      return false;
+
+    bool F = false;
     if (Size > Ptr.getNumElems()) {
       S.FFDiag(S.Current->getSource(OpPC), diag::note_constexpr_access_past_end)
           << AK_Read;
       Size = Ptr.getNumElems();
+      F = true;
     }
 
     if constexpr (std::is_same_v<ResultT, APValue>) {
@@ -236,7 +243,18 @@ bool Context::evaluateStringRepr(State &Parent, const Expr *SizeExpr,
       assert((std::is_same_v<ResultT, std::string>));
       if (Size < Result.max_size())
         Result.resize(Size);
-      Result.assign(reinterpret_cast<const char *>(Ptr.getRawAddress()), Size);
+      if (Ptr.isStringPointer()) {
+        if (F)
+          Result.assign(reinterpret_cast<const char *>(Ptr.getRawAddress()),
+                        Size - 1);
+        else
+          Result.assign(reinterpret_cast<const char *>(Ptr.getRawAddress()),
+                        Size);
+
+      } else {
+        Result.assign(reinterpret_cast<const char *>(Ptr.getRawAddress()),
+                      Size);
+      }
     }
 
     return true;
@@ -274,11 +292,7 @@ bool Context::evaluateString(State &Parent, const Expr *E,
 
   auto PtrRes = C.interpretAsPointer(E, [&](InterpState &S, CodePtr OpPC,
                                             const Pointer &Ptr) {
-    if (!Ptr.isBlockPointer())
-      return false;
-
-    const Descriptor *FieldDesc = Ptr.getFieldDesc();
-    if (!FieldDesc->isPrimitiveArray())
+    if (!Ptr.isReadablePointerType())
       return false;
 
     if (!Ptr.isConst())
@@ -288,6 +302,10 @@ bool Context::evaluateString(State &Parent, const Expr *E,
 
     if (Ptr.elemSize() == 1 /* bytes */) {
       const char *Chars = reinterpret_cast<const char *>(Ptr.getRawAddress());
+      if (Ptr.isStringPointer()) {
+        Result.assign(Chars, N - 1);
+        return true;
+      }
       unsigned Length = strnlen(Chars, N);
       // Wasn't null terminated.
       if (N == Length)
@@ -296,10 +314,15 @@ bool Context::evaluateString(State &Parent, const Expr *E,
       return true;
     }
 
-    PrimType ElemT = FieldDesc->getPrimType();
+    PrimType ElemT;
+    if (Ptr.isBlockPointer())
+      ElemT = Ptr.getFieldDesc()->getPrimType();
+    else {
+      ElemT = *classify(Ptr.getType());
+    }
     for (unsigned I = Ptr.getIndex(); I != N; ++I) {
       INT_TYPE_SWITCH(ElemT, {
-        auto Elem = Ptr.elem<T>(I);
+        auto Elem = Ptr.loadElem<T>(I);
         if (Elem.isZero())
           return true;
         Result.push_back(static_cast<char>(Elem));

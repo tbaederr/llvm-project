@@ -59,6 +59,9 @@ Pointer::Pointer(const Pointer &P)
   case Storage::Typeid:
     Typeid = P.Typeid;
     break;
+  case Storage::String:
+    Str = P.Str;
+    break;
   }
 }
 
@@ -78,6 +81,8 @@ Pointer::Pointer(Pointer &&P) : Offset(P.Offset), StorageKind(P.StorageKind) {
   case Storage::Typeid:
     Typeid = P.Typeid;
     break;
+  case Storage::String:
+    Str = P.Str;
   }
 }
 
@@ -127,6 +132,9 @@ Pointer &Pointer::operator=(const Pointer &P) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::String:
+    Str = P.Str;
   }
   return *this;
 }
@@ -166,6 +174,9 @@ Pointer &Pointer::operator=(Pointer &&P) {
     break;
   case Storage::Typeid:
     Typeid = P.Typeid;
+    break;
+  case Storage::String:
+    Str = P.Str;
   }
   return *this;
 }
@@ -201,6 +212,16 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
                    CharUnits::Zero(), {},
                    /*OnePastTheEnd=*/false, /*IsNull=*/false);
   } break;
+  case Storage::String: {
+    if (Offset != 0) {
+      Path.push_back(APValue::LValuePathEntry::ArrayIndex(Offset));
+    }
+    return APValue(APValue::LValueBase(Str.Lit),
+                   CharUnits::fromQuantity(Offset), Path,
+                   /*OnePastTheEnd=*/false, /*IsNull=*/false);
+  }
+
+    assert(false);
   }
 
   assert(isBlockPointer());
@@ -353,6 +374,11 @@ void Pointer::print(llvm::raw_ostream &OS) const {
     OS << "(Typeid) { " << (const void *)asTypeidPointer().TypePtr << ", "
        << (const void *)asTypeidPointer().TypeInfoType << " + " << Offset
        << "}";
+    break;
+  case Storage::String:
+    OS << "(String) { " << (const void *)Str.Lit << ' ';
+    Str.Lit->outputString(OS);
+    OS << " + " << Offset << "}";
   }
 }
 
@@ -377,6 +403,8 @@ Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+  case Storage::String:
+    return reinterpret_cast<uintptr_t>(Str.Lit) + Offset;
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
@@ -455,6 +483,8 @@ Pointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
     return getIntegerRepresentation();
   case Storage::Typeid:
     return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+  case Storage::String:
+    return Offset;
   }
 
   auto getTypeSize = [&](QualType T) -> std::optional<size_t> {
@@ -808,6 +838,8 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
     return true;
   if (A.isTypeidPointer() && B.isTypeidPointer())
     return A.asTypeidPointer().TypePtr == B.asTypeidPointer().TypePtr;
+  if (A.isStringPointer() && B.isStringPointer())
+    return A.Str.Lit == B.Str.Lit;
 
   if (A.StorageKind != B.StorageKind)
     return false;
@@ -874,6 +906,9 @@ bool Pointer::pointsToLiteral() const {
 }
 
 bool Pointer::pointsToStringLiteral() const {
+  if (isStringPointer())
+    return true;
+
   if (isZero() || !isBlockPointer())
     return false;
 
@@ -1129,7 +1164,7 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
   if (OptPrimType T = Ctx.classify(ResultType)) {
     if (!canDeref(*T))
       return std::nullopt;
-    TYPE_SWITCH(*T, return this->deref<T>().toAPValue(ASTCtx));
+    TYPE_SWITCH(*T, return this->load<T>().toAPValue(ASTCtx));
   }
 
   // Return the composite type.
@@ -1142,6 +1177,14 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
 const VarDecl *Pointer::getRootVarDecl() const {
   if (isBlockPointer())
     return getDeclDesc()->asVarDecl();
+  return nullptr;
+}
+
+const Expr *Pointer::getRootExpr() const {
+  if (isBlockPointer())
+    return getDeclDesc()->asExpr();
+  if (isStringPointer())
+    return Str.Lit;
   return nullptr;
 }
 

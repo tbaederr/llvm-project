@@ -81,7 +81,7 @@ static bool popToAPSInt(InterpState &S, QualType T, APSInt &Out) {
 static bool isReadable(const Pointer &P) {
   if (P.isDummy())
     return false;
-  if (!P.isBlockPointer())
+  if (!P.isReadablePointerType())
     return false;
   if (!P.isLive())
     return false;
@@ -157,6 +157,13 @@ static void assignIntegral(InterpState &S, const Pointer &Dest, PrimType ValueT,
 }
 
 static QualType getElemType(const Pointer &P) {
+  if (P.isStringPointer()) {
+    return P.asStringPointer()
+        .Lit->getType()
+        ->getAsArrayTypeUnsafe()
+        ->getElementType();
+  }
+
   const Descriptor *Desc = P.getFieldDesc();
   QualType T = Desc->getType();
   if (Desc->isPrimitive())
@@ -298,17 +305,17 @@ static bool interp__builtin_strcmp(InterpState &S, CodePtr OpPC,
 
   if (A.isDummy() || B.isDummy())
     return false;
-  if (!A.isBlockPointer() || !B.isBlockPointer())
+  if (!A.isReadablePointerType() || !B.isReadablePointerType())
     return false;
-  if (!A.getFieldDesc()->isPrimitiveArray() ||
-      !B.getFieldDesc()->isPrimitiveArray())
-    return false;
+  // if (!A.getFieldDesc()->isPrimitiveArray() ||
+  // !B.getFieldDesc()->isPrimitiveArray())
+  // return false;
 
   bool IsWide = ID == Builtin::BIwcscmp || ID == Builtin::BIwcsncmp ||
                 ID == Builtin::BI__builtin_wcscmp ||
                 ID == Builtin::BI__builtin_wcsncmp;
-  assert(A.getFieldDesc()->isPrimitiveArray());
-  assert(B.getFieldDesc()->isPrimitiveArray());
+  // assert(A.getFieldDesc()->isPrimitiveArray());
+  // assert(B.getFieldDesc()->isPrimitiveArray());
 
   // Different element types shouldn't happen, but with casts they can.
   if (!S.getASTContext().hasSameUnqualifiedType(getElemType(A), getElemType(B)))
@@ -328,8 +335,10 @@ static bool interp__builtin_strcmp(InterpState &S, CodePtr OpPC,
 
     if (Steps >= Limit)
       break;
-    PtrView PA = A.view().atIndex(IndexA);
-    PtrView PB = B.view().atIndex(IndexB);
+
+    // FIXME: We can use PtrView here.
+    Pointer PA = A.atIndex(IndexA);
+    Pointer PB = B.atIndex(IndexB);
     if (!CheckRange(S, OpPC, PA, AK_Read) ||
         !CheckRange(S, OpPC, PB, AK_Read)) {
       return false;
@@ -337,8 +346,8 @@ static bool interp__builtin_strcmp(InterpState &S, CodePtr OpPC,
 
     if (IsWide) {
       INT_TYPE_SWITCH(ElemT, {
-        T CA = PA.deref<T>();
-        T CB = PB.deref<T>();
+        T CA = PA.load<T>();
+        T CB = PB.load<T>();
         if (CA > CB)
           return returnResult(1);
         if (CA < CB)
@@ -349,8 +358,8 @@ static bool interp__builtin_strcmp(InterpState &S, CodePtr OpPC,
       continue;
     }
 
-    uint8_t CA = PA.deref<uint8_t>();
-    uint8_t CB = PB.deref<uint8_t>();
+    uint8_t CA = PA.load<uint8_t>();
+    uint8_t CB = PB.load<uint8_t>();
 
     if (CA > CB)
       return returnResult(1);
@@ -379,6 +388,27 @@ static bool interp__builtin_strlen(InterpState &S, CodePtr OpPC,
 
   if (!CheckLive(S, OpPC, StrPtr, AK_Read))
     return false;
+
+  // For string literal pointers, this is pretty simple.
+  if (StrPtr.isStringPointer()) {
+    if (StrPtr.isOnePastEnd())
+      return CheckRange(S, OpPC, StrPtr, AK_Read);
+
+    const auto *Lit = StrPtr.asStringPointer().Lit;
+    int64_t Off = StrPtr.getByteOffset();
+    if (Off < 0)
+      return false;
+
+    unsigned Length = 0;
+    for (uint64_t I = Off; I != Lit->getLength(); ++I) {
+      if (Lit->getCodeUnit(I) == 0)
+        break;
+      ++Length;
+    }
+
+    pushInteger(S, Length, Call->getType());
+    return true;
+  }
 
   if (!StrPtr.isBlockPointer())
     return false;
@@ -429,34 +459,47 @@ static bool interp__builtin_nan(InterpState &S, CodePtr OpPC,
   if (!CheckLoad(S, OpPC, Arg))
     return false;
 
-  if (!Arg.getFieldDesc()->isPrimitiveArray())
+  if (!Arg.pointsToStringLiteral() && !Arg.getFieldDesc()->isPrimitiveArray())
     return Invalid(S, OpPC);
 
   // Convert the given string to an integer using StringRef's API.
   llvm::APInt Fill;
-  std::string Str;
-  unsigned ArgLength = Arg.getNumElems();
-  bool FoundZero = false;
-  for (unsigned I = 0; I != ArgLength; ++I) {
-    if (!Arg.isElementInitialized(I))
-      return false;
+  if (Arg.isBlockPointer()) {
+    std::string Str;
+    unsigned ArgLength = Arg.getNumElems();
+    bool FoundZero = false;
+    for (unsigned I = 0; I != ArgLength; ++I) {
+      if (!Arg.isElementInitialized(I))
+        return false;
 
-    if (Arg.elem<int8_t>(I) == 0) {
-      FoundZero = true;
-      break;
+      if (Arg.loadElem<int8_t>(I) == 0) {
+        FoundZero = true;
+        break;
+      }
+      Str += Arg.elem<char>(I);
     }
-    Str += Arg.elem<char>(I);
-  }
 
-  // If we didn't find a NUL byte, diagnose as a one-past-the-end read.
-  if (!FoundZero)
-    return CheckRange(S, OpPC, Arg.atIndex(ArgLength), AK_Read);
+    // If we didn't find a NUL byte, diagnose as a one-past-the-end read.
+    if (!FoundZero)
+      return CheckRange(S, OpPC, Arg.atIndex(ArgLength), AK_Read);
 
-  // Treat empty strings as if they were zero.
-  if (Str.empty())
-    Fill = llvm::APInt(32, 0);
-  else if (StringRef(Str).getAsInteger(0, Fill))
+    // Treat empty strings as if they were zero.
+    if (Str.empty())
+      Fill = llvm::APInt(32, 0);
+    else if (StringRef(Str).getAsInteger(0, Fill))
+      return false;
+  } else if (Arg.isStringPointer()) {
+    if (!Arg.asStringPointer().Lit->isOrdinary())
+      return false;
+    StringRef Str = Arg.asStringPointer().Lit->getString();
+    // Treat empty strings as if they were zero.
+    if (Str.empty())
+      Fill = llvm::APInt(32, 0);
+    else if (StringRef(Str).getAsInteger(0, Fill))
+      return false;
+  } else {
     return false;
+  }
 
   const llvm::fltSemantics &TargetSemantics =
       S.getASTContext().getFloatTypeSemantics(
@@ -1970,7 +2013,7 @@ static bool interp__builtin_memcpy(InterpState &S, CodePtr OpPC,
   }
 
   size_t RemainingDestElems;
-  if (DestPtr.getFieldDesc()->isArray()) {
+  if (DestPtr.inArray()) { // DestPtr.getFieldDesc()->isArray()) {
     RemainingDestElems = DestPtr.isUnknownSizeArray()
                              ? 0
                              : (DestPtr.getNumElems() - DestPtr.getIndex());
@@ -1994,7 +2037,7 @@ static bool interp__builtin_memcpy(InterpState &S, CodePtr OpPC,
 
   QualType SrcElemType = getElemType(SrcPtr);
   size_t RemainingSrcElems;
-  if (SrcPtr.getFieldDesc()->isArray()) {
+  if (SrcPtr.inArray()) { // SrcPtr.getFieldDesc()->isArray()) {
     RemainingSrcElems = SrcPtr.isUnknownSizeArray()
                             ? 0
                             : (SrcPtr.getNumElems() - SrcPtr.getIndex());
@@ -2077,7 +2120,7 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
     return true;
   }
 
-  if (!PtrA.isBlockPointer() || !PtrB.isBlockPointer())
+  if (!PtrA.isReadablePointerType() || !PtrB.isReadablePointerType())
     return false;
 
   bool IsWide =
@@ -2103,7 +2146,7 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
   // Now, read both pointers to a buffer and compare those.
   BitcastBuffer BufferA(
       Bits(ASTCtx.getTypeSize(ElemTypeA) * PtrA.getNumElems()));
-  readPointerToBuffer(S.getContext(), PtrA, BufferA, false);
+  readPointerToBuffer(S.getContext(), PtrA, BufferA, /*ReturnOnUninit=*/false);
 
   // FIXME: The swapping here is UNDOING something we do when reading the
   // data into the buffer.
@@ -2112,7 +2155,7 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
 
   BitcastBuffer BufferB(
       Bits(ASTCtx.getTypeSize(ElemTypeB) * PtrB.getNumElems()));
-  readPointerToBuffer(S.getContext(), PtrB, BufferB, false);
+  readPointerToBuffer(S.getContext(), PtrB, BufferB, /*ReturnOnUninit=*/false);
   // FIXME: The swapping here is UNDOING something we do when reading the
   // data into the buffer.
   if (ASTCtx.getTargetInfo().isBigEndian())
@@ -2216,12 +2259,13 @@ static bool interp__builtin_memchr(InterpState &S, CodePtr OpPC,
     return false;
   }
 
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isReadablePointerType()) // isBlockPointer())
     return false;
 
-  QualType ElemTy = Ptr.getFieldDesc()->isArray()
-                        ? Ptr.getFieldDesc()->getElemQualType()
-                        : Ptr.getFieldDesc()->getType();
+  QualType ElemTy = getElemType(Ptr);
+  // Ptr.getFieldDesc()->isArray()
+  // ? Ptr.getFieldDesc()->getElemQualType()
+  // : Ptr.getFieldDesc()->getType();
   bool IsRawByte = ID == Builtin::BImemchr || ID == Builtin::BI__builtin_memchr;
 
   // Give up on byte-oriented matching against multibyte elements.
@@ -2278,7 +2322,7 @@ static bool interp__builtin_memchr(InterpState &S, CodePtr OpPC,
 
     uint64_t V;
     INT_TYPE_SWITCH_NO_BOOL(
-        ElemT, { V = static_cast<uint64_t>(ElemPtr.deref<T>().toUnsigned()); });
+        ElemT, { V = static_cast<uint64_t>(ElemPtr.load<T>().toUnsigned()); });
 
     if (V == DesiredVal) {
       S.Stk.push<Pointer>(ElemPtr);

@@ -71,6 +71,7 @@ def ArgDesc : ArgType { let Name = "const Descriptor *"; }
 def ArgPrimType : ArgType { let Name = "PrimType"; }
 def ArgEnumDecl : ArgType { let Name = "const EnumDecl *"; }
 def ArgTypePtr : ArgType { let Name = "const Type *"; }
+def ArgStringLiteral : ArgType { let Name = "const StringLiteral *"; }
 
 //===----------------------------------------------------------------------===//
 // Classes of types instructions operate on.
@@ -1043,3 +1044,7 @@ def PushCC : SuccessOpcode {
 def PopCC : SuccessOpcode;
 def PushMSVCCE : SuccessOpcode;
 def PopMSVCCE : SuccessOpcode;
+
+def GetStringPtr : SuccessOpcode {
+  let Args = [ArgStringLiteral];
+}

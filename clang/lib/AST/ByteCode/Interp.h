@@ -1360,8 +1360,10 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   }
 
   // FIXME: The source check here isn't entirely correct.
-  if (LHS.pointsToStringLiteral() && RHS.pointsToStringLiteral() &&
-      LHS.getFieldDesc()->asExpr() != RHS.getFieldDesc()->asExpr()) {
+  if (LHS.isStringPointer() && RHS.isStringPointer() &&
+      LHS.asStringPointer().Lit != RHS.asStringPointer().Lit) {
+    // if (LHS.pointsToStringLiteral() && RHS.pointsToStringLiteral() &&
+    //     LHS.getFieldDesc()->asExpr() != RHS.getFieldDesc()->asExpr()) {
     if (arePotentiallyOverlappingStringLiterals(LHS, RHS)) {
       const SourceInfo &Loc = S.Current->getSource(OpPC);
       S.FFDiag(Loc, diag::note_constexpr_literal_comparison)
@@ -1382,15 +1384,17 @@ inline bool CmpHelperEQ<Pointer>(InterpState &S, CodePtr OpPC, CompareFn Fn) {
   }
 
   // Otherwise we need to do a bunch of extra checks before returning Unordered.
-  if (LHS.isOnePastEnd() && !RHS.isOnePastEnd() && RHS.isBlockPointer() &&
-      RHS.getOffset() == 0) {
+  if (LHS.isOnePastEnd() && !RHS.isOnePastEnd()) {
+    // && RHS.isBlockPointer() &&
+    // RHS.getOffset() == 0) {
     const SourceInfo &Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_past_end)
         << LHS.toDiagnosticString(S.getASTContext());
     return false;
   }
-  if (RHS.isOnePastEnd() && !LHS.isOnePastEnd() && LHS.isBlockPointer() &&
-      LHS.getOffset() == 0) {
+  if (RHS.isOnePastEnd() && !LHS.isOnePastEnd()) {
+    // && LHS.isBlockPointer() &&
+    // LHS.getOffset() == 0) {
     const SourceInfo &Loc = S.Current->getSource(OpPC);
     S.FFDiag(Loc, diag::note_constexpr_pointer_comparison_past_end)
         << RHS.toDiagnosticString(S.getASTContext());
@@ -2243,11 +2247,11 @@ bool Load(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.peek<Pointer>();
   if (!CheckLoad(S, OpPC, Ptr))
     return false;
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isReadablePointerType())
     return false;
   if (!Ptr.canDeref(Name))
     return false;
-  S.Stk.push<T>(Ptr.deref<T>());
+  S.Stk.push<T>(Ptr.load<T>());
   return true;
 }
 
@@ -2256,11 +2260,11 @@ bool LoadPop(InterpState &S, CodePtr OpPC) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
   if (!CheckLoad(S, OpPC, Ptr))
     return false;
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isReadablePointerType())
     return false;
   if (!Ptr.canDeref(Name))
     return false;
-  S.Stk.push<T>(Ptr.deref<T>());
+  S.Stk.push<T>(Ptr.load<T>());
   return true;
 }
 
@@ -2584,6 +2588,26 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
       S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_array_index)
           << N << /*non-array*/ true << 0;
     return Pointer(Ptr.asFunctionPointer().Func, N);
+  } else if (Ptr.isStringPointer()) {
+    int64_t NewOffset;
+    if constexpr (Op == ArithOp::Add)
+      NewOffset = Ptr.getByteOffset() + static_cast<int64_t>(Offset);
+    else
+      NewOffset = Ptr.getByteOffset() - static_cast<int64_t>(Offset);
+    if (NewOffset < 0 ||
+        NewOffset > (Ptr.asStringPointer().Lit->getLength() + 1)) {
+      S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_array_index)
+          << NewOffset << /*non-array*/ false
+          << (Ptr.asStringPointer().Lit->getLength() + 1);
+      return std::nullopt;
+    }
+
+    if constexpr (Op == ArithOp::Add)
+      return Pointer(Ptr.asStringPointer(),
+                     Ptr.getByteOffset() + static_cast<uint64_t>(Offset));
+    else
+      return Pointer(Ptr.asStringPointer(),
+                     Ptr.getByteOffset() - static_cast<uint64_t>(Offset));
   } else if (!Ptr.isBlockPointer()) {
     return std::nullopt;
   }
@@ -3022,6 +3046,9 @@ bool CastPointerIntegral(InterpState &S, CodePtr OpPC) {
     } else if (Ptr.isFunctionPointer()) {
       const void *FuncDecl = Ptr.asFunctionPointer().Func->getDecl();
       S.Stk.push<T>(IntegralKind::FunctionAddress, FuncDecl, /*Offset=*/0);
+    } else if (Ptr.isStringPointer()) {
+      S.Stk.push<T>(IntegralKind::ExprAddress,
+                    (const void *)Ptr.asStringPointer().Lit, 0);
     } else {
       S.Stk.push<T>(T::from(Ptr.getIntegerRepresentation()));
     }
@@ -3621,6 +3648,11 @@ inline bool GetIntPtr(InterpState &S, CodePtr OpPC, const Type *Ty) {
     S.Stk.push<Pointer>(static_cast<uint64_t>(IntVal), Ty);
   }
 
+  return true;
+}
+
+inline bool GetStringPtr(InterpState &S, const StringLiteral *Lit) {
+  S.Stk.push<Pointer>(Lit);
   return true;
 }
 

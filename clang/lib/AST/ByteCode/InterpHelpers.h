@@ -46,11 +46,14 @@ bool CheckDummy(InterpState &S, CodePtr OpPC, const Block *B, AccessKinds AK);
 bool CheckRange(InterpState &S, CodePtr OpPC, PtrView Ptr, AccessKinds AK);
 inline bool CheckRange(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
                        AccessKinds AK) {
-  if (!Ptr.isBlockPointer()) {
-    assert(!Ptr.isOnePastEnd());
+  if (!Ptr.isOnePastEnd() && !Ptr.isZeroSizeArray())
     return true;
+  if (S.getLangOpts().CPlusPlus) {
+    const SourceInfo &Loc = S.Current->getSource(OpPC);
+    S.FFDiag(Loc, diag::note_constexpr_access_past_end)
+        << AK << S.Current->getRange(OpPC);
   }
-  return CheckRange(S, OpPC, Ptr.view(), AK);
+  return false;
 }
 
 /// Checks if a field from which a pointer is going to be derived is valid.
