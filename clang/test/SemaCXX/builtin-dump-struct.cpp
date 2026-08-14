@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -std=c++20 -verify %s
+// RUN: %clang_cc1 -std=c++20 -verify %s -fexperimental-new-constant-interpreter
 
 namespace std {
   typedef decltype(sizeof(int)) size_t;

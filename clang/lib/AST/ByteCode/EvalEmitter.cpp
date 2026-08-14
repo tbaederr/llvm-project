@@ -243,7 +243,6 @@ template <PrimType OpType> bool EvalEmitter::emitRet(SourceInfo Info) {
 }
 
 template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
-  // llvm::errs()<< __PRETTY_FUNCTION__ << "Ret\n";
   if (!isActive())
     return true;
 
@@ -266,9 +265,6 @@ template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
   // Implicitly convert lvalue to rvalue, if requested.
   if (ConvertResultToRValue) {
     if (Ptr.isPastEnd())
-      return false;
-
-    if (Ptr.pointsToStringLiteral() && Ptr.isArrayRoot())
       return false;
 
     if (!Ptr.isZero() && !CheckFinalLoad(S, CodePtr(), Ptr))

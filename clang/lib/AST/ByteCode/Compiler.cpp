@@ -3113,10 +3113,8 @@ bool Compiler<Emitter>::VisitStringLiteral(const StringLiteral *E) {
   if (DiscardResult)
     return true;
 
-  if (!Initializing) {
-    unsigned StringIndex = P.createGlobalString(E);
-    return this->emitGetPtrGlobal(StringIndex, E);
-  }
+  if (!Initializing)
+    return this->emitGetStringPtr(E, E);
 
   // We are initializing an array on the stack.
   const ConstantArrayType *CAT =
@@ -3202,9 +3200,7 @@ bool Compiler<Emitter>::VisitSYCLUniqueStableNameExpr(
   StringLiteral *SL =
       StringLiteral::Create(A, ResultStr, StringLiteralKind::Ordinary,
                             /*Pascal=*/false, ArrayTy, E->getLocation());
-
-  unsigned StringIndex = P.createGlobalString(SL);
-  return this->emitGetPtrGlobal(StringIndex, E);
+  return this->emitGetStringPtr(SL, E);
 }
 
 template <class Emitter>
@@ -3734,11 +3730,8 @@ bool Compiler<Emitter>::VisitPredefinedExpr(const PredefinedExpr *E) {
   if (DiscardResult)
     return true;
 
-  if (!Initializing) {
-    unsigned StringIndex = P.createGlobalString(E->getFunctionName(), E);
-    return this->emitGetPtrGlobal(StringIndex, E);
-  }
-
+  if (!Initializing)
+    return this->emitGetStringPtr(E, E);
   return this->delegate(E->getFunctionName());
 }
 
