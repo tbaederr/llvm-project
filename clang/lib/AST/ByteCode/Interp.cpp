@@ -23,6 +23,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Basic/TargetInfo.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
 
 using namespace clang;
@@ -316,7 +317,7 @@ bool CheckBCPResult(InterpState &S, const Pointer &Ptr) {
   if (Ptr.getType()->isAnyComplexType())
     return true;
 
-  if (const Expr *Base = Ptr.getDeclDesc()->asExpr())
+  if (const Expr *Base = Ptr.getRootExpr())
     return isa<StringLiteral>(Base) && Ptr.getIndex() == 0;
   return false;
 }
@@ -898,10 +899,10 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   }
   // Block pointers are the only ones we can actually read from.
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isReadablePointerType())
     return false;
 
-  if (!Ptr.block()->isAccessible()) {
+  if (Ptr.isBlockPointer() && !Ptr.block()->isAccessible()) {
     if (!CheckLive(S, OpPC, Ptr, AK))
       return false;
     if (!CheckExtern(S, OpPC, Ptr))
@@ -921,7 +922,7 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return diagnoseUninitialized(S, OpPC, Ptr, AK);
   if (!CheckLifetime(S, OpPC, Ptr, AK))
     return false;
-  if (!CheckTemporary(S, OpPC, Ptr.block(), AK))
+  if (Ptr.isBlockPointer() && !CheckTemporary(S, OpPC, Ptr.block(), AK))
     return false;
 
   if (!CheckMutable(S, OpPC, Ptr))
@@ -931,7 +932,7 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
   if (isConstexprUnknown(Ptr))
     return false;
 
-  if (!Ptr.isArrayRoot()) {
+  if (Ptr.isBlockPointer() && !Ptr.isArrayRoot()) {
     // According to GCC info page:
     //
     // 6.28 Compound Literals
@@ -965,10 +966,10 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
 /// EvalEmitter to do the final lvalue-to-rvalue conversion.
 bool CheckFinalLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
   assert(!Ptr.isZero());
-  if (!Ptr.isBlockPointer())
+  if (!Ptr.isReadablePointerType())
     return false;
 
-  if (!Ptr.block()->isAccessible()) {
+  if (Ptr.isBlockPointer() && !Ptr.block()->isAccessible()) {
     if (!CheckLive(S, OpPC, Ptr, AK_Read))
       return false;
     if (!CheckExtern(S, OpPC, Ptr))
@@ -987,7 +988,7 @@ bool CheckFinalLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
     return false;
   if (!Ptr.isInitialized())
     return diagnoseUninitialized(S, OpPC, Ptr, AK_Read);
-  if (!CheckTemporary(S, OpPC, Ptr.block(), AK_Read))
+  if (Ptr.isBlockPointer() && !CheckTemporary(S, OpPC, Ptr.block(), AK_Read))
     return false;
   if (!CheckMutable(S, OpPC, Ptr))
     return false;
@@ -2851,13 +2852,14 @@ bool DiagTypeid(InterpState &S, CodePtr OpPC) {
 
 bool arePotentiallyOverlappingStringLiterals(const Pointer &LHS,
                                              const Pointer &RHS) {
+
   if (!LHS.pointsToStringLiteral() || !RHS.pointsToStringLiteral())
     return false;
 
   unsigned LHSOffset = LHS.isOnePastEnd() ? LHS.getNumElems() : LHS.getIndex();
   unsigned RHSOffset = RHS.isOnePastEnd() ? RHS.getNumElems() : RHS.getIndex();
-  const auto *LHSLit = cast<StringLiteral>(LHS.getDeclDesc()->asExpr());
-  const auto *RHSLit = cast<StringLiteral>(RHS.getDeclDesc()->asExpr());
+  const auto *LHSLit = cast<StringLiteral>(LHS.getRootExpr());
+  const auto *RHSLit = cast<StringLiteral>(RHS.getRootExpr());
 
   StringRef LHSStr(LHSLit->getBytes());
   unsigned LHSLength = LHSStr.size();
@@ -2879,11 +2881,11 @@ bool arePotentiallyOverlappingStringLiterals(const Pointer &LHS,
   StringRef Shorter;
   StringRef Longer;
   if (LHSLength < RHSLength) {
-    ShorterCharWidth = LHS.getFieldDesc()->getElemDataSize();
+    ShorterCharWidth = LHSLit->getCharByteWidth();
     Shorter = LHSStr;
     Longer = RHSStr;
   } else {
-    ShorterCharWidth = RHS.getFieldDesc()->getElemDataSize();
+    ShorterCharWidth = RHSLit->getCharByteWidth();
     Shorter = RHSStr;
     Longer = LHSStr;
   }

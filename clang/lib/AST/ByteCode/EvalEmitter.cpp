@@ -243,7 +243,6 @@ template <PrimType OpType> bool EvalEmitter::emitRet(SourceInfo Info) {
 }
 
 template <> bool EvalEmitter::emitRet<PT_Ptr>(SourceInfo Info) {
-  // llvm::errs()<< __PRETTY_FUNCTION__ << "Ret\n";
   if (!isActive())
     return true;
 

@@ -1043,3 +1043,7 @@ def PushCC : SuccessOpcode {
 def PopCC : SuccessOpcode;
 def PushMSVCCE : SuccessOpcode;
 def PopMSVCCE : SuccessOpcode;
+
+def GetStringPtr : SuccessOpcode {
+  let Args = [ArgExpr];
+}
