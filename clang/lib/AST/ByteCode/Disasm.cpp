@@ -476,16 +476,13 @@ LLVM_DUMP_METHOD void Descriptor::dumpFull(unsigned Offset,
   OS.indent(Spaces);
   dump(OS);
   OS << '\n';
-  OS.indent(Spaces) << "Metadata: " << getMetadataSize() << " bytes\n";
   OS.indent(Spaces) << "Size: " << getSize() << " bytes\n";
   OS.indent(Spaces) << "AllocSize: " << getAllocSize() << " bytes\n";
-  Offset += getMetadataSize();
   if (isCompositeArray()) {
     OS.indent(Spaces) << "Elements: " << getNumElems() << '\n';
     unsigned FO = Offset;
     for (unsigned I = 0; I != getNumElems(); ++I) {
       FO += sizeof(InlineDescriptor);
-      assert(getElemDesc()->getMetadataSize() == 0);
       OS.indent(Spaces) << "Element " << I << " offset: " << FO << '\n';
       getElemDesc()->dumpFull(FO, Indent + 1);
 
