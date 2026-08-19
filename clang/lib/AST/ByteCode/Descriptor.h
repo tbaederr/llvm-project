@@ -126,8 +126,8 @@ private:
   const Type *SourceType = nullptr;
   /// Size of an element, in host bytes.
   const unsigned ElemSize;
-  /// Size of the storage, in host bytes.
-  const unsigned Size;
+  /// Number of elements (1 for non-arrays).
+  const unsigned NumElems;
   /// Size of the metadata.
   const unsigned MDSize;
   /// Size of the allocation (storage + metadata), in host bytes.
@@ -234,7 +234,7 @@ public:
   /// Returns the size of the object without metadata.
   unsigned getSize() const {
     assert(!isUnknownSizeArray() && "Array of unknown size");
-    return Size;
+    return NumElems * ElemSize;
   }
 
   PrimType getPrimType() const {
@@ -256,7 +256,7 @@ public:
 
   /// Returns the number of elements stored in the block.
   unsigned getNumElems() const {
-    return Size == UnknownSizeMark ? 0 : (getSize() / getElemSize());
+    return NumElems == UnknownSizeMark ? 0 : NumElems;
   }
 
   /// Checks if the descriptor is of an array of primitives.
@@ -264,9 +264,9 @@ public:
   /// Checks if the descriptor is of an array of composites.
   bool isCompositeArray() const { return IsArray && ElemDesc; }
   /// Checks if the descriptor is of an array of zero size.
-  bool isZeroSizeArray() const { return Size == 0; }
+  bool isZeroSizeArray() const { return NumElems == 0; }
   /// Checks if the descriptor is of an array of unknown size.
-  bool isUnknownSizeArray() const { return Size == UnknownSizeMark; }
+  bool isUnknownSizeArray() const { return NumElems == UnknownSizeMark; }
 
   /// Checks if the descriptor is of a primitive.
   bool isPrimitive() const { return !IsArray && !ElemRecord && PrimT; }
