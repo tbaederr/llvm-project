@@ -83,13 +83,13 @@ static void ctorArrayDesc(Block *B, std::byte *Ptr, bool IsConst,
                           bool InUnion, const Descriptor *D) {
   const unsigned NumElems = D->getNumElems();
   const unsigned ElemSize =
-      D->ElemDesc->getAllocSize() + sizeof(InlineDescriptor);
+      D->getElemDesc()->getAllocSize() + sizeof(InlineDescriptor);
 
   unsigned ElemOffset = 0;
   for (unsigned I = 0; I != NumElems; ++I, ElemOffset += ElemSize) {
     auto *ElemPtr = Ptr + ElemOffset;
     auto *Desc = reinterpret_cast<InlineDescriptor *>(ElemPtr);
-    auto *SD = D->ElemDesc;
+    auto *SD = D->getElemDesc();
 
     Desc->Offset = ElemOffset + sizeof(InlineDescriptor);
     Desc->Desc = SD;
@@ -102,10 +102,10 @@ static void ctorArrayDesc(Block *B, std::byte *Ptr, bool IsConst,
     Desc->IsArrayElement = true;
     Desc->IsVolatile = IsVolatile;
 
-    if (auto Fn = D->ElemDesc->CtorFn) {
+    if (auto Fn = D->getElemDesc()->CtorFn) {
       auto *ElemLoc = reinterpret_cast<std::byte *>(Desc + 1);
       Fn(B, ElemLoc, Desc->IsConst, Desc->IsFieldMutable, IsVolatile, IsActive,
-         Desc->InUnion || SD->isUnion(), D->ElemDesc);
+         Desc->InUnion || SD->isUnion(), D->getElemDesc());
     }
   }
 }
@@ -113,17 +113,17 @@ static void ctorArrayDesc(Block *B, std::byte *Ptr, bool IsConst,
 static void dtorArrayDesc(Block *B, std::byte *Ptr, const Descriptor *D) {
   const unsigned NumElems = D->getNumElems();
   const unsigned ElemSize =
-      D->ElemDesc->getAllocSize() + sizeof(InlineDescriptor);
+      D->getElemDesc()->getAllocSize() + sizeof(InlineDescriptor);
 
   unsigned ElemOffset = 0;
-  auto Dtor = D->ElemDesc->DtorFn;
+  auto Dtor = D->getElemDesc()->DtorFn;
   assert(Dtor &&
          "a composite array without an elem dtor shouldn't have a dtor itself");
   for (unsigned I = 0; I != NumElems; ++I, ElemOffset += ElemSize) {
     auto *ElemPtr = Ptr + ElemOffset;
     auto *Desc = reinterpret_cast<InlineDescriptor *>(ElemPtr);
     auto *ElemLoc = reinterpret_cast<std::byte *>(Desc + 1);
-    Dtor(B, ElemLoc, D->ElemDesc);
+    Dtor(B, ElemLoc, D->getElemDesc());
   }
 }
 
@@ -157,8 +157,8 @@ static void initBase(Block *B, std::byte *Ptr, bool IsConst, bool IsMutable,
                      const Descriptor *D, unsigned FieldOffset,
                      bool IsVirtualBase) {
   assert(D);
-  assert(D->ElemRecord);
-  assert(!D->ElemRecord->isUnion()); // Unions cannot be base classes.
+  assert(D->getElemRecord());
+  assert(!D->getElemRecord()->isUnion()); // Unions cannot be base classes.
 
   auto *Desc = reinterpret_cast<InlineDescriptor *>(Ptr + FieldOffset) - 1;
   Desc->Offset = FieldOffset;
@@ -172,10 +172,10 @@ static void initBase(Block *B, std::byte *Ptr, bool IsConst, bool IsMutable,
   Desc->InUnion = InUnion;
   Desc->IsVolatile = false;
 
-  for (const auto &V : D->ElemRecord->bases())
+  for (const auto &V : D->getElemRecord()->bases())
     initBase(B, Ptr + FieldOffset, IsConst, IsMutable, IsVolatile, IsActive,
              InUnion, V.Desc, V.Offset, false);
-  for (const auto &F : D->ElemRecord->fields())
+  for (const auto &F : D->getElemRecord()->fields())
     initField(B, Ptr + FieldOffset, IsConst, IsMutable, IsVolatile, IsActive,
               InUnion, InUnion, F.Desc, F.Offset);
 }
@@ -183,16 +183,16 @@ static void initBase(Block *B, std::byte *Ptr, bool IsConst, bool IsMutable,
 static void ctorRecord(Block *B, std::byte *Ptr, bool IsConst, bool IsMutable,
                        bool IsVolatile, bool IsActive, bool InUnion,
                        const Descriptor *D) {
-  for (const auto &V : D->ElemRecord->bases())
+  for (const auto &V : D->getElemRecord()->bases())
     initBase(B, Ptr, IsConst, IsMutable, IsVolatile, IsActive, InUnion, V.Desc,
              V.Offset,
              /*IsVirtualBase=*/false);
-  for (const auto &F : D->ElemRecord->fields()) {
+  for (const auto &F : D->getElemRecord()->fields()) {
     bool IsUnionField = D->isUnion();
     initField(B, Ptr, IsConst, IsMutable, IsVolatile, IsActive, IsUnionField,
               InUnion || IsUnionField, F.Desc, F.Offset);
   }
-  for (const auto &V : D->ElemRecord->virtual_bases())
+  for (const auto &V : D->getElemRecord()->virtual_bases())
     initBase(B, Ptr, IsConst, IsMutable, IsVolatile, IsActive, InUnion, V.Desc,
              V.Offset,
              /*IsVirtualBase=*/true);
@@ -207,20 +207,20 @@ static void destroyField(Block *B, std::byte *Ptr, const Descriptor *D,
 static void destroyBase(Block *B, std::byte *Ptr, const Descriptor *D,
                         unsigned FieldOffset) {
   assert(D);
-  assert(D->ElemRecord);
+  assert(D->getElemRecord());
 
-  for (const auto &V : D->ElemRecord->bases())
+  for (const auto &V : D->getElemRecord()->bases())
     destroyBase(B, Ptr + FieldOffset, V.Desc, V.Offset);
-  for (const auto &F : D->ElemRecord->fields())
+  for (const auto &F : D->getElemRecord()->fields())
     destroyField(B, Ptr + FieldOffset, F.Desc, F.Offset);
 }
 
 static void dtorRecord(Block *B, std::byte *Ptr, const Descriptor *D) {
-  for (const auto &F : D->ElemRecord->bases())
+  for (const auto &F : D->getElemRecord()->bases())
     destroyBase(B, Ptr, F.Desc, F.Offset);
-  for (const auto &F : D->ElemRecord->fields())
+  for (const auto &F : D->getElemRecord()->fields())
     destroyField(B, Ptr, F.Desc, F.Offset);
-  for (const auto &F : D->ElemRecord->virtual_bases())
+  for (const auto &F : D->getElemRecord()->virtual_bases())
     destroyBase(B, Ptr, F.Desc, F.Offset);
 }
 
@@ -327,7 +327,7 @@ Descriptor::Descriptor(DeclOrExpr D, const Type *SourceTy,
       NumElems(NumElems), MDSize(MD.value_or(0)),
       AllocSize(std::max<size_t>(alignof(void *), ElemSize * NumElems) +
                 MDSize),
-      ElemDesc(Elem), IsConst(IsConst), IsMutable(IsMutable),
+      ElemDescOrRecord(Elem), IsConst(IsConst), IsMutable(IsMutable),
       IsTemporary(IsTemporary), IsArray(true), CtorFn(ctorArrayDesc),
       DtorFn(Elem->DtorFn ? dtorArrayDesc : nullptr) {
   assert(Source && "Missing source");
@@ -338,7 +338,7 @@ Descriptor::Descriptor(DeclOrExpr D, const Descriptor *Elem, MetadataSize MD,
                        bool IsTemporary, UnknownSize)
     : Source(D), ElemSize(Elem->getAllocSize() + sizeof(InlineDescriptor)),
       NumElems(UnknownSizeMark), MDSize(MD.value_or(0)),
-      AllocSize(MDSize + alignof(void *)), ElemDesc(Elem), IsConst(true),
+      AllocSize(MDSize + alignof(void *)), ElemDescOrRecord(Elem), IsConst(true),
       IsMutable(false), IsTemporary(IsTemporary), IsArray(true),
       CtorFn(ctorArrayDesc), DtorFn(Elem->DtorFn ? dtorArrayDesc : nullptr) {
   assert(Source && "Missing source");
@@ -350,7 +350,7 @@ Descriptor::Descriptor(DeclOrExpr D, const Record *R, MetadataSize MD,
                        bool IsVolatile)
     : Source(D), ElemSize(std::max<size_t>(alignof(void *), R->getFullSize())),
       NumElems(1), MDSize(MD.value_or(0)), AllocSize(ElemSize + MDSize),
-      ElemRecord(R), IsConst(IsConst), IsMutable(IsMutable),
+      ElemDescOrRecord(R), IsConst(IsConst), IsMutable(IsMutable),
       IsTemporary(IsTemporary), IsVolatile(IsVolatile), CtorFn(ctorRecord),
       DtorFn(needsRecordDtor(R) ? dtorRecord : nullptr) {
   assert(Source && "Missing source");
@@ -359,7 +359,7 @@ Descriptor::Descriptor(DeclOrExpr D, const Record *R, MetadataSize MD,
 /// Dummy.
 Descriptor::Descriptor(DeclOrExpr D, MetadataSize MD)
     : Source(D), ElemSize(1), NumElems(1), MDSize(MD.value_or(0)),
-      AllocSize(MDSize), ElemRecord(nullptr), IsConst(true), IsMutable(false),
+      AllocSize(MDSize), ElemDescOrRecord(nullptr), IsConst(true), IsMutable(false),
       IsTemporary(false) {
   assert(Source && "Missing source");
 }
@@ -374,7 +374,7 @@ QualType Descriptor::getType() const {
   // The Source sometimes has a different type than the once
   // we really save. Try to consult the Record first.
   if (isRecord()) {
-    const RecordDecl *RD = ElemRecord->getDecl();
+    const RecordDecl *RD = getElemRecord()->getDecl();
     QualType T = RD->getASTContext().getTagType(ElaboratedTypeKeyword::None,
                                                 std::nullopt, RD, false);
     if (IsConst)
@@ -409,7 +409,7 @@ QualType Descriptor::getElemQualType() const {
   } else if (const auto *TDecl = dyn_cast_if_present<TypeDecl>(asDecl())) {
     T = TDecl->getASTContext().getTypeDeclType(TDecl);
   } else if (isRecord()) {
-    const RecordDecl *RD = ElemRecord->getDecl();
+    const RecordDecl *RD = getElemRecord()->getDecl();
     T = RD->getASTContext().getTagType(ElaboratedTypeKeyword::None,
                                        std::nullopt, RD, false);
     if (IsConst)
@@ -490,17 +490,16 @@ bool Descriptor::hasTrivialDtor() const {
     return true;
 
   if (isRecord()) {
-    assert(ElemRecord);
-    return ElemRecord->hasTrivialDtor();
+    return getElemRecord()->hasTrivialDtor();
   }
 
-  if (!ElemDesc)
-    return true;
+  if (const Descriptor *ElemDesc = getElemDescOrNull())
+    return ElemDesc->hasTrivialDtor();
   // Composite arrays.
-  return ElemDesc->hasTrivialDtor();
+  return true;
 }
 
-bool Descriptor::isUnion() const { return isRecord() && ElemRecord->isUnion(); }
+bool Descriptor::isUnion() const { return isRecord() && getElemRecord()->isUnion(); }
 
 unsigned Descriptor::getElemDataSize() const {
   if ((isPrimitive() || isPrimitiveArray()) &&

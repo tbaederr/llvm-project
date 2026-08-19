@@ -16,13 +16,13 @@
 #include "DeclOrExpr.h"
 #include "InitMap.h"
 #include "PrimType.h"
+#include "Record.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
 
 namespace clang {
 namespace interp {
 class Block;
-class Record;
 class SourceInfo;
 struct Descriptor;
 enum PrimType : uint8_t;
@@ -149,10 +149,21 @@ public:
       std::numeric_limits<decltype(AllocSize)>::max() - sizeof(InitMapPtr) -
       align(std::max(*InlineDescMD, *GlobalMD));
 
-  /// Pointer to the record, if block contains records.
-  const Record *const ElemRecord = nullptr;
-  /// Descriptor of the array element.
-  const Descriptor *const ElemDesc = nullptr;
+  llvm::PointerUnion<const Record *, const Descriptor *> ElemDescOrRecord = nullptr;
+  const Descriptor *getElemDesc() const {
+    return cast<const Descriptor*>(ElemDescOrRecord);
+  }
+  const Descriptor *getElemDescOrNull() const {
+    return dyn_cast_if_present<const Descriptor*>(ElemDescOrRecord);
+  }
+  const Record *getElemRecord() const {
+    return cast<const Record*>(ElemDescOrRecord);
+  }
+  const Record *getElemRecordOrNull() const {
+    return dyn_cast_if_present<const Record*>(ElemDescOrRecord);
+  }
+
+
   /// The primitive type this descriptor was created for,
   /// or the primitive element type in case this is
   /// a primitive array.
@@ -260,21 +271,21 @@ public:
   }
 
   /// Checks if the descriptor is of an array of primitives.
-  bool isPrimitiveArray() const { return IsArray && !ElemDesc; }
+  bool isPrimitiveArray() const { return IsArray && !getElemDescOrNull(); }
   /// Checks if the descriptor is of an array of composites.
-  bool isCompositeArray() const { return IsArray && ElemDesc; }
+  bool isCompositeArray() const { return IsArray && getElemDescOrNull(); }
   /// Checks if the descriptor is of an array of zero size.
   bool isZeroSizeArray() const { return NumElems == 0; }
   /// Checks if the descriptor is of an array of unknown size.
   bool isUnknownSizeArray() const { return NumElems == UnknownSizeMark; }
 
   /// Checks if the descriptor is of a primitive.
-  bool isPrimitive() const { return !IsArray && !ElemRecord && PrimT; }
+  bool isPrimitive() const { return !IsArray && !getElemRecordOrNull() && PrimT; }
 
   /// Checks if the descriptor is of an array.
   bool isArray() const { return IsArray; }
   /// Checks if the descriptor is of a record.
-  bool isRecord() const { return !IsArray && ElemRecord; }
+  bool isRecord() const { return !IsArray && getElemRecordOrNull(); }
   /// Checks if the descriptor is of a union.
   bool isUnion() const;
 
