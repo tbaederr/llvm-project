@@ -5853,11 +5853,12 @@ TryListConversion(Sema &S, InitListExpr *From, QualType ToType,
         }
         if (CT->getSize().ugt(e)) {
           // Need an init from empty {}, is there one?
-          InitListExpr EmptyList(S.Context, From->getEndLoc(), {},
-                                 From->getEndLoc(), /*isExplicit=*/false);
-          EmptyList.setType(S.Context.VoidTy);
+          auto *EmptyList = InitListExpr::Create(
+              S.Context, From->getEndLoc(), {}, From->getEndLoc(),
+              /*IsExplicit=*/false);
+          EmptyList->setType(S.Context.VoidTy);
           DfltElt = TryListConversion(
-              S, &EmptyList, InitTy, SuppressUserConversions,
+              S, EmptyList, InitTy, SuppressUserConversions,
               InOverloadResolution, AllowObjCWritebackConversion);
           if (DfltElt.isBad()) {
             // No {} init, fatally bad

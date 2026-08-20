@@ -619,8 +619,10 @@ ExprResult InitListChecker::PerformEmptyInit(SourceLocation Loc,
                                                             true);
   MultiExprArg SubInit;
   Expr *InitExpr;
-  InitListExpr DummyInitList(SemaRef.Context, Loc, {}, Loc,
-                             /*isExplicit=*/false);
+  InitListExpr *DummyInitList =
+      InitListExpr::CreateEmpty(SemaRef.Context, /*NumInits=*/0);
+  DummyInitList->setLBraceLoc(Loc);
+  DummyInitList->setRBraceLoc(Loc);
 
   // C++ [dcl.init.aggr]p7:
   //   If there are fewer initializer-clauses in the list than there are
@@ -639,10 +641,10 @@ ExprResult InitListChecker::PerformEmptyInit(SourceLocation Loc,
     //
     // Only do this if we're initializing a class type, to avoid filling in
     // the initializer list where possible.
-    InitExpr = VerifyOnly ? &DummyInitList
-                          : new (SemaRef.Context)
-                                InitListExpr(SemaRef.Context, Loc, {}, Loc,
-                                             /*isExplicit=*/false);
+    InitExpr = VerifyOnly
+                   ? DummyInitList
+                   : InitListExpr::Create(SemaRef.Context, Loc, {}, Loc,
+                                          /*IsExplicit=*/false);
     InitExpr->setType(SemaRef.Context.VoidTy);
     SubInit = InitExpr;
     Kind = InitializationKind::CreateCopy(Loc, Loc);
@@ -1091,6 +1093,37 @@ static bool hasAnyDesignatedInits(const InitListExpr *IL) {
   return false;
 }
 
+/// Compute the maximum semantic index that will be needed when processing
+/// \p IL as an array initializer. This accounts for designated initializers
+/// with explicit array indices (e.g. [10] = 5) and trailing positional
+/// initializers after them.
+static unsigned computeMaxArrayIndex(const ASTContext &Ctx,
+                                     const InitListExpr *IL) {
+  unsigned MaxIndex = 0;
+  unsigned CurrentIndex = 0;
+  for (unsigned I = 0, N = IL->getNumInits(); I != N; ++I) {
+    const Expr *Init = IL->getInit(I);
+    if (const auto *DIE = dyn_cast_or_null<DesignatedInitExpr>(Init)) {
+      for (const auto &D : DIE->designators()) {
+        if (D.isArrayDesignator()) {
+          Expr::EvalResult Result;
+          if (DIE->getArrayIndex(D)->EvaluateAsInt(Result, Ctx))
+            CurrentIndex = Result.Val.getInt().getZExtValue();
+        } else if (D.isArrayRangeDesignator()) {
+          Expr::EvalResult Result;
+          if (DIE->getArrayRangeEnd(D)->EvaluateAsInt(Result, Ctx))
+            CurrentIndex = Result.Val.getInt().getZExtValue();
+        }
+        break;
+      }
+    }
+    if (CurrentIndex >= MaxIndex)
+      MaxIndex = CurrentIndex + 1;
+    ++CurrentIndex;
+  }
+  return MaxIndex;
+}
+
 InitListChecker::InitListChecker(
     Sema &S, const InitializedEntity &Entity, InitListExpr *IL, QualType &T,
     bool VerifyOnly, bool TreatUnavailableAsInvalid, bool InOverloadResolution,
@@ -1100,8 +1133,12 @@ InitListChecker::InitListChecker(
       InOverloadResolution(InOverloadResolution),
       AggrDeductionCandidateParamTypes(AggrDeductionCandidateParamTypes) {
   if (!VerifyOnly || hasAnyDesignatedInits(IL)) {
-    FullyStructuredList = createInitListExpr(
-        T, IL->getSourceRange(), IL->getNumInits(), IL->isExplicit());
+    unsigned ExpectedInits = IL->getNumInits();
+    if (S.Context.getAsArrayType(T))
+      ExpectedInits =
+          std::max(ExpectedInits, computeMaxArrayIndex(S.Context, IL));
+    FullyStructuredList = createInitListExpr(T, IL->getSourceRange(),
+                                            ExpectedInits, IL->isExplicit());
 
     // FIXME: Check that IL isn't already the semantic form of some other
     // InitListExpr. If it is, we'd create a broken AST.
@@ -2908,9 +2945,12 @@ InitListChecker::CheckDesignatedInitializer(const InitializedEntity &Entity,
                   dyn_cast<DesignatedInitUpdateExpr>(ExistingInit))
             StructuredList = E->getUpdater();
           else {
+            InitListExpr *Updater = createInitListExpr(
+                ExistingInit->getType(),
+                SourceRange(D->getBeginLoc(), DIE->getEndLoc()),
+                /*ExpectedNumInits=*/0, /*IsExplicit=*/false);
             DesignatedInitUpdateExpr *DIUE = new (SemaRef.Context)
-                DesignatedInitUpdateExpr(SemaRef.Context, D->getBeginLoc(),
-                                         ExistingInit, DIE->getEndLoc());
+                DesignatedInitUpdateExpr(SemaRef.Context, ExistingInit, Updater);
             StructuredList->updateInit(SemaRef.Context, StructuredIndex, DIUE);
             StructuredList = DIUE->getUpdater();
           }
@@ -3555,9 +3595,13 @@ InitListChecker::getStructuredSubobjectInit(InitListExpr *IList, unsigned Index,
 
   unsigned ExpectedNumInits = 0;
   if (Index < IList->getNumInits()) {
-    if (auto *Init = dyn_cast_or_null<InitListExpr>(IList->getInit(Index)))
+    if (auto *Init = dyn_cast_or_null<InitListExpr>(IList->getInit(Index))) {
       ExpectedNumInits = Init->getNumInits();
-    else
+      if (SemaRef.Context.getAsArrayType(CurrentObjectType))
+        ExpectedNumInits =
+            std::max(ExpectedNumInits,
+                     computeMaxArrayIndex(SemaRef.Context, Init));
+    } else
       ExpectedNumInits = IList->getNumInits() - Index;
   }
 
@@ -3574,16 +3618,8 @@ InitListExpr *InitListChecker::createInitListExpr(QualType CurrentObjectType,
                                                   SourceRange InitRange,
                                                   unsigned ExpectedNumInits,
                                                   bool IsExplicit) {
-  InitListExpr *Result =
-      new (SemaRef.Context) InitListExpr(SemaRef.Context, InitRange.getBegin(),
-                                         {}, InitRange.getEnd(), IsExplicit);
-
-  QualType ResultType = CurrentObjectType;
-  if (!ResultType->isArrayType())
-    ResultType = ResultType.getNonLValueExprType(SemaRef.Context);
-  Result->setType(ResultType);
-
-  // Pre-allocate storage for the structured initializer list.
+  // Compute number of elements to pre-allocate. Unlike with ASTVector, trailing
+  // objects cannot grow, so we must allocate enough capacity upfront.
   unsigned NumElements = 0;
 
   if (const ArrayType *AType
@@ -3593,17 +3629,33 @@ InitListExpr *InitListChecker::createInitListExpr(QualType CurrentObjectType,
       // Simple heuristic so that we don't allocate a very large
       // initializer with many empty entries at the end.
       if (NumElements > ExpectedNumInits)
-        NumElements = 0;
+        NumElements = ExpectedNumInits;
     }
   } else if (const VectorType *VType = CurrentObjectType->getAs<VectorType>()) {
     NumElements = VType->getNumElements();
   } else if (CurrentObjectType->isRecordType()) {
     NumElements = numStructUnionElements(CurrentObjectType);
+    if (auto *RD = CurrentObjectType->getAsRecordDecl())
+      if (!RD->isUnion() && RD->hasFlexibleArrayMember())
+        ++NumElements;
   } else if (CurrentObjectType->isDependentType()) {
     NumElements = 1;
   }
 
-  Result->reserveInits(SemaRef.Context, NumElements);
+  if (NumElements < ExpectedNumInits)
+    NumElements = ExpectedNumInits;
+
+  InitListExpr *Result =
+      InitListExpr::CreateEmpty(SemaRef.Context, NumElements);
+  Result->setLBraceLoc(InitRange.getBegin());
+  Result->setRBraceLoc(InitRange.getEnd());
+  Result->sawArrayRangeDesignator(false);
+  Result->setExplicit(IsExplicit);
+
+  QualType ResultType = CurrentObjectType;
+  if (!ResultType->isArrayType())
+    ResultType = ResultType.getNonLValueExprType(SemaRef.Context);
+  Result->setType(ResultType);
 
   return Result;
 }
@@ -7028,9 +7080,9 @@ void InitializationSequence::InitializeFrom(Sema &S,
            !Context.hasSameUnqualifiedType(SourceType, DestType);
   };
   if (ShouldTryListInitialization()) {
-    InitListExpr *ILE = new (Context)
-        InitListExpr(S.getASTContext(), Args.front()->getBeginLoc(), Args,
-                     Args.back()->getEndLoc(), /*isExplicit=*/false);
+    InitListExpr *ILE = InitListExpr::Create(
+        S.getASTContext(), Args.front()->getBeginLoc(), Args,
+        Args.back()->getEndLoc(), /*IsExplicit=*/false);
     ILE->setType(DestType);
     Args[0] = ILE;
     TryListInitialization(S, Entity, Kind, ILE, *this,
@@ -8486,9 +8538,9 @@ ExprResult InitializationSequence::Perform(Sema &S,
     case SK_RewrapInitList: {
       Expr *E = CurInit.get();
       InitListExpr *Syntactic = Step->WrappingSyntacticList;
-      InitListExpr *ILE = new (S.Context)
-          InitListExpr(S.Context, Syntactic->getLBraceLoc(), E,
-                       Syntactic->getRBraceLoc(), Syntactic->isExplicit());
+      InitListExpr *ILE = InitListExpr::Create(
+          S.Context, Syntactic->getLBraceLoc(), E, Syntactic->getRBraceLoc(),
+          Syntactic->isExplicit());
       ILE->setSyntacticForm(Syntactic);
       ILE->setType(E->getType());
       ILE->setValueKind(E->getValueKind());
@@ -10438,10 +10490,10 @@ QualType Sema::DeduceTemplateSpecializationFromInitializer(
         // Inits are expressions inside the parentheses. We don't have
         // the parentheses source locations, use the begin/end of Inits as the
         // best heuristic.
-        InitListExpr TempListInit(getASTContext(), Inits.front()->getBeginLoc(),
-                                  Inits, Inits.back()->getEndLoc(),
-                                  /*isExplicit=*/false);
-        SynthesizeAggrGuide(&TempListInit);
+        InitListExpr *TempListInit = InitListExpr::Create(
+            getASTContext(), Inits.front()->getBeginLoc(), Inits,
+            Inits.back()->getEndLoc(), /*IsExplicit=*/false);
+        SynthesizeAggrGuide(TempListInit);
       }
     }
 

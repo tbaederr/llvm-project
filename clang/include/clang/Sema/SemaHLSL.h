@@ -238,7 +238,7 @@ public:
 
   QualType getInoutParameterType(QualType Ty);
 
-  bool transformInitList(const InitializedEntity &Entity, InitListExpr *Init);
+  bool transformInitList(const InitializedEntity &Entity, InitListExpr *&Init);
   bool handleInitialization(VarDecl *VDecl, Expr *&Init);
   void deduceAddressSpace(VarDecl *Decl);
   QualType checkMatrixComponent(Sema &S, QualType baseType, ExprValueKind &VK,

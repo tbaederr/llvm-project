@@ -6298,8 +6298,8 @@ class InitListTransformer {
       }
     }
     auto *NewInit =
-        new (Ctx) InitListExpr(Ctx, Inits.front()->getBeginLoc(), Inits,
-                               Inits.back()->getEndLoc(), /*isExplicit=*/false);
+        InitListExpr::Create(Ctx, Inits.front()->getBeginLoc(), Inits,
+                             Inits.back()->getEndLoc(), /*IsExplicit=*/false);
     NewInit->setType(Ty);
     return NewInit;
   }
@@ -6336,8 +6336,8 @@ public:
       Inits.push_back(generateInitListsImpl(InitTy));
 
     auto *NewInit =
-        new (Ctx) InitListExpr(Ctx, Inits.front()->getBeginLoc(), Inits,
-                               Inits.back()->getEndLoc(), /*isExplicit=*/false);
+        InitListExpr::Create(Ctx, Inits.front()->getBeginLoc(), Inits,
+                             Inits.back()->getEndLoc(), /*IsExplicit=*/false);
     llvm::APInt ArySize(64, Inits.size());
     NewInit->setType(Ctx.getConstantArrayType(InitTy, ArySize, nullptr,
                                               ArraySizeModifier::Normal, 0));
@@ -6381,7 +6381,7 @@ static bool containsIncompleteArrayType(QualType Ty) {
 }
 
 bool SemaHLSL::transformInitList(const InitializedEntity &Entity,
-                                 InitListExpr *Init) {
+                                 InitListExpr *&Init) {
   // If the initializer is a scalar, just return it.
   if (Init->getType()->isScalarType())
     return true;
@@ -6446,9 +6446,9 @@ bool SemaHLSL::transformInitList(const InitializedEntity &Entity,
   // generateInitListsImpl will always return an InitListExpr here, because the
   // scalar case is handled above.
   auto *NewInit = cast<InitListExpr>(ILT.generateInitLists());
-  Init->resizeInits(Ctx, NewInit->getNumInits());
-  for (unsigned I = 0; I < NewInit->getNumInits(); ++I)
-    Init->updateInit(Ctx, I, NewInit->getInit(I));
+  NewInit->setLBraceLoc(Init->getLBraceLoc());
+  NewInit->setRBraceLoc(Init->getRBraceLoc());
+  Init = NewInit;
   return true;
 }
 

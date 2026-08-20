@@ -1393,7 +1393,8 @@ static bool interp__builtin_assume_aligned(InterpState &S, CodePtr OpPC,
   }
 
   APValue AV = Ptr.toAPValue(S.getASTContext());
-  CharUnits AVOffset = AV.getLValueOffset();
+  CharUnits AVOffset = CharUnits::fromQuantity(*Ptr.computeLayoutOffset(S.getASTContext()));
+  //AV.getLValueOffset();
   if (ExtraOffset)
     AVOffset -= CharUnits::fromQuantity(ExtraOffset->getZExtValue());
   if (AVOffset.alignTo(Align) != AVOffset) {

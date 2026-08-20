@@ -5316,10 +5316,20 @@ private:
 /// Since many initializer lists have the same syntactic and semantic forms,
 /// getSyntacticForm() may return NULL, indicating that the current
 /// semantic initializer list also serves as its syntactic form.
-class InitListExpr : public Expr {
-  // FIXME: Eliminate this vector in favor of ASTContext allocation
-  typedef ASTVector<Stmt *> InitExprsTy;
-  InitExprsTy InitExprs;
+class InitListExpr final
+    : public Expr,
+      private llvm::TrailingObjects<InitListExpr, Stmt *> {
+  friend class TrailingObjects;
+  friend class ASTStmtReader;
+  friend class ASTStmtWriter;
+
+  /// Number of Stmt* slots allocated.
+  unsigned NumInitsAlloc;
+
+  /// When non-null, points to a separately allocated array of Stmt* that
+  /// replaced the trailing objects storage when the init list needed to grow.
+  Stmt **InitsOverflow = nullptr;
+
   SourceLocation LBraceLoc, RBraceLoc;
 
   /// The alternative form of the initializer list (if it exists).
@@ -5338,52 +5348,67 @@ class InitListExpr : public Expr {
   ///  field within the union will be initialized.
   llvm::PointerUnion<Expr *, FieldDecl *> ArrayFillerOrUnionFieldInit;
 
-public:
-  InitListExpr(const ASTContext &C, SourceLocation lbraceloc,
-               ArrayRef<Expr *> initExprs, SourceLocation rbraceloc,
-               bool isExplicit);
+  InitListExpr(SourceLocation LBraceLoc, ArrayRef<Expr *> InitExprs,
+               SourceLocation RBraceLoc, bool IsExplicit);
 
-  /// Build an empty initializer list.
-  explicit InitListExpr(EmptyShell Empty)
-      : Expr(InitListExprClass, Empty), AltForm(nullptr, true) {
-    InitListExprBits.IsExplicit = false;
+  /// Build an empty initializer list with \p NumInits trailing init
+  /// expressions (all null).
+  InitListExpr(EmptyShell Empty, unsigned NumInits);
+
+  Stmt **getInitsData() {
+    return InitsOverflow ? InitsOverflow : getTrailingObjects();
+  }
+  Stmt *const *getInitsData() const {
+    return InitsOverflow ? InitsOverflow : getTrailingObjects();
   }
 
-  unsigned getNumInits() const { return InitExprs.size(); }
+public:
+  static InitListExpr *Create(const ASTContext &Ctx, SourceLocation LBraceLoc,
+                              ArrayRef<Expr *> InitExprs,
+                              SourceLocation RBraceLoc, bool IsExplicit);
+
+  /// Create an empty InitListExpr with \p NumInits trailing init
+  /// expressions (all null). Used for deserialization and for creating
+  /// semantic forms in Sema.
+  static InitListExpr *CreateEmpty(const ASTContext &Ctx, unsigned NumInits);
+
+  unsigned getNumInits() const { return InitListExprBits.NumInits; }
 
   /// getNumInits but if the list has an EmbedExpr inside includes full length
   /// of embedded data.
   unsigned getNumInitsWithEmbedExpanded() const {
-    unsigned Sum = InitExprs.size();
-    for (auto *IE : InitExprs)
-      if (auto *EE = dyn_cast<EmbedExpr>(IE))
+    unsigned Sum = getNumInits();
+    for (unsigned I = 0; I < getNumInits(); ++I)
+      if (auto *EE = dyn_cast<EmbedExpr>(getInitsData()[I]))
         Sum += EE->getDataElementCount() - 1;
     return Sum;
   }
 
   /// Retrieve the set of initializers.
-  Expr **getInits() { return reinterpret_cast<Expr **>(InitExprs.data()); }
+  Expr **getInits() {
+    return reinterpret_cast<Expr **>(getInitsData());
+  }
 
   /// Retrieve the set of initializers.
-  Expr * const *getInits() const {
-    return reinterpret_cast<Expr * const *>(InitExprs.data());
+  Expr *const *getInits() const {
+    return reinterpret_cast<Expr *const *>(getInitsData());
   }
 
   ArrayRef<Expr *> inits() const { return {getInits(), getNumInits()}; }
 
   const Expr *getInit(unsigned Init) const {
     assert(Init < getNumInits() && "Initializer access out of range!");
-    return cast_or_null<Expr>(InitExprs[Init]);
+    return cast_or_null<Expr>(getInitsData()[Init]);
   }
 
   Expr *getInit(unsigned Init) {
     assert(Init < getNumInits() && "Initializer access out of range!");
-    return cast_or_null<Expr>(InitExprs[Init]);
+    return cast_or_null<Expr>(getInitsData()[Init]);
   }
 
   void setInit(unsigned Init, Expr *expr) {
     assert(Init < getNumInits() && "Initializer access out of range!");
-    InitExprs[Init] = expr;
+    getInitsData()[Init] = expr;
 
     if (expr)
       setDependence(getDependence() | expr->getDependence());
@@ -5396,24 +5421,13 @@ public:
     setDependence(getDependence() | ExprDependence::ErrorDependent);
   }
 
-  /// Reserve space for some number of initializers.
-  void reserveInits(const ASTContext &C, unsigned NumInits);
-
-  /// Specify the number of initializers
-  ///
-  /// If there are more than @p NumInits initializers, the remaining
-  /// initializers will be destroyed. If there are fewer than @p
-  /// NumInits initializers, NULL expressions will be added for the
-  /// unknown initializers.
+  /// Resize the initializer list. \p NumInits must be no larger than
+  /// the allocated capacity.
   void resizeInits(const ASTContext &Context, unsigned NumInits);
 
   /// Updates the initializer at index @p Init with the new
   /// expression @p expr, and returns the old expression at that
-  /// location.
-  ///
-  /// When @p Init is out of range for this initializer list, the
-  /// initializer list will be extended with NULL expressions to
-  /// accommodate the new entry.
+  /// location. \p Init must be within the allocated capacity.
   Expr *updateInit(const ASTContext &C, unsigned Init, Expr *expr);
 
   /// If this initializer list initializes an array with more elements
@@ -5460,6 +5474,7 @@ public:
   // Explicit InitListExpr's originate from source code (and have valid source
   // locations). Implicit InitListExpr's are created by the semantic analyzer.
   bool isExplicit() const { return InitListExprBits.IsExplicit; }
+  void setExplicit(bool V) { InitListExprBits.IsExplicit = V; }
 
   /// Is this an initializer for an array of characters, initialized by a string
   /// literal or an @encode?
@@ -5513,34 +5528,34 @@ public:
 
   // Iterators
   child_range children() {
-    const_child_range CCR = const_cast<const InitListExpr *>(this)->children();
-    return child_range(cast_away_const(CCR.begin()),
-                       cast_away_const(CCR.end()));
+    // FIXME: This does not include the array filler expression.
+    Stmt **Begin = getInitsData();
+    return child_range(Begin, Begin + getNumInits());
   }
 
   const_child_range children() const {
     // FIXME: This does not include the array filler expression.
-    if (InitExprs.empty())
-      return const_child_range(const_child_iterator(), const_child_iterator());
-    return const_child_range(&InitExprs[0], &InitExprs[0] + InitExprs.size());
+    Stmt *const *Begin = getInitsData();
+    return const_child_range(Begin, Begin + getNumInits());
   }
 
-  typedef InitExprsTy::iterator iterator;
-  typedef InitExprsTy::const_iterator const_iterator;
-  typedef InitExprsTy::reverse_iterator reverse_iterator;
-  typedef InitExprsTy::const_reverse_iterator const_reverse_iterator;
+  using iterator = Stmt **;
+  using const_iterator = Stmt *const *;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  iterator begin() { return InitExprs.begin(); }
-  const_iterator begin() const { return InitExprs.begin(); }
-  iterator end() { return InitExprs.end(); }
-  const_iterator end() const { return InitExprs.end(); }
-  reverse_iterator rbegin() { return InitExprs.rbegin(); }
-  const_reverse_iterator rbegin() const { return InitExprs.rbegin(); }
-  reverse_iterator rend() { return InitExprs.rend(); }
-  const_reverse_iterator rend() const { return InitExprs.rend(); }
-
-  friend class ASTStmtReader;
-  friend class ASTStmtWriter;
+  iterator begin() { return getInitsData(); }
+  const_iterator begin() const { return getInitsData(); }
+  iterator end() { return begin() + getNumInits(); }
+  const_iterator end() const { return begin() + getNumInits(); }
+  reverse_iterator rbegin() { return reverse_iterator(end()); }
+  const_reverse_iterator rbegin() const {
+    return const_reverse_iterator(end());
+  }
+  reverse_iterator rend() { return reverse_iterator(begin()); }
+  const_reverse_iterator rend() const {
+    return const_reverse_iterator(begin());
+  }
 };
 
 /// Represents a C99 designated initializer expression.
@@ -5934,8 +5949,8 @@ class DesignatedInitUpdateExpr : public Expr {
   Stmt *BaseAndUpdaterExprs[2];
 
 public:
-  DesignatedInitUpdateExpr(const ASTContext &C, SourceLocation lBraceLoc,
-                           Expr *baseExprs, SourceLocation rBraceLoc);
+  DesignatedInitUpdateExpr(const ASTContext &C, Expr *baseExpr,
+                           InitListExpr *updater);
 
   explicit DesignatedInitUpdateExpr(EmptyShell Empty)
     : Expr(DesignatedInitUpdateExprClass, Empty) { }

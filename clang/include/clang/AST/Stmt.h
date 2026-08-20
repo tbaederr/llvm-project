@@ -682,6 +682,9 @@ protected:
     // Whether this list is explicitly written in the source (with braces).
     LLVM_PREFERRED_TYPE(bool)
     unsigned IsExplicit : 1;
+
+    /// Number of init expressions in the trailing storage.
+    unsigned NumInits;
   };
 
   class ParenListExprBitfields {

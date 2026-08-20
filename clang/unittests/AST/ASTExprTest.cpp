@@ -98,7 +98,7 @@ TEST(ASTExpr, InitListIsConstantInitialized) {
 
   SourceLocation Loc{};
   InitListExpr *BaseInit =
-      new (Ctx) InitListExpr(Ctx, Loc, {}, Loc, /*isExplicit=*/true);
+      InitListExpr::Create(Ctx, Loc, {}, Loc, /*IsExplicit=*/true);
   BaseInit->setType(Ctx.getCanonicalTagType(Empty));
   Expr *Exprs[3] = {
       BaseInit,
@@ -106,7 +106,7 @@ TEST(ASTExpr, InitListIsConstantInitialized) {
       createIntLiteral(Ctx, 42),
   };
   InitListExpr *FooInit =
-      new (Ctx) InitListExpr(Ctx, Loc, Exprs, Loc, /*isExplicit=*/true);
+      InitListExpr::Create(Ctx, Loc, Exprs, Loc, /*IsExplicit=*/true);
   FooInit->setType(Ctx.getCanonicalTagType(Foo));
   EXPECT_TRUE(FooInit->isConstantInitializer(Ctx, false));
 

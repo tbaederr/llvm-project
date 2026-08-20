@@ -1227,6 +1227,7 @@ void ASTStmtWriter::VisitMatrixElementExpr(MatrixElementExpr *E) {
 
 void ASTStmtWriter::VisitInitListExpr(InitListExpr *E) {
   VisitExpr(E);
+  Record.push_back(E->getNumInits());
   // NOTE: only add the (possibly null) syntactic form.
   // No need to serialize the isSemanticForm flag and the semantic form.
   Record.AddStmt(E->getSyntacticForm());
@@ -1239,7 +1240,6 @@ void ASTStmtWriter::VisitInitListExpr(InitListExpr *E) {
   else
     Record.AddDeclRef(E->getInitializedFieldInUnion());
   Record.push_back(E->hadArrayRangeDesignator());
-  Record.push_back(E->getNumInits());
   if (isArrayFiller) {
     // ArrayFiller may have filled "holes" due to designated initializer.
     // Replace them by 0 to indicate that the filler goes in that place.

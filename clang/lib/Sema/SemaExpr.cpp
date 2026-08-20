@@ -7677,8 +7677,8 @@ ExprResult Sema::BuildInitList(SourceLocation LBraceLoc,
     }
   }
 
-  InitListExpr *E = new (Context)
-      InitListExpr(Context, LBraceLoc, InitArgList, RBraceLoc, IsExplicit);
+  InitListExpr *E = InitListExpr::Create(Context, LBraceLoc, InitArgList,
+                                         RBraceLoc, IsExplicit);
   E->setType(Context.VoidTy); // FIXME: just a place holder for now.
   return E;
 }
@@ -8347,9 +8347,9 @@ ExprResult Sema::BuildVectorLiteral(SourceLocation LParenLoc,
   }
   // FIXME: This means that pretty-printing the final AST will produce curly
   // braces instead of the original commas.
-  InitListExpr *initE =
-      new (Context) InitListExpr(Context, LiteralLParenLoc, initExprs,
-                                 LiteralRParenLoc, /*isExplicit=*/false);
+  InitListExpr *initE = InitListExpr::Create(
+      Context, LiteralLParenLoc, initExprs, LiteralRParenLoc,
+      /*IsExplicit=*/false);
   initE->setType(Ty);
   return BuildCompoundLiteralExpr(LParenLoc, TInfo, RParenLoc, initE);
 }
@@ -10106,8 +10106,8 @@ static void ConstructTransparentUnion(Sema &S, ASTContext &C,
   // Build an initializer list that designates the appropriate member
   // of the transparent union.
   Expr *E = EResult.get();
-  InitListExpr *Initializer = new (C) InitListExpr(
-      C, SourceLocation(), E, SourceLocation(), /*isExplicit=*/false);
+  InitListExpr *Initializer = InitListExpr::Create(
+      C, SourceLocation(), E, SourceLocation(), /*IsExplicit=*/false);
   Initializer->setType(UnionType);
   Initializer->setInitializedFieldInUnion(Field);
 

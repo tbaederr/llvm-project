@@ -680,8 +680,8 @@ BuiltinTypeMethodBuilder &BuiltinTypeMethodBuilder::concat(V Vec, S Scalar,
   }
   Elts.push_back(ScalarExpr);
 
-  auto *InitList = new (AST) InitListExpr(
-      AST, SourceLocation(), Elts, SourceLocation(), /*isExplicit=*/false);
+  auto *InitList = InitListExpr::Create(AST, SourceLocation(), Elts,
+                                        SourceLocation(), /*IsExplicit=*/false);
   InitList->setType(ResultTy);
 
   ExprResult Cast = DeclBuilder.SemaRef.BuildCStyleCastExpr(

@@ -2412,36 +2412,80 @@ EmbedExpr::EmbedExpr(const ASTContext &Ctx, SourceLocation Loc,
   assert(getType()->isSignedIntegerType() && "IntTy should be signed");
 }
 
-InitListExpr::InitListExpr(const ASTContext &C, SourceLocation lbraceloc,
-                           ArrayRef<Expr *> initExprs, SourceLocation rbraceloc,
-                           bool isExplicit)
+InitListExpr::InitListExpr(SourceLocation LBraceLoc,
+                           ArrayRef<Expr *> InitExprs,
+                           SourceLocation RBraceLoc, bool IsExplicit)
     : Expr(InitListExprClass, QualType(), VK_PRValue, OK_Ordinary),
-      InitExprs(C, initExprs.size()), LBraceLoc(lbraceloc),
-      RBraceLoc(rbraceloc), AltForm(nullptr, true) {
+      NumInitsAlloc(InitExprs.size()), LBraceLoc(LBraceLoc),
+      RBraceLoc(RBraceLoc), AltForm(nullptr, true) {
+  InitListExprBits.NumInits = InitExprs.size();
   sawArrayRangeDesignator(false);
-  InitExprs.insert(C, InitExprs.end(), initExprs.begin(), initExprs.end());
-  InitListExprBits.IsExplicit = isExplicit;
+  InitListExprBits.IsExplicit = IsExplicit;
 
+  std::copy(InitExprs.begin(), InitExprs.end(), getTrailingObjects());
   setDependence(computeDependence(this));
 }
 
-void InitListExpr::reserveInits(const ASTContext &C, unsigned NumInits) {
-  if (NumInits > InitExprs.size())
-    InitExprs.reserve(C, NumInits);
+InitListExpr::InitListExpr(EmptyShell Empty, unsigned NumInits)
+    : Expr(InitListExprClass, QualType(), VK_PRValue, OK_Ordinary),
+      NumInitsAlloc(NumInits), AltForm(nullptr, true) {
+  InitListExprBits.NumInits = 0;
+  InitListExprBits.IsExplicit = false;
+  setDependence(ExprDependence::None);
+  std::fill_n(getTrailingObjects(), NumInits, nullptr);
+}
+
+InitListExpr *InitListExpr::Create(const ASTContext &Ctx,
+                                   SourceLocation LBraceLoc,
+                                   ArrayRef<Expr *> InitExprs,
+                                   SourceLocation RBraceLoc, bool IsExplicit) {
+  void *Mem = Ctx.Allocate(totalSizeToAlloc<Stmt *>(InitExprs.size()),
+                           alignof(InitListExpr));
+  return new (Mem) InitListExpr(LBraceLoc, InitExprs, RBraceLoc, IsExplicit);
+}
+
+InitListExpr *InitListExpr::CreateEmpty(const ASTContext &Ctx,
+                                        unsigned NumInits) {
+  void *Mem = Ctx.Allocate(totalSizeToAlloc<Stmt *>(NumInits),
+                           alignof(InitListExpr));
+  return new (Mem) InitListExpr(EmptyShell(), NumInits);
 }
 
 void InitListExpr::resizeInits(const ASTContext &C, unsigned NumInits) {
-  InitExprs.resize(C, NumInits, nullptr);
+  if (NumInits > NumInitsAlloc) {
+    // Allocate a new, larger array from the ASTContext.
+    Stmt **NewInits = new (C) Stmt *[NumInits];
+    std::copy_n(getInitsData(), InitListExprBits.NumInits, NewInits);
+    std::fill(NewInits + InitListExprBits.NumInits, NewInits + NumInits,
+              nullptr);
+    InitsOverflow = NewInits;
+    NumInitsAlloc = NumInits;
+    InitListExprBits.NumInits = NumInits;
+    return;
+  }
+  // Null out any new slots when growing.
+  for (unsigned I = InitListExprBits.NumInits; I < NumInits; ++I)
+    getInitsData()[I] = nullptr;
+  // Null out removed slots when shrinking.
+  for (unsigned I = NumInits; I < InitListExprBits.NumInits; ++I)
+    getInitsData()[I] = nullptr;
+  InitListExprBits.NumInits = NumInits;
 }
 
 Expr *InitListExpr::updateInit(const ASTContext &C, unsigned Init, Expr *expr) {
-  if (Init >= InitExprs.size()) {
-    InitExprs.insert(C, InitExprs.end(), Init - InitExprs.size() + 1, nullptr);
+  if (Init >= InitListExprBits.NumInits) {
+    if (Init >= NumInitsAlloc)
+      resizeInits(C, Init + 1);
+    else {
+      for (unsigned I = InitListExprBits.NumInits; I < Init; ++I)
+        getInitsData()[I] = nullptr;
+      InitListExprBits.NumInits = Init + 1;
+    }
     setInit(Init, expr);
     return nullptr;
   }
 
-  Expr *Result = cast_or_null<Expr>(InitExprs[Init]);
+  Expr *Result = cast_or_null<Expr>(getInitsData()[Init]);
   setInit(Init, expr);
   return Result;
 }
@@ -2510,10 +2554,8 @@ SourceLocation InitListExpr::getBeginLoc() const {
   SourceLocation Beg = LBraceLoc;
   if (Beg.isInvalid()) {
     // Find the first non-null initializer.
-    for (InitExprsTy::const_iterator I = InitExprs.begin(),
-                                     E = InitExprs.end();
-      I != E; ++I) {
-      if (Stmt *S = *I) {
+    for (unsigned I = 0, E = getNumInits(); I != E; ++I) {
+      if (Stmt *S = getInitsData()[I]) {
         Beg = S->getBeginLoc();
         break;
       }
@@ -2528,8 +2570,8 @@ SourceLocation InitListExpr::getEndLoc() const {
   SourceLocation End = RBraceLoc;
   if (End.isInvalid()) {
     // Find the first non-null initializer from the end.
-    for (Stmt *S : llvm::reverse(InitExprs)) {
-      if (S) {
+    for (int I = getNumInits() - 1; I >= 0; --I) {
+      if (Stmt *S = getInitsData()[I]) {
         End = S->getEndLoc();
         break;
       }
@@ -4940,17 +4982,12 @@ void DesignatedInitExpr::ExpandDesignator(const ASTContext &C, unsigned Idx,
 }
 
 DesignatedInitUpdateExpr::DesignatedInitUpdateExpr(const ASTContext &C,
-                                                   SourceLocation lBraceLoc,
                                                    Expr *baseExpr,
-                                                   SourceLocation rBraceLoc)
+                                                   InitListExpr *updater)
     : Expr(DesignatedInitUpdateExprClass, baseExpr->getType(), VK_PRValue,
            OK_Ordinary) {
   BaseAndUpdaterExprs[0] = baseExpr;
-
-  InitListExpr *ILE =
-      new (C) InitListExpr(C, lBraceLoc, {}, rBraceLoc, /*isExplicit=*/false);
-  ILE->setType(baseExpr->getType());
-  BaseAndUpdaterExprs[1] = ILE;
+  BaseAndUpdaterExprs[1] = updater;
 
   // FIXME: this is wrong, set it correctly.
   setDependence(ExprDependence::None);

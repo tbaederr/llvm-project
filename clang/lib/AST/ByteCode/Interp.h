@@ -2149,7 +2149,7 @@ inline bool FinishInitPop(InterpState &S) {
 }
 
 inline bool FinishInit(InterpState &S) {
-  const Pointer &Ptr = S.Stk.peek<Pointer>();
+  const Pointer Ptr = S.Stk.peek<Pointer>();
   if (Ptr.canBeInitialized())
     Ptr.initialize();
   return true;

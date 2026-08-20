@@ -1257,6 +1257,8 @@ void ASTStmtReader::VisitMatrixElementExpr(MatrixElementExpr *E) {
 
 void ASTStmtReader::VisitInitListExpr(InitListExpr *E) {
   VisitExpr(E);
+  // NumInits is already read and used during CreateEmpty; skip it.
+  Record.skipInts(1);
   if (auto *SyntForm = cast_or_null<InitListExpr>(Record.readSubStmt()))
     E->setSyntacticForm(SyntForm);
   E->setLBraceLoc(readSourceLocation());
@@ -1269,18 +1271,18 @@ void ASTStmtReader::VisitInitListExpr(InitListExpr *E) {
   } else
     E->ArrayFillerOrUnionFieldInit = readDeclAs<FieldDecl>();
   E->sawArrayRangeDesignator(Record.readInt());
-  unsigned NumInits = Record.readInt();
-  E->reserveInits(Record.getContext(), NumInits);
+  unsigned NumInits = E->NumInitsAlloc;
+  E->InitListExprBits.NumInits = NumInits;
   if (isArrayFiller) {
     for (unsigned I = 0; I != NumInits; ++I) {
       Expr *init = Record.readSubExpr();
-      E->updateInit(Record.getContext(), I, init ? init : filler);
+      E->setInit(I, init ? init : filler);
     }
   } else {
     for (unsigned I = 0; I != NumInits; ++I)
-      E->updateInit(Record.getContext(), I, Record.readSubExpr());
+      E->setInit(I, Record.readSubExpr());
   }
-  E->InitListExprBits.IsExplicit = Record.readBool();
+  E->setExplicit(Record.readBool());
 }
 
 void ASTStmtReader::VisitDesignatedInitExpr(DesignatedInitExpr *E) {
@@ -3474,7 +3476,8 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
       break;
 
     case EXPR_INIT_LIST:
-      S = new (Context) InitListExpr(Empty);
+      S = InitListExpr::CreateEmpty(
+          Context, Record[ASTStmtReader::NumExprFields]);
       break;
 
     case EXPR_DESIGNATED_INIT:

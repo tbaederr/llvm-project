@@ -307,8 +307,8 @@ Sema::BuildCXXExpansionStmtDecl(DeclContext *Ctx, SourceLocation TemplateKWLoc,
 ExprResult Sema::ActOnCXXExpansionInitList(MultiExprArg SubExprs,
                                            SourceLocation LBraceLoc,
                                            SourceLocation RBraceLoc) {
-  return new (Context) InitListExpr(Context, LBraceLoc, SubExprs, RBraceLoc,
-                                    /*IsExplicit=*/true);
+  return InitListExpr::Create(Context, LBraceLoc, SubExprs, RBraceLoc,
+                              /*IsExplicit=*/true);
 }
 
 StmtResult Sema::ActOnCXXExpansionStmtPattern(
@@ -477,8 +477,8 @@ StmtResult Sema::BuildNonEnumeratingCXXExpansionStmtPattern(
   }
 
   ExprResult Select = BuildCXXExpansionSelectExpr(
-      new (Context) InitListExpr(Context, ColonLoc, Bindings, ColonLoc,
-                                 /*IsExplicit=*/false),
+      InitListExpr::Create(Context, ColonLoc, Bindings, ColonLoc,
+                           /*IsExplicit=*/false),
       Index);
 
   if (Select.isInvalid()) {
