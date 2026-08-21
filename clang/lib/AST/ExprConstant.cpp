@@ -22890,7 +22890,7 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue *Result,
   // Build evaluation settings.
   Expr::EvalStatus Status;
   EvalInfo Info(Ctx, Status, EvaluationMode::ConstantExpression);
-  SmallVector<PartialDiagnosticAt> MSRelaxedDiag;
+  SmallVector<PartialDiagnosticAt, 0> MSRelaxedDiag;
   Status.ExtendedDiag = AllowRelaxedEval ? &MSRelaxedDiag : nullptr;
 
   bool IsConstExpr =

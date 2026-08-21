@@ -2578,7 +2578,7 @@ VarDecl::evaluateValueImpl(SmallVectorImpl<PartialDiagnosticAt> *Notes,
 
   Eval->IsEvaluating = true;
 
-  SmallVector<PartialDiagnosticAt> MSWarning;
+  SmallVector<PartialDiagnosticAt, 0> MSWarning;
   ASTContext &Ctx = getASTContext();
   Expr::EvalResult EStatus;
   EStatus.Diag = Notes;
