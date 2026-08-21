@@ -460,8 +460,10 @@ static bool lvalFields(InterpState &S, const ASTContext &Ctx, PtrView Ptr,
     }
 
     for (const Record::Field &F : R->fields()) {
-      PtrView FieldPtr = Ptr.atField(F.Offset);
+      if (!isOrHasPtr(F.Desc))
+          continue;
 
+      PtrView FieldPtr = Ptr.atField(F.Offset);
       if (F.Desc->isPrimitive() && F.Desc->getPrimType() == PT_Ptr) {
         if (!FieldPtr.isLive())
           return false;
@@ -481,6 +483,8 @@ static bool lvalFields(InterpState &S, const ASTContext &Ctx, PtrView Ptr,
     }
 
     for (const Record::Base &B : R->virtual_bases()) {
+      if (!B.R->hasPtrField())
+        continue;
       PtrView BasePtr = Ptr.atField(B.Offset);
       if (!lvalFields(S, Ctx, BasePtr, B.Desc->getType(), Info, ConstexprKind,
                       CheckedBlocks))
