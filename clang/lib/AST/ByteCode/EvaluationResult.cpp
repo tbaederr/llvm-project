@@ -79,26 +79,26 @@ static bool CheckFieldsInitialized(InterpState &S, SourceLocation Loc,
     if (R->isUnion() && !FieldPtr.isActive())
       continue;
 
-    QualType FieldType = F.Decl->getType();
+    QualType FieldType = F.getDecl()->getType();
     const Descriptor *FieldDesc = FieldPtr.getFieldDesc();
 
     if (FieldDesc->isRecord()) {
       Result &= CheckFieldsInitialized(S, Loc, FieldPtr, FieldPtr.getRecord());
     } else if (FieldType->isIncompleteArrayType()) {
       // Nothing to do here.
-    } else if (F.Decl->isUnnamedBitField()) {
+    } else if (F.isUnnamedBitField()) {
       // Nothing do do here.
     } else if (FieldDesc->isArray()) {
       Result &= CheckArrayInitialized(S, Loc, FieldPtr);
     } else if (!FieldPtr.isInitialized()) {
-      DiagnoseUninitializedSubobject(S, Loc, F.Decl);
+      DiagnoseUninitializedSubobject(S, Loc, F.getDecl());
       Result = false;
     }
   }
 
   auto diagnoseBase = [&](const Record::Base &B, unsigned Index) -> bool {
     const Descriptor *Desc = BasePtr.getDeclDesc();
-    if (const auto *CD = dyn_cast_if_present<CXXRecordDecl>(R->getDecl())) {
+    if (const auto *CD = dyn_cast<CXXRecordDecl>(R->getDecl())) {
       const auto &BS = *std::next(CD->bases_begin(), Index);
       SourceLocation TypeBeginLoc = BS.getBaseTypeLoc();
       S.FFDiag(TypeBeginLoc, diag::note_constexpr_uninitialized_base)
@@ -115,7 +115,8 @@ static bool CheckFieldsInitialized(InterpState &S, SourceLocation Loc,
     PtrView P = BasePtr.atField(B.Offset);
     if (!P.isInitialized())
       return diagnoseBase(B, I);
-    Result &= CheckFieldsInitialized(S, Loc, P, B.R, /*IsCompleteClass=*/false);
+    Result &= CheckFieldsInitialized(S, Loc, P, B.getRecord(),
+                                     /*IsCompleteClass=*/false);
   }
 
   // And virtual bases.
@@ -124,8 +125,8 @@ static bool CheckFieldsInitialized(InterpState &S, SourceLocation Loc,
       PtrView P = BasePtr.atField(B.Offset);
       if (!P.isInitialized())
         return diagnoseBase(B, I);
-      Result &=
-          CheckFieldsInitialized(S, Loc, P, B.R, /*IsCompleteClass=*/false);
+      Result &= CheckFieldsInitialized(S, Loc, P, B.getRecord(),
+                                       /*IsCompleteClass=*/false);
     }
   }
 
@@ -194,7 +195,7 @@ static void collectBlocks(PtrView Ptr,
       return;
 
     for (const Record::Base &B : R->bases()) {
-      if (!B.R->hasPtrField())
+      if (!B.getRecord()->hasPtrField())
         continue;
       PtrView BasePtr = Ptr.atField(B.Offset);
       collectBlocks(BasePtr, Blocks, /*IsCompleteClass=*/false);
@@ -209,7 +210,7 @@ static void collectBlocks(PtrView Ptr,
 
     if (IsCompleteClass) {
       for (const Record::Base &B : R->virtual_bases()) {
-        if (!B.R->hasPtrField())
+        if (!B.getRecord()->hasPtrField())
           continue;
         PtrView BasePtr = Ptr.atField(B.Offset);
         collectBlocks(BasePtr, Blocks, /*IsCompleteClass=*/false);

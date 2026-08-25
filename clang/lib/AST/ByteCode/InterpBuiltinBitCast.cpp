@@ -189,7 +189,7 @@ static Result enumerateData(PtrView P, const Context &Ctx, Bits Offset,
 
       PtrView Elem = P.atField(Fi.Offset);
       Bits BitOffset =
-          Offset + Bits(Layout.getFieldOffset(Fi.Decl->getFieldIndex()));
+          Offset + Bits(Layout.getFieldOffset(Fi.getDecl()->getFieldIndex()));
       Result Res =
           enumerateData(Elem, Ctx, BitOffset, BitsToRead, F, Initialize);
       if (Initialize) {
@@ -205,8 +205,7 @@ static Result enumerateData(PtrView P, const Context &Ctx, Bits Offset,
       if (!Initialize && !Elem.isInitialized())
         return Result::Failure;
 
-      CharUnits ByteOffset =
-          Layout.getBaseClassOffset(cast<CXXRecordDecl>(B.Decl));
+      CharUnits ByteOffset = Layout.getBaseClassOffset(B.getDecl());
       Bits BitOffset = Offset + Bits(Ctx.getASTContext().toBits(ByteOffset));
       Result Res =
           enumerateData(Elem, Ctx, BitOffset, BitsToRead, F, Initialize);

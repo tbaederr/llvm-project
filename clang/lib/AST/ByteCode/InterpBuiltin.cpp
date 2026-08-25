@@ -7061,7 +7061,7 @@ static bool copyRecord(InterpState &S, CodePtr OpPC, PtrView Src, PtrView Dest,
 
   auto copyField = [&](const Record::Field &F, bool Activate) -> bool {
     PtrView DestField = Dest.atField(F.Offset);
-    if (OptPrimType FT = S.Ctx.classify(F.Decl->getType())) {
+    if (OptPrimType FT = S.Ctx.classify(F.getDecl()->getType())) {
       TYPE_SWITCH(*FT, {
         DestField.deref<T>() = Src.atField(F.Offset).deref<T>();
         if (Src.atField(F.Offset).isInitialized())

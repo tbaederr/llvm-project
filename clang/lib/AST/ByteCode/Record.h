@@ -13,50 +13,52 @@
 #ifndef LLVM_CLANG_AST_INTERP_RECORD_H
 #define LLVM_CLANG_AST_INTERP_RECORD_H
 
+#include "Descriptor.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 
 namespace clang {
 namespace interp {
 class Program;
-struct Descriptor;
 
 /// Structure/Class descriptor.
 class Record final {
 public:
   /// Describes a record field.
   struct Field {
-    const FieldDecl *Decl;
     const Descriptor *Desc;
     unsigned Offset;
 
-    bool isBitField() const { return Decl->isBitField(); }
-    bool isUnnamedBitField() const { return Decl->isUnnamedBitField(); }
+    Field(const Descriptor *Desc, unsigned Offset)
+        : Desc(Desc), Offset(Offset) {}
+
+    bool isBitField() const { return getDecl()->isBitField(); }
+    bool isUnnamedBitField() const { return getDecl()->isUnnamedBitField(); }
     unsigned bitWidth() const {
       assert(isBitField());
-      return Decl->getBitWidthValue();
+      return getDecl()->getBitWidthValue();
     }
-
-    Field(const FieldDecl *D, const Descriptor *Desc, unsigned Offset)
-        : Decl(D), Desc(Desc), Offset(Offset) {}
+    const FieldDecl *getDecl() const { return Desc->asFieldDecl(); }
   };
 
   /// Describes a base class.
   struct Base {
-    const RecordDecl *Decl;
     const Descriptor *Desc;
-    const Record *R;
     unsigned Offset;
 
-    Base(const RecordDecl *D, const Descriptor *Desc, const Record *R,
-         unsigned Offset)
-        : Decl(D), Desc(Desc), R(R), Offset(Offset) {}
+    Base(const Descriptor *Desc, unsigned Offset)
+        : Desc(Desc), Offset(Offset) {}
+
+    const CXXRecordDecl *getDecl() const {
+      return cast<CXXRecordDecl>(Desc->asRecordDecl());
+    }
+    const Record *getRecord() const { return Desc->ElemRecord; }
   };
 
   /// Mapping from identifiers to field descriptors.
   using FieldList = llvm::SmallVector<Field, 8>;
   /// Mapping from identifiers to base classes.
-  using BaseList = llvm::SmallVector<Base, 8>;
+  using BaseList = llvm::SmallVector<Base, 2>;
   /// List of virtual base classes.
   using VirtualBaseList = llvm::SmallVector<Base, 0>;
 
@@ -84,7 +86,7 @@ public:
 
   /// Returns true for anonymous unions and records
   /// with no destructor or for those with a trivial destructor.
-  bool hasTrivialDtor() const;
+  bool hasTrivialDtor() const { return HasTrivialDtor; }
 
   using const_field_iter = FieldList::const_iterator;
   llvm::iterator_range<const_field_iter> fields() const {
@@ -150,10 +152,6 @@ private:
   /// List of all virtual bases.
   VirtualBaseList VirtualBases;
 
-  /// Mapping from declarations to bases.
-  llvm::DenseMap<const RecordDecl *, const Base *> BaseMap;
-  /// Mapping from declarations to virtual bases.
-  llvm::DenseMap<const RecordDecl *, Base *> VirtualBaseMap;
   /// Size of the structure.
   unsigned BaseSize;
   /// Size of all virtual bases.
@@ -164,6 +162,7 @@ private:
   bool IsAnonymousUnion;
   /// If any of the fields are pointers (or references).
   bool HasPtrField = false;
+  bool HasTrivialDtor = false;
 };
 
 } // namespace interp

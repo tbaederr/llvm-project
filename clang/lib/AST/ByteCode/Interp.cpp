@@ -1573,7 +1573,7 @@ static bool diagnoseTypeIdField(InterpState &S, CodePtr OpPC,
   QualType(Ptr.asTypeidPointer().TypePtr, 0)
       .print(SS, S.getASTContext().getPrintingPolicy());
   SS << ").";
-  SS << Field->Decl->getNameAsString();
+  SS << Field->getDecl()->getNameAsString();
 
   S.FFDiag(S.Current->getSource(OpPC),
            diag::note_constexpr_access_unreadable_object)
@@ -2093,7 +2093,7 @@ static DynamicCastResult findRecordBase(const ASTContext &Ctx, const Record *R,
     Res.setOffset(0);
 
   for (const Record::Base &B : R->bases()) {
-    auto N = findRecordBase(Ctx, B.R, Needle);
+    auto N = findRecordBase(Ctx, B.getRecord(), Needle);
     if (N.Offset)
       N.Offset = *N.Offset + B.Offset;
     Res.merge(N);

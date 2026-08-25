@@ -353,8 +353,7 @@ LLVM_DUMP_METHOD void Program::dump(llvm::raw_ostream &OS) const {
 
     // All Records.
     for (const Record *R : Records.values()) {
-      Bytes += sizeof(Record) + R->BaseMap.getMemorySize() +
-               R->VirtualBaseMap.getMemorySize();
+      Bytes += sizeof(Record);
       Bytes += R->Fields.capacity_in_bytes() + R->Bases.capacity_in_bytes() +
                R->VirtualBases.capacity_in_bytes();
     }
@@ -504,7 +503,7 @@ LLVM_DUMP_METHOD void Descriptor::dumpFull(unsigned Offset,
       OS.indent(Spaces) << "- Field " << I << ": ";
       {
         ColorScope SC(OS, true, {llvm::raw_ostream::BRIGHT_RED, true});
-        OS << F.Decl->getName();
+        OS << F.getDecl()->getName();
       }
       OS << ". Offset " << (Offset + F.Offset) << "\n";
       F.Desc->dumpFull(Offset + F.Offset, Indent + 1);
@@ -591,7 +590,7 @@ LLVM_DUMP_METHOD void Record::dump(llvm::raw_ostream &OS, unsigned Indentation,
   for (const Record::Base &B : bases()) {
     OS.indent(Indent) << "- Base " << I << ". Offset " << (Offset + B.Offset)
                       << "\n";
-    B.R->dump(OS, Indentation + 1, Offset + B.Offset);
+    B.getRecord()->dump(OS, Indentation + 1, Offset + B.Offset);
     ++I;
   }
 
@@ -600,7 +599,7 @@ LLVM_DUMP_METHOD void Record::dump(llvm::raw_ostream &OS, unsigned Indentation,
     OS.indent(Indent) << "- Field " << I << ": ";
     {
       ColorScope SC(OS, true, {llvm::raw_ostream::BRIGHT_RED, true});
-      OS << F.Decl->getName();
+      OS << F.getDecl()->getName();
     }
     OS << ". Offset " << (Offset + F.Offset) << "\n";
     ++I;
@@ -610,7 +609,7 @@ LLVM_DUMP_METHOD void Record::dump(llvm::raw_ostream &OS, unsigned Indentation,
   for (const Record::Base &B : virtual_bases()) {
     OS.indent(Indent) << "- Virtual Base " << I << ". Offset "
                       << (Offset + B.Offset) << "\n";
-    B.R->dump(OS, Indentation + 1, Offset + B.Offset);
+    B.getRecord()->dump(OS, Indentation + 1, Offset + B.Offset);
     ++I;
   }
 }

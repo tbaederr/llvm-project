@@ -279,6 +279,7 @@ Record *Program::getOrCreateRecord(const RecordDecl *RD) {
                               /*IsMutable=*/false, /*IsVolatile=*/false);
   };
 
+  bool HasPtrField = false;
   // Reserve space for base classes.
   Record::BaseList Bases;
   Record::VirtualBaseList VirtBases;
@@ -299,8 +300,9 @@ Record *Program::getOrCreateRecord(const RecordDecl *RD) {
         return nullptr;
 
       BaseSize += align(sizeof(InlineDescriptor));
-      Bases.emplace_back(BD, Desc, BR, BaseSize);
+      Bases.emplace_back(Desc, BaseSize);
       BaseSize += align(BR->getSize());
+      HasPtrField = HasPtrField || BR->hasPtrField();
     }
 
     for (const CXXBaseSpecifier &Spec : CD->vbases()) {
@@ -312,15 +314,15 @@ Record *Program::getOrCreateRecord(const RecordDecl *RD) {
         return nullptr;
 
       VirtSize += align(sizeof(InlineDescriptor));
-      VirtBases.emplace_back(BD, Desc, BR, VirtSize);
+      VirtBases.emplace_back(Desc, VirtSize);
       VirtSize += align(BR->getSize());
+      HasPtrField = HasPtrField || BR->hasPtrField();
     }
   }
 
   // Reserve space for fields.
   Record::FieldList Fields;
   Fields.reserve(RD->getNumFields());
-  bool HasPtrField = false;
   for (const FieldDecl *FD : RD->fields()) {
     FD = FD->getFirstDecl();
     // Note that we DO create fields and descriptors
@@ -350,7 +352,7 @@ Record *Program::getOrCreateRecord(const RecordDecl *RD) {
     } else {
       Desc = allocateDescriptor(FD);
     }
-    Fields.emplace_back(FD, Desc, BaseSize);
+    Fields.emplace_back(Desc, BaseSize);
     BaseSize += align(Desc->getAllocSize());
   }
 

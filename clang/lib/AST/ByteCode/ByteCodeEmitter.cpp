@@ -48,7 +48,7 @@ void ByteCodeEmitter::compileFunc(const FunctionDecl *FuncDecl,
           Offset, Cap.second->getType()->isReferenceType()};
     }
     if (LTC) {
-      QualType CaptureType = R->getField(LTC)->Decl->getType();
+      QualType CaptureType = R->getField(LTC)->getDecl()->getType();
       this->LambdaThisCapture = {R->getField(LTC)->Offset,
                                  CaptureType->isPointerOrReferenceType()};
     }

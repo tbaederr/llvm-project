@@ -800,11 +800,11 @@ unsigned Context::collectBaseOffset(const RecordDecl *BaseDecl,
     assert(CurRecord->getNumBases() > 0);
     // One level up
     for (const Record::Base &B : CurRecord->bases()) {
-      const auto *BaseDecl = cast<CXXRecordDecl>(B.Decl);
+      const CXXRecordDecl *BaseDecl = B.getDecl();
 
       if (BaseDecl == FinalDecl || BaseDecl->isDerivedFrom(FinalDecl)) {
         OffsetSum += B.Offset;
-        CurRecord = B.R;
+        CurRecord = B.getRecord();
         CurDecl = BaseDecl;
         break;
       }
