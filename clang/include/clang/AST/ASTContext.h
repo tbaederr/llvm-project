@@ -97,6 +97,7 @@ class CXXABI;
 class CXXConstructorDecl;
 class CXXMethodDecl;
 class CXXRecordDecl;
+class LifetimeExtendedTemporaryDecl;
 class DiagnosticsEngine;
 class DynTypedNodeList;
 class Expr;
@@ -356,6 +357,10 @@ class ASTContext : public RefCountedBase<ASTContext> {
 
   /// Mapping from __block VarDecls to BlockVarCopyInit.
   llvm::DenseMap<const VarDecl *, BlockVarCopyInit> BlockVarCopyInits;
+
+  /// Mapping from lifetime-extended temporary declarations to their values.
+  llvm::DenseMap<const LifetimeExtendedTemporaryDecl *, APValue *>
+      LifetimeExtendedTemporaryValues;
 
   /// Mapping from GUIDs to the corresponding MSGuidDecl.
   mutable llvm::FoldingSet<MSGuidDecl> MSGuidDecls;
@@ -3554,6 +3559,11 @@ public:
   /// Get the copy initialization expression of the VarDecl \p VD, or
   /// nullptr if none exists.
   BlockVarCopyInit getBlockVarCopyInit(const VarDecl* VD) const;
+
+  APValue *getLifetimeExtendedTemporaryValue(
+      const LifetimeExtendedTemporaryDecl *D) const;
+  APValue *getOrCreateLifetimeExtendedTemporaryValue(
+      const LifetimeExtendedTemporaryDecl *D);
 
   /// Allocate an uninitialized TypeSourceInfo.
   ///

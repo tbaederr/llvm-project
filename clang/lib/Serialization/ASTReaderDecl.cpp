@@ -2871,8 +2871,9 @@ void ASTDeclReader::VisitLifetimeExtendedTemporaryDecl(
   D->ExtendingDecl = readDeclAs<ValueDecl>();
   D->ExprWithTemporary = Record.readStmt();
   if (Record.readInt()) {
-    D->Value = new (D->getASTContext()) APValue(Record.readAPValue());
-    D->getASTContext().addDestruction(D->Value);
+    APValue *V =
+        D->getASTContext().getOrCreateLifetimeExtendedTemporaryValue(D);
+    *V = Record.readAPValue();
   }
   D->ManglingNumber = Record.readInt();
   mergeMergeable(D);

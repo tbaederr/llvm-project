@@ -3453,12 +3453,17 @@ StorageDuration LifetimeExtendedTemporaryDecl::getStorageDuration() const {
 APValue *LifetimeExtendedTemporaryDecl::getOrCreateValue(bool MayCreate) const {
   assert(getStorageDuration() == SD_Static &&
          "don't need to cache the computed value for this temporary");
-  if (MayCreate && !Value) {
-    Value = (new (getASTContext()) APValue);
-    getASTContext().addDestruction(Value);
-  }
-  assert(Value && "may not be null");
-  return Value;
+  ASTContext &Ctx = getASTContext();
+  if (MayCreate)
+    return Ctx.getOrCreateLifetimeExtendedTemporaryValue(this);
+
+  APValue *V = Ctx.getLifetimeExtendedTemporaryValue(this);
+  assert(V && "may not be null");
+  return V;
+}
+
+APValue *LifetimeExtendedTemporaryDecl::getValue() const {
+  return getASTContext().getLifetimeExtendedTemporaryValue(this);
 }
 
 void UsingShadowDecl::anchor() {}

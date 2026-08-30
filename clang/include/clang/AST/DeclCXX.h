@@ -3341,8 +3341,6 @@ class LifetimeExtendedTemporaryDecl final
   ValueDecl *ExtendingDecl = nullptr;
   unsigned ManglingNumber;
 
-  mutable APValue *Value = nullptr;
-
   LLVM_DECLARE_VIRTUAL_ANCHOR_FUNCTION();
 
   LifetimeExtendedTemporaryDecl(Expr *Temp, ValueDecl *EDecl, unsigned Mangling)
@@ -3385,7 +3383,7 @@ public:
   /// of static storage duration.
   APValue *getOrCreateValue(bool MayCreate) const;
 
-  APValue *getValue() const { return Value; }
+  APValue *getValue() const;
 
   // Iterators
   Stmt::child_range childrenExpr() {

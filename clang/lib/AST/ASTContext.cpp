@@ -3234,6 +3234,24 @@ void ASTContext::setBlockVarCopyInit(const VarDecl*VD, Expr *CopyExpr,
   BlockVarCopyInits[VD].setExprAndFlag(CopyExpr, CanThrow);
 }
 
+APValue *ASTContext::getLifetimeExtendedTemporaryValue(
+    const LifetimeExtendedTemporaryDecl *D) const {
+  auto I = LifetimeExtendedTemporaryValues.find(D);
+  if (I != LifetimeExtendedTemporaryValues.end())
+    return I->second;
+  return nullptr;
+}
+
+APValue *ASTContext::getOrCreateLifetimeExtendedTemporaryValue(
+    const LifetimeExtendedTemporaryDecl *D) {
+  auto &V = LifetimeExtendedTemporaryValues[D];
+  if (!V) {
+    V = new (*this) APValue;
+    addDestruction(V);
+  }
+  return V;
+}
+
 TypeSourceInfo *ASTContext::CreateTypeSourceInfo(QualType T,
                                                  unsigned DataSize) const {
   if (!DataSize)
