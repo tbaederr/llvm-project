@@ -2054,3 +2054,9 @@ namespace BaseInitViaDIE {
   constexpr SS ss {};
   static_assert(ss.b == 42, "");
 }
+
+namespace OPEOpaque {
+  struct S {char c[14];};
+  extern S s;
+  static_assert((&s + 1) - &s == 1, "");
+}

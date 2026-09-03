@@ -165,6 +165,9 @@ static QualType getElemType(const Pointer &P) {
         ->getElementType();
   }
 
+  if (P.isOpaquePointer())
+    return P.getType();
+
   const Descriptor *Desc = P.getFieldDesc();
   QualType T = Desc->getType();
   if (Desc->isPrimitive())
@@ -409,7 +412,7 @@ static bool interp__builtin_strlen(InterpState &S, CodePtr OpPC,
   if (!StrPtr.isBlockPointer())
     return false;
 
-  if (!CheckDummy(S, OpPC, StrPtr.block(), AK_Read))
+  if (!CheckDummy(S, OpPC, StrPtr, AK_Read))
     return false;
 
   if (!StrPtr.getFieldDesc()->isPrimitiveArray())
@@ -1318,13 +1321,13 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
   }
   assert(FirstArgT == PT_Ptr);
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-  if (!Ptr.isBlockPointer()) {
+  if (!Ptr.isBlockPointer() && !Ptr.isOpaquePointer()) {
     S.FFDiag(Call->getArg(0), diag::note_constexpr_alignment_compute)
         << Alignment;
     return false;
   }
 
-  const ValueDecl *PtrDecl = Ptr.getDeclDesc()->asValueDecl();
+  const VarDecl *PtrDecl = Ptr.getRootVarDecl();
   // We need a pointer for a declaration here.
   if (!PtrDecl) {
     if (BuiltinOp == Builtin::BI__builtin_is_aligned)
@@ -1336,10 +1339,19 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
     return false;
   }
 
-  // For one-past-end pointers, we can't call getIndex() since it asserts.
-  // Use getNumElems() instead which gives the correct index for past-end.
-  unsigned PtrOffset =
-      Ptr.isElementPastEnd() ? Ptr.getNumElems() : Ptr.getIndex();
+  unsigned PtrOffset;
+  if (Ptr.isBlockPointer()) {
+    // For one-past-end pointers, we can't call getIndex() since it asserts.
+    // Use getNumElems() instead which gives the correct index for past-end.
+    PtrOffset = Ptr.isElementPastEnd() ? Ptr.getNumElems() : Ptr.getIndex();
+  } else {
+    if (std::optional<size_t> PtrOff =
+            Ptr.computeLayoutOffset(S.getASTContext()))
+      PtrOffset = *PtrOff;
+    else
+      return false;
+  }
+
   CharUnits BaseAlignment = S.getASTContext().getDeclAlign(PtrDecl);
   CharUnits PtrAlign =
       BaseAlignment.alignmentAtOffset(CharUnits::fromQuantity(PtrOffset));
@@ -1388,8 +1400,18 @@ static bool interp__builtin_is_aligned_up_down(InterpState &S, CodePtr OpPC,
                                     ? llvm::alignDown(PtrOffset, Alignment64)
                                     : llvm::alignTo(PtrOffset, Alignment64));
 
-    S.Stk.push<Pointer>(Ptr.atIndex(NewOffset.getQuantity()));
-    return true;
+    if (Ptr.isBlockPointer()) {
+      S.Stk.push<Pointer>(Ptr.atIndex(NewOffset.getQuantity()));
+      return true;
+    }
+
+    assert(Ptr.isOpaquePointer());
+
+    APSInt APOffset =
+        APSInt(APInt(64, NewOffset.getQuantity(), /*IsSigned=*/true),
+               /*IsUnsigned=*/false);
+    return arrayElemPtrOpaque(S, OpPC, Ptr, std::move(APOffset),
+                              /*AllocReplace=*/true);
   }
 
   // Otherwise, we cannot constant-evaluate the result.
@@ -1420,9 +1442,9 @@ static bool interp__builtin_assume_aligned(InterpState &S, CodePtr OpPC,
   CharUnits Align = CharUnits::fromQuantity(Alignment.getZExtValue());
 
   // If there is a base object, then it must have the correct alignment.
-  if (Ptr.isBlockPointer()) {
+  if (Ptr.isBlockPointer() || Ptr.isOpaquePointer()) {
     CharUnits BaseAlignment;
-    if (const auto *VD = Ptr.getDeclDesc()->asValueDecl())
+    if (const auto *VD = Ptr.getRootVarDecl())
       BaseAlignment = ASTCtx.getDeclAlign(VD);
     else if (const auto *E = Ptr.getRootExpr())
       BaseAlignment = GetAlignOfExpr(ASTCtx, E, UETT_AlignOf);
@@ -1443,7 +1465,7 @@ static bool interp__builtin_assume_aligned(InterpState &S, CodePtr OpPC,
   if (ExtraOffset)
     AVOffset -= CharUnits::fromQuantity(ExtraOffset->getZExtValue());
   if (AVOffset.alignTo(Align) != AVOffset) {
-    if (Ptr.isBlockPointer())
+    if (Ptr.isBlockPointer() || Ptr.isOpaquePointer())
       S.CCEDiag(Call->getArg(0),
                 diag::note_constexpr_baa_insufficient_alignment)
           << 1 << AVOffset.getQuantity() << Align.getQuantity();
@@ -2124,7 +2146,8 @@ static bool interp__builtin_memcmp(InterpState &S, CodePtr OpPC,
     return true;
   }
 
-  if (!PtrA.isReadablePointerType() || !PtrB.isReadablePointerType())
+  if ((!PtrA.isReadablePointerType() && !PtrA.isOpaquePointer()) ||
+      (!PtrB.isReadablePointerType() && !PtrB.isOpaquePointer()))
     return false;
 
   bool IsWide =
@@ -2423,14 +2446,14 @@ static bool interp__builtin_is_within_lifetime(InterpState &S, CodePtr OpPC,
       return false;
     if (!CheckMutable(S, OpPC, Ptr))
       return false;
-    if (!CheckDummy(S, OpPC, Ptr.block(), AK_Read))
+    if (!CheckDummy(S, OpPC, Ptr, AK_Read))
       return false;
   }
 
   // Check if we're currently running an initializer.
   if (S.initializingBlock(Ptr.block()))
     return Error(2);
-  if (S.EvaluatingDecl && Ptr.getDeclDesc()->asVarDecl() == S.EvaluatingDecl)
+  if (S.EvaluatingDecl && Ptr.getRootVarDecl() == S.EvaluatingDecl)
     return Error(2);
 
   pushInteger(S, Result, Call->getType());
