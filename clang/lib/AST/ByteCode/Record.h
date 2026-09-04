@@ -15,18 +15,18 @@
 
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "Descriptor.h"
 
 namespace clang {
 namespace interp {
 class Program;
-struct Descriptor;
 
 /// Structure/Class descriptor.
 class Record final {
 public:
   /// Describes a record field.
   struct Field {
-    const FieldDecl *Decl;
+    // const FieldDecl *Decl;
     const Descriptor *Desc;
     unsigned Offset;
     bool IsBitField;
@@ -34,15 +34,16 @@ public:
 
     bool isBitField() const { return IsBitField; }
     bool isUnnamedBitField() const { return IsUnnamedBitField; }
+    const FieldDecl *getDecl() const { return Desc->asFieldDecl(); }
     unsigned bitWidth() const {
       assert(isBitField());
-      return Decl->getBitWidthValue();
+      return getDecl()->getBitWidthValue();
     }
 
     Field(const FieldDecl *D, const Descriptor *Desc, unsigned Offset)
-        : Decl(D), Desc(Desc), Offset(Offset) {
-      IsBitField = Decl->isBitField();
-      IsUnnamedBitField = IsBitField && Decl->isUnnamedBitField();
+        : Desc(Desc), Offset(Offset) {
+      IsBitField = D->isBitField();
+      IsUnnamedBitField = IsBitField && D->isUnnamedBitField();
     }
   };
 

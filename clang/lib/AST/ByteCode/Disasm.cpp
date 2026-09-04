@@ -496,7 +496,7 @@ LLVM_DUMP_METHOD void Descriptor::dumpFull(unsigned Offset,
       OS.indent(Spaces) << "- Field " << I << ": ";
       {
         ColorScope SC(OS, true, {llvm::raw_ostream::BRIGHT_RED, true});
-        OS << F.Decl->getName();
+        OS << F.getDecl()->getName();
       }
       OS << ". Offset " << (Offset + F.Offset) << "\n";
       F.Desc->dumpFull(Offset + F.Offset, Indent + 1);
@@ -592,7 +592,7 @@ LLVM_DUMP_METHOD void Record::dump(llvm::raw_ostream &OS, unsigned Indentation,
     OS.indent(Indent) << "- Field " << I << ": ";
     {
       ColorScope SC(OS, true, {llvm::raw_ostream::BRIGHT_RED, true});
-      OS << F.Decl->getName();
+      OS << F.getDecl()->getName();
     }
     OS << ". Offset " << (Offset + F.Offset) << "\n";
     ++I;

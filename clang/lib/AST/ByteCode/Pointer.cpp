@@ -1102,7 +1102,7 @@ static bool toRValue(const Context &Ctx, QualType Ty, PtrView Ptr, APValue &R) {
             TYPE_SWITCH(Desc->getPrimType(),
                         Value = FP.deref<T>().toAPValue(ASTCtx));
           } else {
-            QualType FieldTy = F.Decl->getType();
+            QualType FieldTy = F.getDecl()->getType();
             Ok &= toRValue(Ctx, FieldTy, FP, Value);
           }
           ActiveField = FP.getFieldDesc()->asFieldDecl();
@@ -1126,7 +1126,7 @@ static bool toRValue(const Context &Ctx, QualType Ty, PtrView Ptr, APValue &R) {
           TYPE_SWITCH(Desc->getPrimType(),
                       Value = FP.deref<T>().toAPValue(ASTCtx));
         } else {
-          QualType FieldTy = FD->Decl->getType();
+          QualType FieldTy = FD->getDecl()->getType();
           Ok &= toRValue(Ctx, FieldTy, FP, Value);
         }
       }
@@ -1302,7 +1302,7 @@ std::optional<IntPointer> IntPointer::atOffset(const interp::Context &Ctx,
   if (!F)
     return *this;
 
-  const FieldDecl *FD = F->Decl;
+  const FieldDecl *FD = F->getDecl();
   if (FD->getParent()->isInvalidDecl())
     return std::nullopt;
 

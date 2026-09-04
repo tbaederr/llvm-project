@@ -189,7 +189,7 @@ static Result enumerateData(PtrView P, const Context &Ctx, Bits Offset,
 
       PtrView Elem = P.atField(Fi.Offset);
       Bits BitOffset =
-          Offset + Bits(Layout.getFieldOffset(Fi.Decl->getFieldIndex()));
+          Offset + Bits(Layout.getFieldOffset(Fi.getDecl()->getFieldIndex()));
       Result Res =
           enumerateData(Elem, Ctx, BitOffset, BitsToRead, F, Initialize);
       if (Initialize) {

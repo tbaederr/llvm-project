@@ -1596,7 +1596,7 @@ static bool diagnoseTypeIdField(InterpState &S, CodePtr OpPC,
   QualType(Ptr.asTypeidPointer().TypePtr, 0)
       .print(SS, S.getASTContext().getPrintingPolicy());
   SS << ").";
-  SS << Field->Decl->getNameAsString();
+  SS << Field->getDecl()->getNameAsString();
 
   S.FFDiag(S.Current->getSource(OpPC),
            diag::note_constexpr_access_unreadable_object)
@@ -1645,10 +1645,10 @@ static bool getField(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
       return false;
 
     PointerPathEntry *NewPath = S.extendPointerPath(
-        OP.PathLength + 1, OP.Path, PointerPathEntry::field(F->Decl));
+        OP.PathLength + 1, OP.Path, PointerPathEntry::field(F->getDecl()));
 
     S.Stk.push<Pointer>(OP.withPath(NewPath, OP.PathLength + 1,
-                                    F->Decl->getType().getTypePtr()),
+                                    F->getDecl()->getType().getTypePtr()),
                         Ptr.getByteOffset());
 
     return true;

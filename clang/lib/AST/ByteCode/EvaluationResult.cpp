@@ -79,19 +79,19 @@ static bool CheckFieldsInitialized(InterpState &S, SourceLocation Loc,
     if (R->isUnion() && !FieldPtr.isActive())
       continue;
 
-    QualType FieldType = F.Decl->getType();
+    QualType FieldType = F.getDecl()->getType();
     const Descriptor *FieldDesc = FieldPtr.getFieldDesc();
 
     if (FieldDesc->isRecord()) {
       Result &= CheckFieldsInitialized(S, Loc, FieldPtr, FieldPtr.getRecord());
     } else if (FieldType->isIncompleteArrayType()) {
       // Nothing to do here.
-    } else if (F.Decl->isUnnamedBitField()) {
+    } else if (F.isUnnamedBitField()) {
       // Nothing do do here.
     } else if (FieldDesc->isArray()) {
       Result &= CheckArrayInitialized(S, Loc, FieldPtr);
     } else if (!FieldPtr.isInitialized()) {
-      DiagnoseUninitializedSubobject(S, Loc, F.Decl);
+      DiagnoseUninitializedSubobject(S, Loc, F.getDecl());
       Result = false;
     }
   }
