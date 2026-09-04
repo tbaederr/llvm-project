@@ -243,7 +243,7 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
                    CharUnits::fromQuantity(Offset * elemSize()), Path,
                    /*OnePastTheEnd=*/false, /*IsNull=*/false);
   case Storage::Opaque: {
-    if (!Opaque.Base->getType()->isPointerType()) {
+    if (!Opaque.Base.getType()->isPointerType()) {
       for (const PointerPathEntry &Entry : Opaque.path()) {
         switch (Entry.Kind) {
         case PointerPathEntry::Field:
@@ -264,9 +264,15 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
     }
     size_t LayoutOffset = Opaque.computeLayoutOffset(ASTCtx).value_or(0);
     auto Offset = CharUnits::fromQuantity(LayoutOffset + getByteOffset());
-    auto Result =
-        APValue(Opaque.Base, Offset, Path,
-                /*IsOnePastEnd=*/Opaque.isOnePastEnd(), /*IsNullPtr=*/false);
+    APValue Result;
+    if (const Expr *E = Opaque.Base.asExpr())
+      Result =
+          APValue(E, Offset, Path,
+                  /*IsOnePastEnd=*/Opaque.isOnePastEnd(), /*IsNullPtr=*/false);
+    else
+      Result =
+          APValue(Opaque.Base.asValueDecl(), Offset, Path,
+                  /*IsOnePastEnd=*/Opaque.isOnePastEnd(), /*IsNullPtr=*/false);
     Result.setConstexprUnknown(Opaque.isConstexprUnknown());
     return Result;
   }
@@ -908,15 +914,17 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
   // We allow comparisons between opaque pointers and block pointers, provided
   // they have the same declaration as base.
   if (A.StorageKind != B.StorageKind) {
-    if (A.isOpaquePointer() && B.isBlockPointer()) {
+    if (A.isOpaquePointer() && A.asOpaquePointer().Base.isVarDecl() &&
+        B.isBlockPointer()) {
       if (const VarDecl *BDecl = B.block()->getDescriptor()->asVarDecl())
-        return BDecl == A.Opaque.Base->getMostRecentDecl();
+        return BDecl == A.Opaque.Base.asVarDecl()->getMostRecentDecl();
 
       return false;
     }
-    if (B.isOpaquePointer() && A.isBlockPointer()) {
+    if (B.isOpaquePointer() && B.asOpaquePointer().Base.isVarDecl() &&
+        A.isBlockPointer()) {
       if (const VarDecl *ADecl = A.block()->getDescriptor()->asVarDecl())
-        return ADecl == B.Opaque.Base->getMostRecentDecl();
+        return ADecl == B.Opaque.Base.asVarDecl()->getMostRecentDecl();
       return false;
     }
     return false;
@@ -935,8 +943,12 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
   case Storage::String:
     return A.Str.ID == B.Str.ID && A.Str.getLiteral() == B.Str.getLiteral();
   case Storage::Opaque:
-    return A.asOpaquePointer().Base->getMostRecentDecl() ==
-           B.asOpaquePointer().Base->getMostRecentDecl();
+    if (A.Opaque.Base.isExpr() && B.Opaque.Base.isExpr())
+      return A.Opaque.Base == B.Opaque.Base;
+    else if (A.Opaque.Base.isVarDecl() && B.Opaque.Base.isVarDecl())
+      return A.Opaque.Base.asVarDecl()->getMostRecentDecl() ==
+             B.Opaque.Base.asVarDecl()->getMostRecentDecl();
+    return false;
   }
 
   return A.asBlockPointer().Pointee == B.asBlockPointer().Pointee;
@@ -989,23 +1001,24 @@ bool Pointer::elemsOfSameArray(const Pointer &A, const Pointer &B) {
   return true;
 }
 
+// FIXME: This should return true for string pointers.
 bool Pointer::pointsToLiteral() const {
-  if (isZero() || !isBlockPointer())
+  if (isZero())
     return false;
 
-  if (block()->isDynamic())
+  if (isDynamic())
     return false;
 
-  const Expr *E = block()->getDescriptor()->asExpr();
+  const Expr *E = getRootExpr();
   return E && !isa<MaterializeTemporaryExpr, StringLiteral>(E);
 }
 
 bool Pointer::pointsToLabel() const {
-  if (isZero() || !isBlockPointer())
+  if (isZero())
     return false;
 
-  if (const Expr *E = BS.Pointee->getDescriptor()->asExpr())
-    return isa<AddrLabelExpr>(E);
+  if (isOpaquePointer())
+    return isa_and_nonnull<AddrLabelExpr>(Opaque.Base.asExpr());
   return false;
 }
 
@@ -1063,7 +1076,7 @@ static bool toRValue(const Context &Ctx, QualType Ty, PtrView Ptr, APValue &R) {
     Ty = AT->getValueType();
 
   // Invalid pointers.
-  if (Ptr.isDummy() || !Ptr.isLive() || Ptr.isPastEnd())
+  if (!Ptr.isLive() || Ptr.isPastEnd())
     return false;
 
   // Primitives should never end up here.
@@ -1261,7 +1274,7 @@ const VarDecl *Pointer::getRootVarDecl() const {
   if (isBlockPointer())
     return getDeclDesc()->asVarDecl();
   if (isOpaquePointer())
-    return dyn_cast<VarDecl>(Opaque.Base);
+    return Opaque.getBaseDecl();
   return nullptr;
 }
 
@@ -1270,6 +1283,8 @@ const Expr *Pointer::getRootExpr() const {
     return getDeclDesc()->asExpr();
   if (isStringPointer())
     return Str.getLiteral();
+  if (isOpaquePointer())
+    return Opaque.getBaseExpr();
   return nullptr;
 }
 
@@ -1465,7 +1480,7 @@ bool OpaquePointer::isUnknownSizeArray() const {
   // base to see if this array is a flexible array member _and_ has actually
   // been initialized by data we know the size of.
   if (isa<IncompleteArrayType>(FieldType)) {
-    const VarDecl *Base = cast<VarDecl>(this->Base);
+    const VarDecl *Base = this->Base.asVarDecl();
     if (!Base || !Base->getType()->isRecordType() || !Base->hasInit())
       Result = true;
     else
