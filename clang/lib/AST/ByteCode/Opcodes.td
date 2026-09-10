@@ -420,6 +420,11 @@ def ArrayElemPtr : Opcode {
   let Types = [IntegralTypeClass];
   let HasGroup = 1;
 }
+
+def ArrayElemPtrI : Opcode {
+  let Args = [ArgUint32];
+}
+
 def ArrayElemPtrPop : Opcode {
   let Types = [IntegralTypeClass];
   let HasGroup = 1;
