@@ -3592,6 +3592,13 @@ inline bool ArrayElemPtr(InterpState &S, CodePtr OpPC) {
   return arrayElemPtr<T>(S, OpPC, Ptr, Offset);
 }
 
+inline bool ArrayElemPtrI(InterpState &S, CodePtr OpPC, uint32_t Index) {
+  const Pointer &Ptr = S.Stk.peek<Pointer>();
+
+  auto I = Integral<32, false>::from(Index);
+  return arrayElemPtr(S, OpPC, Ptr, I);
+}
+
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElemPtrPop(InterpState &S, CodePtr OpPC) {
   const T &Offset = S.Stk.pop<T>();

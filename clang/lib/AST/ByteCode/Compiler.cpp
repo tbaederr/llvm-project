@@ -2612,9 +2612,7 @@ bool Compiler<Emitter>::visitArrayElemInit(unsigned ElemIndex, const Expr *Init,
   InitLinkScope<Emitter> ILS(this, InitLink::Elem(ElemIndex));
   // Advance the pointer currently on the stack to the given
   // dimension.
-  if (!this->emitConstUint32(ElemIndex, Init))
-    return false;
-  if (!this->emitArrayElemPtrUint32(Init))
+  if (!this->emitArrayElemPtrI(ElemIndex, Init))
     return false;
   return this->visitInitializerPop(Init);
 }
@@ -5163,9 +5161,7 @@ bool Compiler<Emitter>::visitZeroArrayInitializer(QualType T, const Expr *E) {
       return false;
 
     for (size_t I = 0; I != NumElems; ++I) {
-      if (!this->emitConstUint32(I, E))
-        return false;
-      if (!this->emitArrayElemPtr(PT_Uint32, E))
+      if (!this->emitArrayElemPtrI(I, E))
         return false;
       if (!this->visitZeroRecordInitializer(R, E))
         return false;
@@ -5176,9 +5172,7 @@ bool Compiler<Emitter>::visitZeroArrayInitializer(QualType T, const Expr *E) {
   }
   if (ElemType->isArrayType()) {
     for (size_t I = 0; I != NumElems; ++I) {
-      if (!this->emitConstUint32(I, E))
-        return false;
-      if (!this->emitArrayElemPtr(PT_Uint32, E))
+      if (!this->emitArrayElemPtrI(I, E))
         return false;
       if (!this->visitZeroArrayInitializer(ElemType, E))
         return false;
