@@ -65,7 +65,6 @@ void Context::isPotentialConstantExprUnevaluated(State &Parent, const Expr *E,
   Compiler<EvalEmitter> C(*this, *P, Parent, Stk, FrameAlloc);
 
   if (!C.interpretCall(FD, E)) {
-    C.cleanup();
     Stk.clearTo(StackSizeBefore);
   }
 }
@@ -79,7 +78,6 @@ bool Context::evaluateAsRValue(State &Parent, const Expr *E, APValue &Result) {
   auto Res = C.interpretExpr(E, /*ConvertResultToRValue=*/E->isGLValue());
 
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clearTo(StackSizeBefore);
     return false;
   }
@@ -87,7 +85,6 @@ bool Context::evaluateAsRValue(State &Parent, const Expr *E, APValue &Result) {
   if (!Recursing) {
     // We *can* actually get here with a non-empty stack, since
     // things like InterpState::noteSideEffect() exist.
-    C.cleanup();
 #ifndef NDEBUG
     // Make sure we don't rely on some value being still alive in
     // InterpStack memory.
@@ -110,14 +107,12 @@ bool Context::evaluate(State &Parent, const Expr *E, APValue &Result,
   auto Res = C.interpretExpr(E, /*ConvertResultToRValue=*/false,
                              /*DestroyToplevelScope=*/true);
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clearTo(StackSizeBefore);
     return false;
   }
 
   if (!Recursing) {
     assert(Stk.empty());
-    C.cleanup();
 #ifndef NDEBUG
     // Make sure we don't rely on some value being still alive in
     // InterpStack memory.
@@ -141,7 +136,6 @@ bool Context::evaluateAsInitializer(State &Parent, const VarDecl *VD,
       (VD->getType()->isRecordType() || VD->getType()->isArrayType());
   auto Res = C.interpretDecl(VD, Init, CheckGlobalInitialized);
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clearTo(StackSizeBefore);
 
     return false;
@@ -149,7 +143,6 @@ bool Context::evaluateAsInitializer(State &Parent, const VarDecl *VD,
 
   if (!Recursing) {
     assert(Stk.empty());
-    C.cleanup();
 #ifndef NDEBUG
     // Make sure we don't rely on some value being still alive in
     // InterpStack memory.
@@ -169,7 +162,6 @@ bool Context::evaluateDestruction(State &Parent, const VarDecl *VD,
   auto Res = C.interpretDestructor(VD, Value);
 
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return false;
   }
@@ -255,7 +247,6 @@ bool Context::evaluateStringRepr(State &Parent, const Expr *SizeExpr,
   });
 
   if (PtrRes.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return false;
   }
@@ -337,7 +328,6 @@ bool Context::evaluateString(State &Parent, const Expr *E,
   });
 
   if (PtrRes.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return false;
   }
@@ -403,7 +393,6 @@ std::optional<uint64_t> Context::evaluateStrlen(State &Parent, const Expr *E) {
   });
 
   if (PtrRes.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return std::nullopt;
   }
@@ -435,7 +424,6 @@ std::optional<uint64_t> Context::tryEvaluateObjectSize(State &Parent,
   });
 
   if (PtrRes.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return std::nullopt;
   }
@@ -463,7 +451,6 @@ Context::evaluateWithSubstitution(State &Parent, const FunctionDecl *Callee,
   // failed.
   Stk.clear();
   if (!Result) {
-    C.cleanup();
     return std::nullopt;
   }
   return Result;

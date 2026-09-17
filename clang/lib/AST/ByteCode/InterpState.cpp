@@ -69,13 +69,6 @@ InterpState::~InterpState() {
   }
 }
 
-void InterpState::cleanup() {
-  // As a last resort, make sure all pointers still pointing to a dead block
-  // don't point to it anymore.
-  if (Alloc)
-    Alloc->cleanup();
-}
-
 const Frame *InterpState::getCurrentFrame() { return Current; }
 
 void InterpState::deallocate(Block *B) {

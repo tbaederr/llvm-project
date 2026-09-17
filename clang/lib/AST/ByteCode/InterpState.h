@@ -53,7 +53,7 @@ public:
 
   ~InterpState();
 
-  void cleanup();
+  // void cleanup();
 
   InterpState(const InterpState &) = delete;
   InterpState &operator=(const InterpState &) = delete;

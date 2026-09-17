@@ -55,9 +55,6 @@ public:
                                                  const Expr *This,
                                                  const Expr *Condition);
 
-  /// Clean up all resources.
-  void cleanup();
-
   /// Returns the source location of the current opcode.
   SourceInfo getSource(CodePtr PC) const override { return CurrentSource; }
 
