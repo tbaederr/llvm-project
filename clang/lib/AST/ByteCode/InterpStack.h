@@ -131,7 +131,7 @@ private:
   void shrink(size_t Size);
 
   /// Allocate stack space in 1Mb chunks.
-  static constexpr size_t ChunkSize = 1024 * 1024;
+  static constexpr size_t ChunkSize = 4 * 1024;
 
   /// Metadata for each stack chunk.
   ///
