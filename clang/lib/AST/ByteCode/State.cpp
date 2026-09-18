@@ -24,10 +24,12 @@ bool State::emitRelaxedDiag(SourceLocation Loc, diag::kind DiagId) {
 
   switch (DiagId) {
   case diag::note_constexpr_invalid_cast_ptrtoint:
-    addExtendedDiag(Loc, diag::warn_relaxed_constant_fold_cast);
+    if (EvalStatus.ExtendedDiag)
+      addExtendedDiag(Loc, diag::warn_relaxed_constant_fold_cast);
     return true;
   case diag::note_constexpr_null_subobject:
-    addExtendedDiag(Loc, diag::warn_relaxed_constant_fold_null);
+    if (EvalStatus.ExtendedDiag)
+      addExtendedDiag(Loc, diag::warn_relaxed_constant_fold_null);
     return true;
   default:
     return false;
@@ -36,7 +38,11 @@ bool State::emitRelaxedDiag(SourceLocation Loc, diag::kind DiagId) {
 
 OptionalDiagnostic State::FFDiag(SourceLocation Loc, diag::kind DiagId,
                                  unsigned ExtraNotes) {
-  return diag(Loc, DiagId, ExtraNotes, /*IsFFDiag=*/true);
+  EvalStatus.DiagEmitted = true;
+  if (EvalStatus.Diag)
+    return diag(Loc, DiagId, ExtraNotes, /*IsFFDiag=*/true);
+  setActiveDiagnostic(false);
+  return OptionalDiagnostic();
 }
 
 OptionalDiagnostic State::FFDiag(const Expr *E, diag::kind DiagId,
@@ -107,38 +113,33 @@ PartialDiagnostic &State::addDiag(SourceLocation Loc, diag::kind DiagId) {
 }
 
 void State::addExtendedDiag(SourceLocation Loc, diag::kind DiagId) {
-  if (!EvalStatus.ExtendedDiag)
-    return;
+  assert(EvalStatus.ExtendedDiag);
   PartialDiagnostic PD(DiagId, Ctx.getDiagAllocator());
   EvalStatus.ExtendedDiag->push_back(std::make_pair(Loc, PD));
 }
 
 OptionalDiagnostic State::diag(SourceLocation Loc, diag::kind DiagId,
                                unsigned ExtraNotes, bool IsFFDiag) {
-  if (EvalStatus.Diag) {
-    if (hasPriorDiagnostic()) {
-      return OptionalDiagnostic();
-    }
+  assert(EvalStatus.Diag);
+  if (hasPriorDiagnostic())
+    return OptionalDiagnostic();
 
-    unsigned CallStackNotes = getCallStackDepth() - 1;
-    unsigned Limit = Ctx.getDiagnostics().getConstexprBacktraceLimit();
-    if (Limit)
-      CallStackNotes = std::min(CallStackNotes, Limit + 1);
-    if (checkingPotentialConstantExpression())
-      CallStackNotes = 0;
+  unsigned CallStackNotes = getCallStackDepth() - 1;
+  unsigned Limit = Ctx.getDiagnostics().getConstexprBacktraceLimit();
+  if (Limit)
+    CallStackNotes = std::min(CallStackNotes, Limit + 1);
+  if (checkingPotentialConstantExpression())
+    CallStackNotes = 0;
 
-    setActiveDiagnostic(true);
-    setFoldFailureDiagnostic(IsFFDiag);
-    EvalStatus.Diag->clear();
-    EvalStatus.Diag->reserve(1 + ExtraNotes + CallStackNotes);
-    addDiag(Loc, DiagId);
-    if (!checkingPotentialConstantExpression()) {
-      addCallStack(Limit);
-    }
-    return OptionalDiagnostic(&(*EvalStatus.Diag)[0].second);
+  setActiveDiagnostic(true);
+  setFoldFailureDiagnostic(IsFFDiag);
+  EvalStatus.Diag->clear();
+  EvalStatus.Diag->reserve(1 + ExtraNotes + CallStackNotes);
+  addDiag(Loc, DiagId);
+  if (!checkingPotentialConstantExpression()) {
+    addCallStack(Limit);
   }
-  setActiveDiagnostic(false);
-  return OptionalDiagnostic();
+  return OptionalDiagnostic(&(*EvalStatus.Diag)[0].second);
 }
 
 void State::addCallStack(unsigned Limit) {
