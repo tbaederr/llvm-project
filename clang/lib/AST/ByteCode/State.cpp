@@ -39,6 +39,8 @@ bool State::emitRelaxedDiag(SourceLocation Loc, diag::kind DiagId) {
 OptionalDiagnostic State::FFDiag(SourceLocation Loc, diag::kind DiagId,
                                  unsigned ExtraNotes) {
   EvalStatus.DiagEmitted = true;
+  if (hasPriorDiagnostic())
+    return OptionalDiagnostic();
   if (EvalStatus.Diag)
     return diag(Loc, DiagId, ExtraNotes, /*IsFFDiag=*/true);
   setActiveDiagnostic(false);
@@ -48,6 +50,9 @@ OptionalDiagnostic State::FFDiag(SourceLocation Loc, diag::kind DiagId,
 OptionalDiagnostic State::FFDiag(const Expr *E, diag::kind DiagId,
                                  unsigned ExtraNotes) {
   EvalStatus.DiagEmitted = true;
+  if (hasPriorDiagnostic())
+    return OptionalDiagnostic();
+
   if (EvalStatus.Diag)
     return diag(E->getExprLoc(), DiagId, ExtraNotes, /*IsFFDiag=*/true);
   setActiveDiagnostic(false);
@@ -57,6 +62,9 @@ OptionalDiagnostic State::FFDiag(const Expr *E, diag::kind DiagId,
 OptionalDiagnostic State::FFDiag(SourceInfo SI, diag::kind DiagId,
                                  unsigned ExtraNotes) {
   EvalStatus.DiagEmitted = true;
+  if (hasPriorDiagnostic())
+    return OptionalDiagnostic();
+
   if (EvalStatus.Diag)
     return diag(SI.getLoc(), DiagId, ExtraNotes, /*IsFFDiag=*/true);
   setActiveDiagnostic(false);
@@ -70,6 +78,9 @@ OptionalDiagnostic State::CCEDiag(SourceLocation Loc, diag::kind DiagId,
     return OptionalDiagnostic();
   }
   EvalStatus.DiagEmitted = true;
+  if (hasPriorDiagnostic())
+    return OptionalDiagnostic();
+
   // Don't override a previous diagnostic. Don't bother collecting
   // diagnostics if we're evaluating for overflow.
   if (!EvalStatus.Diag || !EvalStatus.Diag->empty()) {
@@ -121,8 +132,9 @@ void State::addExtendedDiag(SourceLocation Loc, diag::kind DiagId) {
 OptionalDiagnostic State::diag(SourceLocation Loc, diag::kind DiagId,
                                unsigned ExtraNotes, bool IsFFDiag) {
   assert(EvalStatus.Diag);
-  if (hasPriorDiagnostic())
-    return OptionalDiagnostic();
+  assert(!hasPriorDiagnostic());
+  // if (hasPriorDiagnostic())
+    // return OptionalDiagnostic();
 
   unsigned CallStackNotes = getCallStackDepth() - 1;
   unsigned Limit = Ctx.getDiagnostics().getConstexprBacktraceLimit();
@@ -190,7 +202,7 @@ void State::addCallStack(unsigned Limit) {
 }
 
 bool State::hasPriorDiagnostic() {
-  if (!EvalStatus.Diag->empty()) {
+  if (EvalStatus.Diag && !EvalStatus.Diag->empty()) {
     switch (EvalMode) {
     case EvaluationMode::ConstantFold:
     case EvaluationMode::IgnoreSideEffects:
