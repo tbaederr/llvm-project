@@ -3886,8 +3886,12 @@ bool Compiler<Emitter>::VisitCXXConstructExpr(const CXXConstructExpr *E) {
                                         T->getAsCXXRecordDecl()))
       return this->visitInitializer(E->getArg(0));
 
+    // llvm::errs() << "Calling constructor for \n";
+    // E->dump();
+
     // Zero initialization.
     bool ZeroInit = E->requiresZeroInitialization();
+    // llvm::errs()<< "ZeroInit: " << ZeroInit << '\n';
     if (ZeroInit) {
       const Record *R = getRecord(E->getType());
       if (!R)
@@ -3900,6 +3904,19 @@ bool Compiler<Emitter>::VisitCXXConstructExpr(const CXXConstructExpr *E) {
       if (Ctor->isTrivial())
         return true;
     }
+
+    if (Ctor->isTrivial() && Ctor->isDefaultConstructor()) {
+      // llvm::errs() << "AHA!\n";
+      const Record *R = getRecord(T);
+      if (!R)
+        return false;
+      // Ctor->getParent()->dump();
+
+      if (DiscardResult)
+        return this->visitDefaultInitializer(Ctor, E) && this->emitFinishInitPop(E);
+      return this->visitDefaultInitializer(Ctor, E) && this->emitFinishInit(E);
+    }
+
 
     // Avoid materializing a temporary for an elidable copy/move constructor.
     if (!ZeroInit && E->isElidable()) {
@@ -5204,6 +5221,32 @@ bool Compiler<Emitter>::visitZeroArrayInitializer(QualType T, const Expr *E) {
   }
 
   return false;
+}
+
+template <class Emitter>
+bool Compiler<Emitter>::visitDefaultInitializer(const CXXConstructorDecl *Ctor, const Expr *E) {
+
+  return this->emitDefaultInit(Ctor, E);
+
+#if 0
+  if (R->isUnion())
+    return true;
+
+
+  for (const Record::Base &B : R->bases()) {
+    if (!this->emitGetPtrBase(B.Offset, E))
+      return false;
+    if (!this->visitDefaultInitializer(B.R, E))
+      return false;
+    if (!this->emitFinishInitPop(E))
+      return false;
+  }
+
+
+
+
+  return this->emitStartLifetime(E);
+#endif
 }
 
 template <class Emitter>

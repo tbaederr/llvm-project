@@ -20,6 +20,7 @@
 #include "PrimType.h"
 #include "Record.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/StmtVisitor.h"
 
@@ -377,6 +378,7 @@ private:
   bool visitZeroRecordInitializer(const Record *R, const Expr *E,
                                   bool IsCompleteClass = true);
   bool visitZeroArrayInitializer(QualType T, const Expr *E);
+  bool visitDefaultInitializer(const CXXConstructorDecl *Ctor, const Expr *E);
   bool visitAssignment(const Expr *LHS, const Expr *RHS, const Expr *E);
 
   /// Emits an APSInt constant.

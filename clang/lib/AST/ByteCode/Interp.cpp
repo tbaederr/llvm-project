@@ -2610,6 +2610,18 @@ static void startLifetimeRecurse(PtrView Ptr) {
   Ptr.startLifetime();
 }
 
+bool StartLifetime(InterpState &S) {
+  if (S.checkingPotentialConstantExpression())
+    return true;
+
+  const auto &Ptr = S.Stk.peek<Pointer>();
+  if (!Ptr.isBlockPointer())
+    return false;
+  startLifetimeRecurse(Ptr.view());
+  return true;
+}
+
+
 bool StartThisLifetime(InterpState &S) {
   if (S.checkingPotentialConstantExpression())
     return true;
@@ -2681,6 +2693,77 @@ bool MarkDestroyed(InterpState &S, CodePtr OpPC) {
 
   setLifeStateRecurse(Ptr.view().narrow(), Lifetime::Destroyed);
   return true;
+}
+
+static void initBasesRecurse(PtrView Ptr) {
+  assert(Ptr.getRecord());
+
+  const Record *R = Ptr.getRecord();
+  for (const Record::Base &B : R->bases()) {
+    PtrView BasePtr = Ptr.atField(B.Offset);
+    BasePtr.initialize();
+    BasePtr.startLifetime();
+    initBasesRecurse(BasePtr);
+  }
+
+  for (const Record::Field &F : R->fields()) {
+    PtrView FieldPtr = Ptr.atField(F.Offset);
+    FieldPtr.startLifetime();
+    if (FieldPtr.getRecord())
+      initBasesRecurse(FieldPtr);
+  }
+
+
+  for (const Record::Base &B : R->virtual_bases()) {
+    PtrView BasePtr = Ptr.atField(B.Offset);
+    BasePtr.initialize();
+    BasePtr.startLifetime();
+    initBasesRecurse(BasePtr);
+  }
+
+
+
+
+}
+
+bool DefaultInit(InterpState &S, CodePtr OpPC, const CXXConstructorDecl *Ctor) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+  auto Ptr = S.Stk.peek<Pointer>();
+
+  if (!Ptr.isBlockPointer())
+    return false;
+  const Record *R = Ptr.getRecord();
+  if (!R)
+    return false;
+
+  if (Ctor->isInvalidDecl() || Ctor->getParent()->isInvalidDecl())
+    return false;
+
+  if (!Ctor->isConstexpr()) {// && !IsValueInitialization) {
+    if (S.getLangOpts().CPlusPlus11) {
+      // FIXME: If DiagDecl is an implicitly-declared special member function,
+      // we should be much more explicit about why it's not constexpr.
+      S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_invalid_function, 1)
+        << /*IsConstexpr*/0 << /*IsConstructor*/1 << Ctor;
+      S.Note(Ctor->getLocation(), diag::note_declared_at);
+    } else {
+      S.CCEDiag(S.Current->getSource(OpPC), diag::note_invalid_subexpr_in_const_expr);
+    }
+  }
+
+
+
+  Ptr.startLifetime();
+  Ptr.initialize();
+
+
+  startLifetimeRecurse(Ptr.view());
+  initBasesRecurse(Ptr.view());
+
+
+  // llvm::errs() << "yay\n";
+  return true;
+
 }
 
 bool CheckNewTypeMismatch(InterpState &S, CodePtr OpPC, const Expr *E,

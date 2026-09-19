@@ -7260,6 +7260,9 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
                                   EvalInfo &Info, APValue &Result,
                                   bool IsCompleteClass) {
 
+  // llvm::errs()<< __PRETTY_FUNCTION__ << '\n';
+  // Definition->dump();
+
   SourceLocation CallLoc = E->getExprLoc();
   if (!Info.CheckCallLimit(CallLoc))
     return false;
@@ -11727,6 +11730,7 @@ bool RecordExprEvaluator::VisitCXXParenListOrInitListExpr(
 
 bool RecordExprEvaluator::VisitCXXConstructExpr(const CXXConstructExpr *E,
                                                 QualType T) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   // Note that E's type is not necessarily the type of our class here; we might
   // be initializing an array element instead.
   const CXXConstructorDecl *FD = E->getConstructor();
@@ -11737,6 +11741,8 @@ bool RecordExprEvaluator::VisitCXXConstructExpr(const CXXConstructExpr *E,
     if (ZeroInit)
       return ZeroInitialization(E, T);
 
+    // E->dumpColor();
+    // llvm::errs() << "Calling handleDefaultInitValue...\n";
     return handleDefaultInitValue(T, Result);
   }
 

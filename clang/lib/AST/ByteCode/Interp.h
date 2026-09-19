@@ -1639,9 +1639,11 @@ bool GetLocal(InterpState &S, CodePtr OpPC, uint32_t I) {
 
 bool EndLifetime(InterpState &S, CodePtr OpPC);
 bool PseudoDtor(InterpState &S, CodePtr OpPC);
+bool StartLifetime(InterpState &S);
 bool StartThisLifetime(InterpState &S);
 bool StartThisLifetime1(InterpState &S);
 bool MarkDestroyed(InterpState &S, CodePtr OpPC);
+bool DefaultInit(InterpState &S, CodePtr OpPC, const CXXConstructorDecl *Ctor);
 
 /// 1) Pops the value from the stack.
 /// 2) Writes the value to the local variable with the
