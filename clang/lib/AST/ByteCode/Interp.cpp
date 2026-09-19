@@ -729,7 +729,7 @@ bool CheckMutable(InterpState &S, CodePtr OpPC, PtrView Ptr, AccessKinds AK) {
   return false;
 }
 
-static bool CheckVolatile(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
+static bool CheckVolatile(InterpState &S, CodePtr OpPC, PtrView Ptr,
                           AccessKinds AK) {
   assert(Ptr.isLive());
 
@@ -745,7 +745,7 @@ static bool CheckVolatile(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
 
   // The reason why Ptr is volatile might be further up the hierarchy.
   // Find that pointer.
-  Pointer P = Ptr;
+  PtrView P = Ptr;
   while (!P.isRoot()) {
     if (P.getType().isVolatileQualified())
       break;
@@ -960,15 +960,18 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   if (!Ptr.isInitialized())
     return diagnoseUninitialized(S, OpPC, Ptr, AK);
-  if (!CheckLifetime(S, OpPC, Ptr, AK))
-    return false;
-  if (Ptr.isBlockPointer() && !CheckTemporary(S, OpPC, Ptr.block(), AK))
-    return false;
 
-  if (!CheckMutable(S, OpPC, Ptr))
-    return false;
-  if (!CheckVolatile(S, OpPC, Ptr, AK))
-    return false;
+  if (Ptr.isBlockPointer()) {
+    if (!CheckLifetime(S, OpPC, Ptr.getLifetime(), Ptr.block(), AK))
+      return false;
+    if (!CheckTemporary(S, OpPC, Ptr.block(), AK))
+      return false;
+
+    if (!CheckMutable(S, OpPC, Ptr.view(), AK))
+      return false;
+    if (!CheckVolatile(S, OpPC, Ptr.view(), AK))
+      return false;
+  }
   if (isConstexprUnknown(Ptr))
     return false;
 
@@ -1061,10 +1064,12 @@ bool CheckStore(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   if (!CheckConst(S, OpPC, Ptr))
     return false;
-  if (!CheckVolatile(S, OpPC, Ptr, AK))
-    return false;
-  if (!CheckMutable(S, OpPC, Ptr, AK))
-    return false;
+  if (Ptr.isBlockPointer()) {
+    if (!CheckVolatile(S, OpPC, Ptr.view(), AK))
+      return false;
+    if (!CheckMutable(S, OpPC, Ptr.view(), AK))
+      return false;
+  }
   if (isConstexprUnknown(Ptr))
     return false;
   return true;
