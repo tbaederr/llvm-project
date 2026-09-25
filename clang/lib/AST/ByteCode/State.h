@@ -50,7 +50,7 @@ enum CheckSubobjectKind {
   CSK_VectorElement
 };
 
-enum class EvaluationMode {
+enum class EvaluationMode : uint8_t {
   /// Evaluate as a constant expression. Stop if we find that the expression
   /// is not a constant expression.
   ConstantExpression,

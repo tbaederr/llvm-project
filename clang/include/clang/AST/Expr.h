@@ -766,7 +766,7 @@ public:
                                 ArrayRef<const Expr*> Args,
                                 const Expr *This = nullptr) const;
 
-  enum class ConstantExprKind {
+  enum class ConstantExprKind : uint8_t {
     /// An integer constant expression (an array bound, enumerator, case value,
     /// bit-field width, or similar) or similar.
     Normal,
