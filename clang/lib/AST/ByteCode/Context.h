@@ -16,6 +16,7 @@
 #ifndef LLVM_CLANG_AST_INTERP_CONTEXT_H
 #define LLVM_CLANG_AST_INTERP_CONTEXT_H
 
+#include "EvalSettings.h"
 #include "FrameAllocator.h"
 #include "InterpStack.h"
 #include "clang/AST/ASTContext.h"
@@ -32,7 +33,6 @@ class Function;
 class Program;
 class State;
 enum PrimType : uint8_t;
-struct EvalSettings;
 
 struct ParamOffset {
   unsigned Offset;
@@ -55,45 +55,45 @@ public:
   ~Context();
 
   /// Checks if a function is a potential constant expression.
-  bool isPotentialConstantExpr(const EvalSettings &Settings,
+  bool isPotentialConstantExpr(EvalSettings Settings,
                                const FunctionDecl *FD);
-  void isPotentialConstantExprUnevaluated(const EvalSettings &Settings,
+  void isPotentialConstantExprUnevaluated(EvalSettings Settings,
                                           const Expr *E,
                                           const FunctionDecl *FD);
 
   /// Evaluates a toplevel expression as an rvalue.
   // FIXME: Get rid of the version using a parent State.
   bool evaluateAsRValue(State &Parent, const Expr *E, APValue &Result);
-  bool evaluateAsRValue(const EvalSettings &Settings, const Expr *E,
+  bool evaluateAsRValue(EvalSettings Settings, const Expr *E,
                         APValue &Result);
 
   /// Like evaluateAsRvalue(), but does no implicit lvalue-to-rvalue conversion.
   // FIXME: Remove the Kind parameter, it's already in Settings.
-  bool evaluate(const EvalSettings &Settings, const Expr *E, APValue &Result,
+  bool evaluate(EvalSettings Settings, const Expr *E, APValue &Result,
                 ConstantExprKind Kind);
 
   /// Evaluates a toplevel initializer.
-  bool evaluateAsInitializer(const EvalSettings &Settings, const VarDecl *VD,
+  bool evaluateAsInitializer(EvalSettings Settings, const VarDecl *VD,
                              const Expr *Init, APValue &Result);
   void registerRedecl(const VarDecl *VD, const APValue &V);
 
   /// Evaluates the destruction of a variable.
-  bool evaluateDestruction(const EvalSettings &Settings, const VarDecl *VD,
+  bool evaluateDestruction(EvalSettings Settings, const VarDecl *VD,
                            APValue Value);
 
-  bool evaluateCharRange(const EvalSettings &Settings, const Expr *SizeExpr,
+  bool evaluateCharRange(EvalSettings Settings, const Expr *SizeExpr,
                          const Expr *PtrExpr, APValue &Result);
-  bool evaluateCharRange(const EvalSettings &Settings, const Expr *SizeExpr,
+  bool evaluateCharRange(EvalSettings Settings, const Expr *SizeExpr,
                          const Expr *PtrExpr, std::string &Result);
 
   /// Evaluate \param E and if it can be evaluated to a null-terminated string,
   /// copy the result into \param Result.
-  bool evaluateString(const EvalSettings &Settings, const Expr *E,
+  bool evaluateString(EvalSettings Settings, const Expr *E,
                       std::string &Result);
 
   /// Evalute \param E and if it can be evaluated to a string literal,
   /// run strlen() on it.
-  std::optional<uint64_t> evaluateStrlen(const EvalSettings &Settings,
+  std::optional<uint64_t> evaluateStrlen(EvalSettings Settings,
                                          const Expr *E);
 
   /// If \param E evaluates to a pointer the number of accessible bytes
@@ -106,11 +106,11 @@ public:
   /// as the one referred to by E are considered, when Kind & 1 == 0
   /// bytes belonging to the same storage (stack, heap allocation,
   /// global variable) are considered.
-  std::optional<uint64_t> tryEvaluateObjectSize(const EvalSettings &Settings,
+  std::optional<uint64_t> tryEvaluateObjectSize(EvalSettings Settings,
                                                 const Expr *E, unsigned Kind,
                                                 bool IsDynamic);
 
-  std::optional<bool> evaluateWithSubstitution(const EvalSettings &Settings,
+  std::optional<bool> evaluateWithSubstitution(EvalSettings Settings,
                                                const FunctionDecl *Callee,
                                                ArrayRef<const Expr *> Args,
                                                const Expr *This,
@@ -203,10 +203,10 @@ public:
 private:
   friend class EvalIDScope;
   /// Runs a function.
-  bool Run(const EvalSettings &Settings, const Function *Func);
+  bool Run(EvalSettings Settings, const Function *Func);
 
   template <typename ResultT>
-  bool evaluateStringRepr(const EvalSettings &Settings, const Expr *SizeExpr,
+  bool evaluateStringRepr(EvalSettings Settings, const Expr *SizeExpr,
                           const Expr *PtrExpr, ResultT &Result);
 
   /// Current compilation context.

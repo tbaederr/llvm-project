@@ -38,7 +38,7 @@ Context::Context(ASTContext &Ctx) : Ctx(Ctx), P(new Program(*this)) {
 
 Context::~Context() = default;
 
-bool Context::isPotentialConstantExpr(const EvalSettings &Settings,
+bool Context::isPotentialConstantExpr(EvalSettings Settings,
                                       const FunctionDecl *FD) {
   assert(Stk.empty());
 
@@ -59,7 +59,7 @@ bool Context::isPotentialConstantExpr(const EvalSettings &Settings,
   return Run(Settings, Func);
 }
 
-void Context::isPotentialConstantExprUnevaluated(const EvalSettings &Settings,
+void Context::isPotentialConstantExprUnevaluated(EvalSettings Settings,
                                                  const Expr *E,
                                                  const FunctionDecl *FD) {
   assert(Stk.empty());
@@ -102,7 +102,7 @@ bool Context::evaluateAsRValue(State &Parent, const Expr *E, APValue &Result) {
   return true;
 }
 
-bool Context::evaluateAsRValue(const EvalSettings &Settings, const Expr *E,
+bool Context::evaluateAsRValue(EvalSettings Settings, const Expr *E,
                                APValue &Result) {
   ++EvalID;
   bool Recursing = !Stk.empty();
@@ -132,7 +132,7 @@ bool Context::evaluateAsRValue(const EvalSettings &Settings, const Expr *E,
   return true;
 }
 
-bool Context::evaluate(const EvalSettings &Settings, const Expr *E,
+bool Context::evaluate(EvalSettings Settings, const Expr *E,
                        APValue &Result, ConstantExprKind Kind) {
   ++EvalID;
   bool Recursing = !Stk.empty();
@@ -161,7 +161,7 @@ bool Context::evaluate(const EvalSettings &Settings, const Expr *E,
   return true;
 }
 
-bool Context::evaluateAsInitializer(const EvalSettings &Settings,
+bool Context::evaluateAsInitializer(EvalSettings Settings,
                                     const VarDecl *VD, const Expr *Init,
                                     APValue &Result) {
   ++EvalID;
@@ -194,7 +194,7 @@ bool Context::evaluateAsInitializer(const EvalSettings &Settings,
   return true;
 }
 
-bool Context::evaluateDestruction(const EvalSettings &Settings,
+bool Context::evaluateDestruction(EvalSettings Settings,
                                   const VarDecl *VD, APValue Value) {
   assert(Stk.empty());
   Compiler<EvalEmitter> C(*this, *P, Settings, Stk, FrameAlloc);
@@ -220,7 +220,7 @@ void Context::registerRedecl(const VarDecl *VD, const APValue &V) {
 }
 
 template <typename ResultT>
-bool Context::evaluateStringRepr(const EvalSettings &Settings,
+bool Context::evaluateStringRepr(EvalSettings Settings,
                                  const Expr *SizeExpr, const Expr *PtrExpr,
                                  ResultT &Result) {
   assert(Stk.empty());
@@ -304,7 +304,7 @@ bool Context::evaluateStringRepr(const EvalSettings &Settings,
   return true;
 }
 
-bool Context::evaluateCharRange(const EvalSettings &Settings,
+bool Context::evaluateCharRange(EvalSettings Settings,
                                 const Expr *SizeExpr, const Expr *PtrExpr,
                                 APValue &Result) {
   assert(SizeExpr);
@@ -313,7 +313,7 @@ bool Context::evaluateCharRange(const EvalSettings &Settings,
   return evaluateStringRepr(Settings, SizeExpr, PtrExpr, Result);
 }
 
-bool Context::evaluateCharRange(const EvalSettings &Settings,
+bool Context::evaluateCharRange(EvalSettings Settings,
                                 const Expr *SizeExpr, const Expr *PtrExpr,
                                 std::string &Result) {
   assert(SizeExpr);
@@ -322,7 +322,7 @@ bool Context::evaluateCharRange(const EvalSettings &Settings,
   return evaluateStringRepr(Settings, SizeExpr, PtrExpr, Result);
 }
 
-bool Context::evaluateString(const EvalSettings &Settings, const Expr *E,
+bool Context::evaluateString(EvalSettings Settings, const Expr *E,
                              std::string &Result) {
   assert(Stk.empty());
   Compiler<EvalEmitter> C(*this, *P, Settings, Stk, FrameAlloc);
@@ -387,7 +387,7 @@ bool Context::evaluateString(const EvalSettings &Settings, const Expr *E,
   return true;
 }
 
-std::optional<uint64_t> Context::evaluateStrlen(const EvalSettings &Settings,
+std::optional<uint64_t> Context::evaluateStrlen(EvalSettings Settings,
                                                 const Expr *E) {
   assert(Stk.empty());
   Compiler<EvalEmitter> C(*this, *P, Settings, Stk, FrameAlloc);
@@ -455,7 +455,7 @@ std::optional<uint64_t> Context::evaluateStrlen(const EvalSettings &Settings,
 }
 
 std::optional<uint64_t>
-Context::tryEvaluateObjectSize(const EvalSettings &Settings, const Expr *E,
+Context::tryEvaluateObjectSize(EvalSettings Settings, const Expr *E,
                                unsigned Kind, bool IsDynamic) {
   assert(Stk.empty());
   Compiler<EvalEmitter> C(*this, *P, Settings, Stk, FrameAlloc);
@@ -486,7 +486,7 @@ Context::tryEvaluateObjectSize(const EvalSettings &Settings, const Expr *E,
 }
 
 std::optional<bool> Context::evaluateWithSubstitution(
-    const EvalSettings &Settings, const FunctionDecl *Callee,
+    EvalSettings Settings, const FunctionDecl *Callee,
     ArrayRef<const Expr *> Args, const Expr *This, const Expr *Condition) {
   if (OptPrimType ConditionT = classify(Condition);
       !ConditionT || ConditionT != PT_Bool) {
@@ -635,7 +635,7 @@ const llvm::fltSemantics &Context::getFloatSemantics(QualType T) const {
   return Ctx.getFloatTypeSemantics(T);
 }
 
-bool Context::Run(const EvalSettings &Settings, const Function *Func) {
+bool Context::Run(EvalSettings Settings, const Function *Func) {
   auto Memory = std::make_unique<char[]>(InterpFrame::allocSize(Func));
   InterpState State(Settings, *P, Stk, FrameAlloc, *this, Func);
   InterpFrame *Frame = new (Memory.get()) InterpFrame(

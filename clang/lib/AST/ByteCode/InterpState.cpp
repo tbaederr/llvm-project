@@ -31,7 +31,7 @@ InterpState::InterpState(const State &Parent, Program &P, InterpStack &Stk,
   CheckingForUndefinedBehavior = Parent.CheckingForUndefinedBehavior;
   EvalMode = Parent.EvalMode;
 }
-InterpState::InterpState(const EvalSettings &Settings, Program &P,
+InterpState::InterpState(EvalSettings Settings, Program &P,
                          InterpStack &Stk, FrameAllocator &FrameAlloc,
                          Context &Ctx, SourceMapper *M)
     : State(Ctx.getASTContext(), Settings.EvalStatus), M(M),
@@ -45,7 +45,7 @@ InterpState::InterpState(const EvalSettings &Settings, Program &P,
   EvalMode = Settings.EvalMode;
 }
 
-InterpState::InterpState(const EvalSettings &Settings, Program &P,
+InterpState::InterpState(EvalSettings Settings, Program &P,
                          InterpStack &Stk, FrameAllocator &FrameAlloc,
                          Context &Ctx, const Function *Func)
     : State(Ctx.getASTContext(), Settings.EvalStatus), M(nullptr),
