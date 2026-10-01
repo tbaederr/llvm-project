@@ -21,6 +21,12 @@ Record::Record(const RecordDecl *Decl, ArrayRef<Base> Bases,
       HasPtrField(HasPtrField) {
   for (const Base &B : this->Bases)
     BaseMap[B.Decl] = &B;
+
+  HasTrivialDtor = IsAnonymousUnion;
+  if (!HasTrivialDtor) {
+    const CXXDestructorDecl *Dtor = getDestructor();
+    HasTrivialDtor = !Dtor || Dtor->isTrivial();
+  }
 }
 
 std::string Record::getName() const {
@@ -29,13 +35,6 @@ std::string Record::getName() const {
   Decl->getNameForDiagnostic(OS, Decl->getASTContext().getPrintingPolicy(),
                              /*Qualified=*/true);
   return Ret;
-}
-
-bool Record::hasTrivialDtor() const {
-  if (isAnonymousUnion())
-    return true;
-  const CXXDestructorDecl *Dtor = getDestructor();
-  return !Dtor || Dtor->isTrivial();
 }
 
 const Record::Field *Record::findField(unsigned Offset) const {
