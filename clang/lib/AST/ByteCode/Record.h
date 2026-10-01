@@ -86,7 +86,7 @@ public:
 
   /// Returns true for anonymous unions and records
   /// with no destructor or for those with a trivial destructor.
-  bool hasTrivialDtor() const;
+  bool hasTrivialDtor() const { return HasTrivialDtor; }
 
   using const_field_iter = ArrayRef<Field>::const_iterator;
   llvm::iterator_range<const_field_iter> fields() const {
@@ -163,6 +163,7 @@ private:
   bool IsAnonymousUnion;
   /// If any of the fields are pointers (or references).
   bool HasPtrField = false;
+  bool HasTrivialDtor = false;
 };
 
 } // namespace interp
