@@ -31,6 +31,8 @@ public:
   Reflect(ReflectionKind Kind, const void *Operand)
       : Kind(Kind), Operand(Operand) {}
 
+  bool isZero() const { return false; }
+
   ComparisonCategoryResult compare(const Reflect &RHS) const {
     llvm::FoldingSetNodeID LID, RID;
     APValue(Kind, Operand).Profile(LID);

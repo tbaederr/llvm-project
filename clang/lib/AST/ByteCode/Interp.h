@@ -2443,11 +2443,25 @@ bool InitPop(InterpState &S, CodePtr OpPC) {
   return true;
 }
 
+inline void reallocatePrimitiveArray(const Descriptor *Desc, size_t RequestedIndex) {
+  assert(Desc->isPrimitiveArray());
+  const ArraySize &ArrSize = Desc->ArrSize;
+
+  size_t NewAllocatedElems = std::min(ArrSize.FullElems, ArrSize.AllocatedElems * 2u);
+  llvm::errs() << "NewAllocatedElems: " << NewAllocatedElems << '\n';
+
+
+  assert(NewAllocatedElems >= RequestedIndex);
+
+
+}
+
 /// 1) Pops the value from the stack
 /// 2) Peeks a pointer and gets its index \Idx
 /// 3) Sets the value on the pointer, leaving the pointer on the stack.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
 
@@ -2468,6 +2482,15 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
 
   if (!CheckLive(S, OpPC, Ptr, AK_Assign))
     return false;
+
+  assert(Desc->isPrimitiveArray());
+
+  // reallocatePrimitiveArray(Desc, Idx);
+  
+
+
+
+
   if (Idx >= Desc->getNumElems()) {
     // CheckRange.
     if (S.getLangOpts().CPlusPlus) {
@@ -2485,6 +2508,7 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
 /// The same as InitElem, but pops the pointer as well.
 template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
+  // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 

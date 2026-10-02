@@ -686,7 +686,7 @@ static double GetApproxValue(const llvm::APFloat &F) {
 static bool TryPrintAsStringLiteral(raw_ostream &Out,
                                     const PrintingPolicy &Policy,
                                     const ArrayType *ATy,
-                                    ArrayRef<APValue> Inits) {
+                                    ArrayRef<APValue> Inits, bool HasFiller) {
   if (Inits.empty())
     return false;
 
@@ -695,10 +695,11 @@ static bool TryPrintAsStringLiteral(raw_ostream &Out,
     return false;
 
   // Nothing we can do about a sequence that is not null-terminated
-  if (!Inits.back().isInt() || !Inits.back().getInt().isZero())
+  if (!Inits.back().isInt() || (!Inits.back().getInt().isZero() && !HasFiller))
     return false;
 
-  Inits = Inits.drop_back();
+  if (!HasFiller)
+    Inits = Inits.drop_back();
 
   llvm::SmallString<40> Buf;
   Buf.push_back('"');
@@ -943,7 +944,7 @@ void APValue::printPretty(raw_ostream &Out, const PrintingPolicy &Policy,
     const ArrayType *AT = Ty->castAsArrayTypeUnsafe();
     unsigned N = getArrayInitializedElts();
     if (N != 0 && TryPrintAsStringLiteral(Out, Policy, AT,
-                                          {&getArrayInitializedElt(0), N}))
+                                          {&getArrayInitializedElt(0), N}, hasArrayFiller()))
       return;
     QualType ElemTy = AT->getElementType();
     Out << '{';
