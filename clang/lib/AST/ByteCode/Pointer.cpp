@@ -1370,7 +1370,7 @@ std::optional<IntPointer> IntPointer::atOffset(const interp::Context &Ctx,
           .getQuantity();
 
   uint64_t NewValue = this->Value + FieldOffset;
-  return IntPointer{{FD->getType().getTypePtr(), NewValue == 0}, NewValue};
+  return IntPointer(FD->getType().getTypePtr(), NewValue, NewValue == 0);
 }
 
 IntPointer IntPointer::baseCast(const interp::Context &Ctx,
@@ -1405,7 +1405,7 @@ IntPointer IntPointer::baseCast(const interp::Context &Ctx,
   QualType T = RD->getASTContext().getTagType(ElaboratedTypeKeyword::None,
                                               std::nullopt, RD, false);
   uint64_t NewValue = Value + BaseLayoutOffset.getQuantity();
-  return {{T.getTypePtr(), NewValue == 0}, NewValue};
+  return IntPointer(T.getTypePtr(), NewValue, NewValue == 0);
 }
 
 std::optional<size_t>

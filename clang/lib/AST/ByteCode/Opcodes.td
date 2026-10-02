@@ -323,6 +323,11 @@ def ZeroIntAPS : SuccessOpcode {
   let Args = [ArgUint32];
 }
 
+def ZeroInitArray : SuccessOpcode {
+  let Types = [AllTypeClass];
+  let HasGroup = 1;
+}
+
 // [] -> [Pointer]
 def Null : SuccessOpcode {
   let Types = [PtrTypeClass];
