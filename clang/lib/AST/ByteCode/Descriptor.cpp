@@ -310,10 +310,14 @@ Descriptor::Descriptor(DeclOrExpr D, const Type *SourceTy, PrimType Type,
                        size_t NumElems, bool IsConst, bool IsTemporary,
                        bool IsMutable, bool IsVolatile)
     : Source(D), SourceType(SourceTy), ElemSize(primSize(Type)),
-      Size(ElemSize * NumElems), AllocSize(align(Size) + sizeof(InitMapPtr)),
+      Size(ElemSize * NumElems),
+      AllocSize(align(Size) + sizeof(InitMapPtr)),
       PrimT(Type), IsConst(IsConst), IsMutable(IsMutable),
       IsTemporary(IsTemporary), IsVolatile(IsVolatile), IsArray(true),
       CtorFn(nullptr), DtorFn(getDtorArrayPrim(Type)) {
+  ArrSize.FullElems = NumElems;
+  ArrSize.AllocatedElems = 1;
+  ArrSize.InitializedElems = 0;
   assert(Source && "Missing source");
   assert(NumElems <= (MaxArrayElemBytes / ElemSize));
 }

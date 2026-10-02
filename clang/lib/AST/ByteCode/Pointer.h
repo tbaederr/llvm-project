@@ -260,7 +260,7 @@ struct PtrView {
     assert(isLive() && "Invalid pointer");
     assert(Pointee);
     assert(getFieldDesc()->isPrimitiveArray());
-    assert(I < getFieldDesc()->getNumElems());
+    assert(I < getNumElems());
 
     unsigned ElemByteOffset = I * getFieldDesc()->getElemSize();
     unsigned ReadOffset = Base + sizeof(InitMapPtr) + ElemByteOffset;

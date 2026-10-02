@@ -119,6 +119,19 @@ struct InlineDescriptor {
 };
 static_assert(sizeof(GlobalInlineDescriptor) != sizeof(InlineDescriptor), "");
 
+
+struct ArraySize {
+  size_t FullElems;
+  size_t AllocatedElems;
+  size_t InitializedElems;
+  size_t fillerIndex() const {
+    return AllocatedElems;
+  }
+  bool hasArrayFiller() const {
+    return InitializedElems != FullElems;
+  }
+};
+
 /// Describes a memory block created by an allocation site.
 struct Descriptor final {
 private:
@@ -135,7 +148,11 @@ private:
   /// Value to denote arrays of unknown size.
   static constexpr unsigned UnknownSizeMark = (unsigned)-1;
 
+
+
+
 public:
+  ArraySize ArrSize;
   /// Token to denote structures of unknown size.
   struct UnknownSize {};
 

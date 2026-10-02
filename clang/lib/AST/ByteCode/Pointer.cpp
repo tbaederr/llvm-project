@@ -1209,13 +1209,49 @@ static bool toRValue(const Context &Ctx, QualType Ty, PtrView Ptr, APValue &R) {
   if (const auto *AT = Ty->getAsArrayTypeUnsafe()) {
     if (!FieldDesc->isArray())
       return false;
-    const size_t NumElems = Ptr.getNumElems();
+
+    auto isElemZero = [](PtrView Ptr, size_t I, PrimType T) -> bool {
+      TYPE_SWITCH(T, { return Ptr.elem<T>(I).isZero(); });
+    };
+
+    // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+    const Descriptor *D = Ptr.getFieldDesc();
     QualType ElemTy = AT->getElementType();
-    R = APValue(APValue::UninitArray{}, NumElems, NumElems);
+    OptPrimType ElemT = Ctx.classify(ElemTy); // FIXME: Get descriptor desc
+    size_t NumElems = Ptr.getNumElems();
+    if (NumElems == 0) {
+      R = APValue(APValue::UninitArray{}, 0, 0);
+      return true;
+    }
+
+    // llvm::errs() << "NumElems: " << NumElems << '\n';
+    bool Primitive = D->isPrimitiveArray();
+    size_t InitializedElems = NumElems;
+
+    for (size_t I = NumElems - 1; I > 0; --I) {
+      if (Primitive) {
+        if (!isElemZero(Ptr, I, D->getPrimType()))
+          break;
+        --InitializedElems;
+      } else  {
+      }
+    }
+
+    assert(InitializedElems <= NumElems);
+
+
+    // if (InitializedElems == NumElems - 1)
+      // ++InitializedElems;
+
+    R = APValue(APValue::UninitArray{}, InitializedElems, NumElems);//D->ArrSize.InitializedElems, D->ArrSize.FullElems);
+
+    if (NumElems == 0)
+      return true;
+
 
     bool Ok = true;
-    OptPrimType ElemT = Ctx.classify(ElemTy);
-    for (unsigned I = 0; I != NumElems; ++I) {
+    // for (unsigned I = 0; I != D->ArrSize.InitializedElems; ++I) {
+    for (unsigned I = 0; I != InitializedElems; ++I) {
       APValue &Slot = R.getArrayInitializedElt(I);
       if (ElemT) {
         TYPE_SWITCH(*ElemT, Slot = Ptr.elem<T>(I).toAPValue(ASTCtx));
@@ -1223,6 +1259,17 @@ static bool toRValue(const Context &Ctx, QualType Ty, PtrView Ptr, APValue &R) {
         Ok &= toRValue(Ctx, ElemTy, Ptr.atIndex(I).narrow(), Slot);
       }
     }
+
+#if 1
+    if (InitializedElems != NumElems) {
+      if (ElemT) {
+        TYPE_SWITCH(*ElemT, R.getArrayFiller() = Ptr.elem<T>(InitializedElems).toAPValue(ASTCtx));
+      } else {
+        Ok &= toRValue(Ctx, ElemTy, Ptr.atIndex(InitializedElems).narrow(), R.getArrayFiller());
+      }
+    }
+#endif
+
     return Ok;
   }
 
