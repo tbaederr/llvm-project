@@ -3192,6 +3192,27 @@ static inline bool ZeroIntAPS(InterpState &S, uint32_t BitWidth) {
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
+bool ZeroInitArray(InterpState &S) {
+  if constexpr(std::is_same_v<T, Floating>) {
+    T Elem = S.Stk.pop<T>();
+    Pointer &Ptr = S.Stk.peek<Pointer>();
+    assert(Ptr.getFieldDesc()->isPrimitiveArray());
+
+    for (size_t I = 0, N = Ptr.getNumElems(); I != N; ++I) {
+      Ptr.elem<Floating>(I) = Elem;
+    }
+    Ptr.initializeAllElements();
+    return true;
+  }
+
+  S.Stk.discard<T>();
+  Pointer &Ptr = S.Stk.peek<Pointer>();
+  assert(Ptr.getFieldDesc()->isPrimitiveArray());
+  Ptr.initializeAllElements();
+  return true;
+}
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool Null(InterpState &S, uint64_t Value, const Type *Ty) {
   // FIXME(perf): This is a somewhat often-used function and the value of a
   // null pointer is almost always 0.

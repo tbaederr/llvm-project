@@ -5227,12 +5227,11 @@ bool Compiler<Emitter>::visitZeroRecordInitializer(const Record *R,
     if (D->isPrimitiveArray()) {
       QualType ET = D->getElemQualType();
       PrimType T = D->getPrimType();
-      for (uint32_t I = 0, N = D->getNumElems(); I != N; ++I) {
-        if (!this->visitZeroInitializer(T, ET, E))
-          return false;
-        if (!this->emitInitElem(T, I, E))
-          return false;
-      }
+      if (!this->visitZeroInitializer(T, ET, E))
+        return false;
+      if (!this->emitZeroInitArray(T, E))
+        return false;
+
     } else if (D->isCompositeArray()) {
       // Can't be a vector or complex field.
       if (!this->visitZeroArrayInitializer(D->getType(), E))
@@ -5285,13 +5284,9 @@ bool Compiler<Emitter>::visitZeroArrayInitializer(QualType T, const Expr *E) {
   size_t NumElems = cast<ConstantArrayType>(AT)->getZExtSize();
 
   if (OptPrimType ElemT = classify(ElemType)) {
-    for (size_t I = 0; I != NumElems; ++I) {
-      if (!this->visitZeroInitializer(*ElemT, ElemType, E))
-        return false;
-      if (!this->emitInitElem(*ElemT, I, E))
-        return false;
-    }
-    return true;
+    if (!this->visitZeroInitializer(*ElemT, ElemType, E))
+      return false;
+    return this->emitZeroInitArray(*ElemT, E);
   }
   if (ElemType->isRecordType()) {
     const Record *R = getRecord(ElemType);

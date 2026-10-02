@@ -358,14 +358,16 @@ struct BlockPointer {
 };
 
 struct IntPointer {
-  llvm::PointerIntPair<const Type *, 1, bool> TypeAndIsNull;
+  llvm::PointerIntPair<const Type *, 1, bool> TypeAndIsNonNull;
   uint64_t Value;
+
+  IntPointer(const Type *Ty, uint64_t Value, bool IsNull) : TypeAndIsNonNull(Ty, !IsNull), Value(Value) {}
 
   std::optional<IntPointer> atOffset(const Context &Ctx, unsigned Offset) const;
   IntPointer baseCast(const Context &Ctx, unsigned BaseOffset) const;
 
-  const Type *getType() const { return TypeAndIsNull.getPointer(); }
-  bool isNull() const { return TypeAndIsNull.getInt(); }
+  const Type *getType() const { return TypeAndIsNonNull.getPointer(); }
+  bool isNull() const { return !TypeAndIsNonNull.getInt(); }
 
   QualType getPointeeType() const {
     if (!getType())
@@ -545,7 +547,7 @@ enum class Storage { Int, Block, Fn, Typeid, String, Opaque };
 /// \endverbatim
 class Pointer {
 public:
-  Pointer() : StorageKind(Storage::Int), Int{{nullptr, true}, 0} {}
+  Pointer() : StorageKind(Storage::Int), Int(nullptr, 0, true) {}
   Pointer(IntPointer &&IntPtr)
       : StorageKind(Storage::Int), Int(std::move(IntPtr)) {}
   Pointer(Block *B);
@@ -555,7 +557,7 @@ public:
   Pointer(uint64_t Address, const Type *Ty, uint64_t Offset = 0,
           std::optional<bool> IsNull = std::nullopt)
       : Offset(Offset), StorageKind(Storage::Int),
-        Int{{Ty, IsNull.value_or(Address == 0)}, Address} {}
+      Int(Ty, Address, IsNull.value_or(Address == 0)) {}
   Pointer(const Function *F, uint64_t Offset = 0)
       : Offset(Offset), StorageKind(Storage::Fn), Fn{F} {}
   Pointer(const Type *TypePtr, const Type *TypeInfoType, uint64_t Offset = 0)
