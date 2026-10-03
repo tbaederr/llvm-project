@@ -98,7 +98,9 @@ std::string Builtin::Context::getName(unsigned ID) const {
 
 SmallString<64> Builtin::Context::getQuotedName(unsigned ID) const {
   const auto &[Shard, I] = getShardAndInfo(ID);
-  SmallString<64> Result("'");
+  SmallString<64> Result;
+  Result.reserve(1 + Shard.NamePrefix.size() + (*Shard.Strings)[I.Offsets.Name].size() + 1);
+  Result += '\'';
   Result += Shard.NamePrefix;
   Result += (*Shard.Strings)[I.Offsets.Name];
   Result += '\'';
