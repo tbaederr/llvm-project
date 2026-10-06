@@ -2736,10 +2736,7 @@ ConstantEmitter::tryEmitPrivate(const APValue &Value, QualType DestType,
     // Emit array filler, if there is one.
     llvm::Constant *Filler = nullptr;
     if (Value.hasArrayFiller()) {
-      Filler = tryEmitAbstractForMemory(Value.getArrayFiller(),
-                                        ArrayTy->getElementType());
-      if (!Filler)
-        return nullptr;
+      Filler = CGM.EmitNullConstant(ArrayTy->getElementType());
     }
 
     // Emit initializer elements.
