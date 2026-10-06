@@ -1175,6 +1175,7 @@ public:
     return ConstantExprBits.IsImmediateInvocation;
   }
   bool hasAPValueResult() const {
+    // return true;
     return ConstantExprBits.APValueKind != APValue::None;
   }
   APValue getAPValueResult() const;

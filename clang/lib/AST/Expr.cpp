@@ -357,6 +357,7 @@ ConstantExpr *ConstantExpr::Create(const ASTContext &Context, Expr *E,
                                    const APValue &Result) {
   ConstantResultStorageKind StorageKind = getStorageKind(Result);
   ConstantExpr *Self = Create(Context, E, StorageKind);
+  assert(Result.getKind() != APValue::None);
   Self->SetResult(Result, Context);
   return Self;
 }
@@ -382,8 +383,16 @@ ConstantExpr *ConstantExpr::CreateEmpty(const ASTContext &Context,
 }
 
 void ConstantExpr::MoveIntoResult(APValue &Value, const ASTContext &Context) {
+
   assert((unsigned)getStorageKind(Value) <= ConstantExprBits.ResultKind &&
          "Invalid storage for this value kind");
+
+  if (getType()->isVoidType())
+    assert(Value.isAbsent());
+  else
+    assert(!Value.isAbsent());
+
+
   ConstantExprBits.APValueKind = Value.getKind();
   switch (getResultStorageKind()) {
   case ConstantResultStorageKind::None:

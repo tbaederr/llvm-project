@@ -18330,7 +18330,7 @@ Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
       EvalResult.Val.isInt() && !EvalResult.HasSideEffects &&
       (!getLangOpts().CPlusPlus || !EvalResult.HasUndefinedBehavior);
 
-  if (!isa<ConstantExpr>(E))
+  if (!isa<ConstantExpr>(E) && !EvalResult.Val.isAbsent())
     E = ConstantExpr::Create(Context, E, EvalResult.Val);
 
   // For -fms-compatibility mode we relax some requirements
