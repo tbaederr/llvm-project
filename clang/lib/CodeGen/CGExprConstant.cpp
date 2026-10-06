@@ -2826,7 +2826,7 @@ static llvm::Constant *EmitNullConstant(CodeGenModule &CGM,
                       : layout.getBaseSubobjectLLVMType());
 
   unsigned numElements = structure->getNumElements();
-  std::vector<llvm::Constant *> elements(numElements);
+  llvm::SmallVector<llvm::Constant *, 16> elements(numElements);
 
   auto CXXR = dyn_cast<CXXRecordDecl>(record);
   // Fill in all the bases.
