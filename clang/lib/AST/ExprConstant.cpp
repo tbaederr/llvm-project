@@ -22122,6 +22122,20 @@ static bool FastEvaluateAsRValue(const Expr *Exp, APValue &Result,
     return FastEvaluateAsRValue(CE->getSubExpr(), Result, Ctx, IsConst);
   }
 
+  if (const auto *U = dyn_cast<UnaryOperator>(Exp);
+      U && U->getOpcode() == UO_LNot) {
+    const Expr *SubExpr = U->getSubExpr();
+    if (!FastEvaluateAsRValue(SubExpr, Result, Ctx, IsConst))
+      return false;
+    if (Result.isInt()) {
+      Result.getInt() = !Result.getInt();
+      IsConst = true;
+      return true;
+    }
+
+    return false;
+  }
+
   // This case should be rare, but we need to check it before we check on
   // the type below.
   if (Exp->getType().isNull()) {
