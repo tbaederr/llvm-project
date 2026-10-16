@@ -2735,12 +2735,8 @@ ConstantEmitter::tryEmitPrivate(const APValue &Value, QualType DestType,
 
     // Emit array filler, if there is one.
     llvm::Constant *Filler = nullptr;
-    if (Value.hasArrayFiller()) {
-      Filler = tryEmitAbstractForMemory(Value.getArrayFiller(),
-                                        ArrayTy->getElementType());
-      if (!Filler)
-        return nullptr;
-    }
+    if (Value.hasArrayFiller())
+      Filler = CGM.EmitNullConstant(ArrayTy->getElementType());
 
     // Emit initializer elements.
     SmallVector<llvm::Constant*, 16> Elts;

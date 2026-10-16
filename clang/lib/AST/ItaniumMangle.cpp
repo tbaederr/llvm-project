@@ -6668,7 +6668,8 @@ static bool isZeroInitialized(QualType T, const APValue &V) {
     for (unsigned I = 0, N = V.getArrayInitializedElts(); I != N; ++I)
       if (!isZeroInitialized(ElemT, V.getArrayInitializedElt(I)))
         return false;
-    return !V.hasArrayFiller() || isZeroInitialized(ElemT, V.getArrayFiller());
+    // Array fillers in APValues are always 0.
+    return true;
   }
 
   case APValue::Vector: {
@@ -6866,17 +6867,12 @@ void CXXNameMangler::mangleValueInTemplateArg(QualType T, const APValue &V,
     mangleType(T);
 
     // Drop trailing zero-initialized elements.
-    unsigned N = V.getArraySize();
-    if (!V.hasArrayFiller() || isZeroInitialized(ElemT, V.getArrayFiller())) {
-      N = V.getArrayInitializedElts();
-      while (N && isZeroInitialized(ElemT, V.getArrayInitializedElt(N - 1)))
-        --N;
-    }
+    unsigned N = V.getArrayInitializedElts();
+    while (N && isZeroInitialized(ElemT, V.getArrayInitializedElt(N - 1)))
+      --N;
 
     for (unsigned I = 0; I != N; ++I) {
-      const APValue &Elem = I < V.getArrayInitializedElts()
-                                ? V.getArrayInitializedElt(I)
-                                : V.getArrayFiller();
+      const APValue &Elem = V.getArrayInitializedElt(I);
       mangleValueInTemplateArg(ElemT, Elem, false);
     }
     Out << 'E';
