@@ -2126,11 +2126,7 @@ template <typename T>
 static llvm::Constant *
 buildConstantDataArrayFromElements(llvm::LLVMContext &Ctx, const APValue &Arr) {
   const unsigned NumElts = Arr.getArraySize();
-  SmallVector<T, 64> Vals(
-      NumElts,
-      Arr.hasArrayFiller()
-          ? static_cast<T>(Arr.getArrayFiller().getInt().getZExtValue())
-          : 0);
+  SmallVector<T, 64> Vals(NumElts, 0);
   for (unsigned I : llvm::seq(Arr.getArrayInitializedElts()))
     Vals[I] =
         static_cast<T>(Arr.getArrayInitializedElt(I).getInt().getZExtValue());
