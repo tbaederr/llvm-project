@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DynamicAllocator.h"
+#include "ByteCode/Descriptor.h"
 
 using namespace clang;
 using namespace clang::interp;
@@ -69,25 +70,18 @@ Block *DynamicAllocator::allocate(const Descriptor *D, unsigned EvalID,
   });
 
   auto Memory = std::make_unique<std::byte[]>(
-      sizeof(Block) + D->getAllocSize() + Block::InlineDescMD);
-  auto *B = new (Memory.get()) Block(EvalID, D, Block::InlineDescMD,
-                                     /*isStatic=*/false);
+      sizeof(Block) + D->getAllocSize() + Block::getMetadataSize(Block::Local));
+  auto *B = new (Memory.get()) Block(EvalID, D, Block::Local,
+                                     /*IsStatic=*/false);
   B->invokeCtorNoMemset();
-  InlineDescriptor *ID = reinterpret_cast<InlineDescriptor *>(B->rawData());
-  ID->Desc = D;
-  ID->IsActive = true;
-  ID->Offset = sizeof(InlineDescriptor);
-  ID->IsBase = false;
-  ID->IsFieldMutable = false;
-  ID->IsConst = false;
-  ID->IsInitialized = false;
-  ID->IsVolatile = false;
+  auto &ID = B->getBlockDesc<LocalInlineDescriptor>();
+  new (&ID) LocalInlineDescriptor();
 
   if (D->isCompositeArray())
-    ID->LifeState = Lifetime::Started;
+    ID.setLifetime(Lifetime::Started);
   else
-    ID->LifeState =
-        AllocForm == Form::Operator ? Lifetime::Ended : Lifetime::Started;
+    ID.setLifetime(
+        AllocForm == Form::Operator ? Lifetime::Ended : Lifetime::Started);
 
   if (auto It = AllocationSites.find(D->asExpr());
       It != AllocationSites.end()) {

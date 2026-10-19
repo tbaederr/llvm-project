@@ -61,7 +61,7 @@ public:
   void initScope(unsigned Idx);
   void enableLocal(unsigned Idx);
   bool isLocalEnabled(unsigned Idx) const {
-    return localInlineDesc(Idx)->IsActive;
+    return localInlineDesc(Idx)->IsEnabled;
   }
 
   /// Describes the frame with arguments for diagnostic purposes.
@@ -93,7 +93,7 @@ public:
   template <typename T> void setLocal(unsigned Offset, const T &Value) {
     localRef<T>(Offset) = Value;
     localInlineDesc(Offset)->IsInitialized = true;
-    localInlineDesc(Offset)->LifeState = Lifetime::Started;
+    localInlineDesc(Offset)->setLifetime(Lifetime::Started);
   }
 
   /// Returns a pointer to a local variables.
@@ -198,8 +198,8 @@ private:
   }
 
   /// Returns the inline descriptor of the local.
-  InlineDescriptor *localInlineDesc(unsigned Offset) const {
-    return reinterpret_cast<InlineDescriptor *>(locals() + Offset);
+  LocalInlineDescriptor *localInlineDesc(unsigned Offset) const {
+    return reinterpret_cast<LocalInlineDescriptor *>(locals() + Offset);
   }
 
 public:

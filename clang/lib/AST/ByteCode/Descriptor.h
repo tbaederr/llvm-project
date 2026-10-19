@@ -46,17 +46,31 @@ enum class GlobalInitState {
   InitializerFailed,
 };
 
+enum class Lifetime : uint8_t {
+  Started,
+  NotStarted,
+  Destroyed,
+  Ended,
+};
+
 /// Descriptor used for global variables.
 struct alignas(void *) GlobalInlineDescriptor {
   GlobalInitState InitState = GlobalInitState::InitializerFailed;
 };
 static_assert(sizeof(GlobalInlineDescriptor) == sizeof(void *), "");
 
-enum class Lifetime : uint8_t {
-  Started,
-  NotStarted,
-  Destroyed,
-  Ended,
+struct alignas(void *) LocalInlineDescriptor {
+  LLVM_PREFERRED_TYPE(Lifetime)
+  unsigned LifeState : 2;
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned IsInitialized : 1;
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned IsEnabled : 1;
+
+  LocalInlineDescriptor() : LifeState(0), IsInitialized(false), IsEnabled(false) {}
+
+  void setLifetime(Lifetime L) { LifeState = static_cast<unsigned>(L); }
+  Lifetime getLifetime() const { return static_cast<Lifetime>(LifeState); }
 };
 
 /// Inline descriptor embedded in structures and arrays.
