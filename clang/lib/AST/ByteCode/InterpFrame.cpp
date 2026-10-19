@@ -47,11 +47,10 @@ InterpFrame::InterpFrame(InterpState &S, const Function *Func,
 
   for (auto &Scope : Func->scopes()) {
     for (auto &Local : Scope.locals()) {
-      new (localBlock(Local.Offset))
-          Block(S.EvalID, Local.Desc, Block::InlineDescMD);
+      new (localBlock(Local.Offset)) Block(S.EvalID, Local.Desc, Block::Local);
       // Note that we are NOT calling invokeCtor() here, since that is done
       // via the InitScope op.
-      new (localInlineDesc(Local.Offset)) InlineDescriptor(Local.Desc);
+      new (localInlineDesc(Local.Offset)) LocalInlineDescriptor();
     }
   }
 }
@@ -103,7 +102,7 @@ void InterpFrame::enableLocal(unsigned Idx) {
   // variables, we reuse the IsActive flag for the enabled state. We should
   // probably use a different struct than InlineDescriptor for the block-level
   // inline descriptor of local varaibles.
-  localInlineDesc(Idx)->IsActive = true;
+  localInlineDesc(Idx)->IsEnabled = true;
 }
 
 void InterpFrame::destroy(unsigned Idx) {

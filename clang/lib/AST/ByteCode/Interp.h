@@ -3547,8 +3547,15 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElem(InterpState &S, CodePtr OpPC, uint32_t Index) {
   const Pointer &Ptr = S.Stk.peek<Pointer>();
 
-  if (!CheckLoad(S, OpPC, Ptr))
+  if (Ptr.isBlockPointer()) {
+    if (!CheckLoad(S, OpPC, Ptr.view().atIndex(Index)))
+      return false;
+  } else if (Ptr.isStringPointer()) {
+    if (!CheckLoad(S, OpPC, Ptr.atIndex(Index)))
+      return false;
+  } else {
     return false;
+  }
 
   assert(Ptr.atIndex(Index).getFieldDesc()->getPrimType() == Name);
   S.Stk.push<T>(Ptr.elem<T>(Index));
@@ -3559,8 +3566,15 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool ArrayElemPop(InterpState &S, CodePtr OpPC, uint32_t Index) {
   const Pointer &Ptr = S.Stk.pop<Pointer>();
 
-  if (!CheckLoad(S, OpPC, Ptr))
+  if (Ptr.isBlockPointer()) {
+    if (!CheckLoad(S, OpPC, Ptr.view().atIndex(Index)))
+      return false;
+  } else if (Ptr.isStringPointer()) {
+    if (!CheckLoad(S, OpPC, Ptr.atIndex(Index)))
+      return false;
+  } else {
     return false;
+  }
 
   assert(Ptr.atIndex(Index).getFieldDesc()->getPrimType() == Name);
   S.Stk.push<T>(Ptr.elem<T>(Index));

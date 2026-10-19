@@ -733,9 +733,11 @@ bool PtrView::isElementInitialized(unsigned Index) const {
   if (Pointee->isStatic() && Base == 0)
     return true;
 
-  if (isRoot() && Base == sizeof(GlobalInlineDescriptor) && Offset == Base) {
-    const auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
-    return GD.InitState == GlobalInitState::Initialized;
+  if (isRoot() && Offset == Base) {
+    if (Pointee->isGlobal()) {
+      const auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
+      return GD.InitState == GlobalInitState::Initialized;
+    }
   }
 
   if (Desc->isPrimitiveArray()) {
@@ -765,8 +767,14 @@ bool Pointer::isElementAlive(unsigned Index) const {
 }
 
 Lifetime PtrView::getLifetime() const {
-  if (Base < sizeof(InlineDescriptor))
+
+  if (isRoot() && Base == Offset) {
+    if (Pointee->isLocal()) {
+      const auto &LD = Pointee->getBlockDesc<LocalInlineDescriptor>();
+      return LD.getLifetime();
+    }
     return Lifetime::Started;
+  }
 
   if (inPrimitiveArray() && !isArrayRoot()) {
     InitMapPtr &IM = getInitMap();
@@ -780,12 +788,17 @@ Lifetime PtrView::getLifetime() const {
     return IM->isElementAlive(getIndex()) ? Lifetime::Started : Lifetime::Ended;
   }
 
-  return getInlineDesc()->LifeState;
+  return getDescriptor(Offset)->LifeState;
 }
 
 void PtrView::setLifeState(Lifetime L) const {
-  if (Base < sizeof(InlineDescriptor))
+  if (isRoot() && Base == Offset) {
+    if (Pointee->isLocal()) {
+      auto &LD = Pointee->getBlockDesc<LocalInlineDescriptor>();
+      LD.setLifetime(L);
+    }
     return;
+  }
 
   if (inArray() && !isArrayRoot()) {
     assert(L == Lifetime::Started || L == Lifetime::Ended);
@@ -802,7 +815,7 @@ void PtrView::setLifeState(Lifetime L) const {
     return;
   }
 
-  getInlineDesc()->LifeState = L;
+  getDescriptor(Offset)->LifeState = L;
 }
 
 void PtrView::initialize() const {
@@ -812,10 +825,17 @@ void PtrView::initialize() const {
   if (LLVM_UNLIKELY(!Pointee->isInitialized()))
     Pointee->invokeCtor();
 
-  if (isRoot() && Base == sizeof(GlobalInlineDescriptor) && Offset == Base) {
-    auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
-    GD.InitState = GlobalInitState::Initialized;
-    return;
+  if (isRoot() && Offset == Base) {
+    if (Pointee->isGlobal()) {
+      auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
+      GD.InitState = GlobalInitState::Initialized;
+      return;
+    }
+    if (Pointee->isLocal()) {
+      auto &LD = Pointee->getBlockDesc<LocalInlineDescriptor>();
+      LD.IsInitialized = true;
+      return;
+    }
   }
 
   const Descriptor *Desc = getFieldDesc();
@@ -828,8 +848,8 @@ void PtrView::initialize() const {
 
   // Field has its bit in an inline descriptor.
   assert(Base != 0 && "Only composite fields can be initialised");
-  getInlineDesc()->IsInitialized = true;
-  getInlineDesc()->LifeState = Lifetime::Started;
+  getDescriptor(Offset)->IsInitialized = true;
+  getDescriptor(Offset)->LifeState = Lifetime::Started;
 }
 
 void PtrView::initializeElement(unsigned Index) const {
@@ -873,9 +893,11 @@ bool PtrView::allElementsInitialized() const {
   if (Pointee->isStatic() && Base == 0)
     return true;
 
-  if (isRoot() && Base == sizeof(GlobalInlineDescriptor) && Offset == Base) {
-    const auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
-    return GD.InitState == GlobalInitState::Initialized;
+  if (isRoot() && Offset == Base) {
+    if (Pointee->isGlobal()) {
+      const auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
+      return GD.InitState == GlobalInitState::Initialized;
+    }
   }
 
   InitMapPtr IM = getInitMap();
@@ -889,10 +911,12 @@ bool Pointer::allElementsAlive() const {
   if (isStatic() && BS.Base == 0)
     return true;
 
-  if (isRoot() && BS.Base == sizeof(GlobalInlineDescriptor) &&
-      Offset == BS.Base) {
-    const auto &GD = block()->getBlockDesc<GlobalInlineDescriptor>();
-    return GD.InitState == GlobalInitState::Initialized;
+  if (isRoot() && Offset == BS.Base) {
+
+    if (BS.Pointee->isGlobal()) {
+      const auto &GD = block()->getBlockDesc<GlobalInlineDescriptor>();
+      return GD.InitState == GlobalInitState::Initialized;
+    }
   }
 
   InitMapPtr &IM = getInitMap();
@@ -903,7 +927,7 @@ void PtrView::activate() const {
   // Field has its bit in an inline descriptor.
   assert(Base != 0 && "Only composite fields can be activated");
 
-  if (isRoot() && Base == sizeof(GlobalInlineDescriptor))
+  if (isRoot() && (Pointee->isGlobal() || Pointee->isLocal()))
     return;
   if (!getInlineDesc()->InUnion)
     return;

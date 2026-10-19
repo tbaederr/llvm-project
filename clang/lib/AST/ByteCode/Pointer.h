@@ -307,9 +307,15 @@ struct PtrView {
     if (!Pointee->isInitialized())
       return false;
 
-    if (isRoot() && Base == sizeof(GlobalInlineDescriptor) && Offset == Base) {
-      const auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
-      return GD.InitState == GlobalInitState::Initialized;
+    if (isRoot() && Offset == Base) {
+      if (Pointee->isGlobal()) {
+        const auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
+        return GD.InitState == GlobalInitState::Initialized;
+      }
+      if (Pointee->isLocal()) {
+        const auto &LD = Pointee->getBlockDesc<LocalInlineDescriptor>();
+        return LD.IsInitialized;
+      }
     }
 
     assert(Pointee && "Cannot check if null pointer was initialized");
@@ -321,7 +327,7 @@ struct PtrView {
     if (Base == 0)
       return true;
     // Field has its bit in an inline descriptor.
-    return getInlineDesc()->IsInitialized;
+    return getDescriptor(Offset)->IsInitialized;
   }
 
   void initializeElement(unsigned Index) const;

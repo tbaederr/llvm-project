@@ -174,8 +174,9 @@ UnsignedOrNone Program::createGlobal(DeclOrExpr D, QualType Ty, bool IsStatic,
   // Allocate a block for storage.
   unsigned I = Globals.size();
 
-  auto *G = new (Allocator, Desc->getAllocSize() + Block::GlobalMD)
-      Global(Ctx.getEvalID(), getCurrentDecl(), Desc, Block::GlobalMD, IsStatic,
+  auto *G = new (Allocator,
+                 Desc->getAllocSize() + Block::getMetadataSize(Block::Global))
+      Global(Ctx.getEvalID(), getCurrentDecl(), Desc, Block::Global, IsStatic,
              IsExtern, IsWeak);
   G->block()->invokeCtor();
 
