@@ -40,15 +40,15 @@ InterpFrame::InterpFrame(InterpState &S, const Function *Func,
 
   // Initialize argument blocks.
   for (unsigned I = 0, N = Func->getNumWrittenParams(); I != N; ++I)
-    new (argBlock(I)) Block(S.EvalID, Func->getParamDescriptor(I).Desc);
+    new (argBlock(I))
+        Block(S.EvalID, Func->getParamDescriptor(I).Desc, Block::None);
 
   if (Func->getFrameSize() == 0)
     return;
 
   for (auto &Scope : Func->scopes()) {
     for (auto &Local : Scope.locals()) {
-      new (localBlock(Local.Offset))
-          Block(S.EvalID, Local.Desc, Block::InlineDescMD);
+      new (localBlock(Local.Offset)) Block(S.EvalID, Local.Desc, Block::Local);
       // Note that we are NOT calling invokeCtor() here, since that is done
       // via the InitScope op.
       new (localInlineDesc(Local.Offset)) InlineDescriptor(Local.Desc);

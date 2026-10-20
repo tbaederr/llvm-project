@@ -1328,7 +1328,9 @@ bool Compiler<Emitter>::VisitImaginaryLiteral(const ImaginaryLiteral *E) {
     return false;
   if (!this->emitInitElem(SubExprT, 0, SubExpr))
     return false;
-  return this->visitArrayElemInit(1, SubExpr, SubExprT);
+  if (!this->visitArrayElemInit(1, SubExpr, SubExprT))
+    return false;
+  return this->emitFinishInit(E);
 }
 
 template <class Emitter>
@@ -1902,7 +1904,7 @@ bool Compiler<Emitter>::VisitComplexBinOp(const BinaryOperator *E) {
         return this->emitPopPtr(E);
     }
   }
-  return true;
+  return this->emitFinishInit(E);
 }
 
 template <class Emitter>
