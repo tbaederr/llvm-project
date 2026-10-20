@@ -35,8 +35,7 @@ static bool validType(QualType T) {
 }
 
 Pointer::Pointer(Block *Pointee)
-    : Pointer(Pointee, Pointee->getMetadataSize(), Pointee->getMetadataSize()) {
-}
+    : Pointer(Pointee, 0, 0) {}
 
 Pointer::Pointer(Block *Pointee, uint64_t BaseAndOffset)
     : Pointer(Pointee, BaseAndOffset, BaseAndOffset) {}
@@ -45,7 +44,6 @@ Pointer::Pointer(Block *Pointee, unsigned Base, uint64_t Offset)
     : Offset(Offset), StorageKind(Storage::Block) {
   assert(Pointee);
   assert(Base % alignof(void *) == 0 && "wrong base");
-  assert(Base >= Pointee->getMetadataSize());
 
   BS = {Pointee, Base, nullptr, nullptr};
   Pointee->addPointer(this);
@@ -730,7 +728,8 @@ bool PtrView::isElementInitialized(unsigned Index) const {
   const Descriptor *Desc = getFieldDesc();
   assert(Desc);
 
-  if (Pointee->isStatic() && Base == 0)
+  if (Pointee->isStatic() && Base == 0 &&
+      Pointee->getMetadataSize() == 0)
     return true;
 
   if (isRoot() && Offset == Base) {
@@ -824,9 +823,13 @@ void PtrView::initialize() const {
   // initialized the scope via an InitScope op.
   if (LLVM_UNLIKELY(!Pointee->isInitialized()))
     Pointee->invokeCtor();
+    // llvm::errs() << __PRETTY_FUNCTION__ << '\n';
+    // llvm::errs() << Pointee << '\n';
+    // llvm::errs() << "Base/Offset: " << Base <<  " / " << Offset << '\n';
 
   if (isRoot() && Offset == Base) {
     if (Pointee->isGlobal()) {
+      // llvm::errs() << "Global\n";
       auto &GD = Pointee->getBlockDesc<GlobalInlineDescriptor>();
       GD.InitState = GlobalInitState::Initialized;
       return;
@@ -836,7 +839,7 @@ void PtrView::initialize() const {
       LD.IsInitialized = true;
       return;
     }
-
+    return;
 
   }
 
@@ -849,14 +852,15 @@ void PtrView::initialize() const {
   }
 
   // Field has its bit in an inline descriptor.
-  assert(Base != 0 && "Only composite fields can be initialised");
+  assert(Offset != 0 && "Only composite fields can be initialised");
   getDescriptor(Offset)->IsInitialized = true;
   getDescriptor(Offset)->LifeState = Lifetime::Started;
 }
 
 void PtrView::initializeElement(unsigned Index) const {
   // Primitive global arrays don't have an initmap.
-  if (Pointee->isStatic() && Base == 0)
+  if (Pointee->isStatic() && Base == 0 &&
+      Pointee->getMetadataSize() == 0)
     return;
 
   assert(Index < getFieldDesc()->getNumElems());
@@ -892,7 +896,8 @@ bool PtrView::allElementsInitialized() const {
   assert(getFieldDesc()->isPrimitiveArray());
   assert(isArrayRoot());
 
-  if (Pointee->isStatic() && Base == 0)
+  if (Pointee->isStatic() && Base == 0 &&
+      Pointee->getMetadataSize() == 0)
     return true;
 
   if (isRoot() && Offset == Base) {
@@ -910,7 +915,8 @@ bool Pointer::allElementsAlive() const {
   assert(getFieldDesc()->isPrimitiveArray());
   assert(isArrayRoot());
 
-  if (isStatic() && BS.Base == 0)
+  if (isStatic() && BS.Base == 0 &&
+      BS.Pointee->getMetadataSize() == 0)
     return true;
 
   if (isRoot() && Offset == BS.Base) {
@@ -927,7 +933,7 @@ bool Pointer::allElementsAlive() const {
 
 void PtrView::activate() const {
   // Field has its bit in an inline descriptor.
-  assert(Base != 0 && "Only composite fields can be activated");
+  // assert(Base != 0 && "Only composite fields can be activated");
 
   if (isRoot() && (Pointee->isGlobal() || Pointee->isLocal()))
     return;

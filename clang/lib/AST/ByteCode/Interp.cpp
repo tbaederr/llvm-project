@@ -1744,7 +1744,7 @@ static bool getField(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
   if (!Ptr.getFieldDesc()->isRecord())
     return false;
 
-  if ((Ptr.getByteOffset() + Off) >= Ptr.block()->getSize())
+  if ((Ptr.getByteOffset() + Off) >= (Ptr.block()->getSize() - Ptr.block()->getMetadataSize()))
     return false;
 
   S.Stk.push<Pointer>(Ptr.atField(Off));
