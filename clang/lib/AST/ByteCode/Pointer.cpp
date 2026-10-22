@@ -42,25 +42,25 @@ Pointer::Pointer(Block *Pointee, uint64_t BaseAndOffset)
     : Pointer(Pointee, BaseAndOffset, BaseAndOffset) {}
 
 Pointer::Pointer(Block *Pointee, unsigned Base, uint64_t Offset)
-    : Offset(Offset), StorageKind(Storage::Block) {
+    : StorageKind(Storage::Block) {
   assert(Pointee);
   assert(Base % alignof(void *) == 0 && "wrong base");
   assert(Base >= Pointee->getMetadataSize());
 
-  BS = {Pointee, Base, nullptr, nullptr};
+  BS = {{Pointee, Base, Offset}, nullptr, nullptr};
   Pointee->addPointer(this);
 }
 
 Pointer::Pointer(const Pointer &P)
-    : Offset(P.Offset), StorageKind(P.StorageKind) {
+    : StorageKind(P.StorageKind) {
   switch (StorageKind) {
   case Storage::Int:
     Int = P.Int;
     break;
   case Storage::Block:
     BS = P.BS;
-    if (BS.Pointee)
-      BS.Pointee->addPointer(this);
+    if (BS.View.Pointee)
+      BS.View.Pointee->addPointer(this);
     break;
   case Storage::Fn:
     Fn = P.Fn;
@@ -77,15 +77,15 @@ Pointer::Pointer(const Pointer &P)
   }
 }
 
-Pointer::Pointer(Pointer &&P) : Offset(P.Offset), StorageKind(P.StorageKind) {
+Pointer::Pointer(Pointer &&P) : StorageKind(P.StorageKind) {
   switch (StorageKind) {
   case Storage::Int:
     Int = P.Int;
     break;
   case Storage::Block:
     BS = P.BS;
-    if (BS.Pointee)
-      BS.Pointee->replacePointer(&P, this);
+    if (BS.View.Pointee)
+      BS.View.Pointee->replacePointer(&P, this);
     break;
   case Storage::Fn:
     Fn = P.Fn;
@@ -106,9 +106,9 @@ Pointer::~Pointer() {
   if (!isBlockPointer())
     return;
 
-  if (Block *Pointee = BS.Pointee) {
+  if (Block *Pointee = BS.View.Pointee) {
     Pointee->removePointer(this);
-    BS.Pointee = nullptr;
+    BS.View.Pointee = nullptr;
     Pointee->cleanup();
   }
 }
@@ -118,20 +118,19 @@ Pointer &Pointer::operator=(const Pointer &P) {
   // this pointer from the block.
   if (isBlockPointer()) {
     if (P.isBlockPointer() && this->block() == P.block()) {
-      Offset = P.Offset;
-      BS.Base = P.BS.Base;
+      BS.View.Offset = P.BS.View.Offset;
+      BS.View.Base = P.BS.View.Base;
       return *this;
     }
 
-    if (Block *Pointee = BS.Pointee) {
+    if (Block *Pointee = BS.View.Pointee) {
       Pointee->removePointer(this);
-      BS.Pointee = nullptr;
+      BS.View.Pointee = nullptr;
       Pointee->cleanup();
     }
   }
 
   StorageKind = P.StorageKind;
-  Offset = P.Offset;
 
   switch (StorageKind) {
   case Storage::Int:
@@ -140,8 +139,8 @@ Pointer &Pointer::operator=(const Pointer &P) {
   case Storage::Block:
     BS = P.BS;
 
-    if (BS.Pointee)
-      BS.Pointee->addPointer(this);
+    if (BS.View.Pointee)
+      BS.View.Pointee->addPointer(this);
     break;
   case Storage::Fn:
     Fn = P.Fn;
@@ -164,20 +163,19 @@ Pointer &Pointer::operator=(Pointer &&P) {
   // this pointer from the block.
   if (isBlockPointer()) {
     if (P.isBlockPointer() && this->block() == P.block()) {
-      Offset = P.Offset;
-      BS.Base = P.BS.Base;
+      BS.View.Offset = P.BS.View.Offset;
+      BS.View.Base = P.BS.View.Base;
       return *this;
     }
 
-    if (Block *Pointee = BS.Pointee) {
+    if (Block *Pointee = BS.View.Pointee) {
       Pointee->removePointer(this);
-      BS.Pointee = nullptr;
+      BS.View.Pointee = nullptr;
       Pointee->cleanup();
     }
   }
 
   StorageKind = P.StorageKind;
-  Offset = P.Offset;
 
   switch (StorageKind) {
   case Storage::Int:
@@ -186,8 +184,8 @@ Pointer &Pointer::operator=(Pointer &&P) {
   case Storage::Block:
     BS = P.BS;
 
-    if (BS.Pointee)
-      BS.Pointee->addPointer(this);
+    if (BS.View.Pointee)
+      BS.View.Pointee->addPointer(this);
     break;
   case Storage::Fn:
     Fn = P.Fn;
@@ -212,18 +210,19 @@ bool Pointer::operator==(const Pointer &P) const {
   switch (StorageKind) {
   case Storage::Int:
     return P.Int.Value == Int.Value && P.Int.getType() == Int.getType() &&
-           P.Offset == Offset;
+           P.Int.Offset == Int.Offset;
   case Storage::Block:
-    return P.view() == view();
+    return P.BS.View == BS.View;
   case Storage::Fn:
-    return P.Fn.Func == Fn.Func && P.Offset == Offset;
+    return P.Fn.Func == Fn.Func && P.Fn.Offset == Fn.Offset;
   case Storage::Typeid:
     llvm_unreachable("typeid in operator==?");
   case Storage::String:
-    return Str.Base == P.Str.Base && Offset == P.Offset;
+    return Str.Base == P.Str.Base && Str.Offset == P.Str.Offset;
   case Storage::Opaque:
     if (P.Opaque.Base != Opaque.Base ||
-        P.Opaque.PathLength != Opaque.PathLength || P.Offset != Offset)
+        P.Opaque.PathLength != Opaque.PathLength ||
+        P.Opaque.Offset != Opaque.Offset)
       return false;
 
     for (unsigned I = 0; I != Opaque.PathLength; ++I) {
@@ -258,8 +257,7 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   switch (StorageKind) {
   case Storage::Int:
     return APValue(static_cast<const Expr *>(nullptr),
-                   CharUnits::fromQuantity(asIntPointer().Value + this->Offset),
-                   {},
+                   CharUnits::fromQuantity(Int.Value + Int.Offset), {},
                    /*IsOnePastEnd=*/false, /*IsNullPtr=*/false);
   case Storage::Block:
     // See below.
@@ -267,9 +265,9 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   case Storage::Fn: {
     const FunctionPointer &FP = asFunctionPointer();
     if (const FunctionDecl *FD = FP.Func->getDecl())
-      return APValue(FD, CharUnits::fromQuantity(Offset), {},
+      return APValue(FD, CharUnits::fromQuantity(Fn.Offset), {},
                      /*OnePastTheEnd=*/false, /*IsNull=*/false);
-    return APValue(FP.Func->getExpr(), CharUnits::fromQuantity(Offset), {},
+    return APValue(FP.Func->getExpr(), CharUnits::fromQuantity(Fn.Offset), {},
                    /*OnePastTheEnd=*/false, /*IsNull=*/false);
   } break;
   case Storage::Typeid: {
@@ -281,15 +279,15 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   } break;
   case Storage::String: {
     llvm::SmallVector<APValue::LValuePathEntry, 1> Path;
-    if (Offset != 0 || Str.Decayed)
-      Path.push_back(APValue::LValuePathEntry::ArrayIndex(Offset));
+    if (Str.Offset != 0 || Str.Decayed)
+      Path.push_back(APValue::LValuePathEntry::ArrayIndex(Str.Offset));
 
     return APValue(APValue::LValueBase(Str.Base),
-                   CharUnits::fromQuantity(Offset * elemSize()), Path,
+                   CharUnits::fromQuantity(Str.Offset * elemSize()), Path,
                    /*OnePastTheEnd=*/false, /*IsNull=*/false);
   }
   case Storage::Opaque: {
-    bool ValidBase = Opaque.hasValidBase() || this->Offset <= 1;
+    bool ValidBase = Opaque.hasValidBase() || Opaque.Offset <= 1;
 
     size_t LayoutOffset = Opaque.computeLayoutOffset(ASTCtx).value_or(0);
     size_t ElemSize = 0;
@@ -297,7 +295,7 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
       ElemSize = ASTCtx.getTypeSizeInChars(Opaque.getFieldType()).getQuantity();
 
     auto LValueOffset =
-        CharUnits::fromQuantity(LayoutOffset + (this->Offset * ElemSize));
+        CharUnits::fromQuantity(LayoutOffset + (Opaque.Offset * ElemSize));
     APValue::LValueBase Base;
     if (const Expr *E = Opaque.Base.asExpr())
       Base = E;
@@ -370,7 +368,7 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
   bool OnePastEnd = isOnePastEnd() && !isZeroSizeArray();
 
   llvm::SmallVector<APValue::LValuePathEntry, 5> Path;
-  PtrView Ptr = view();
+  PtrView Ptr = BS.View;
   while (Ptr.isField() || Ptr.isArrayElement()) {
 
     if (Ptr.isArrayRoot()) {
@@ -469,18 +467,18 @@ APValue Pointer::toAPValue(const ASTContext &ASTCtx) const {
 void Pointer::print(llvm::raw_ostream &OS) const {
   switch (StorageKind) {
   case Storage::Block: {
-    const Block *B = BS.Pointee;
+    const Block *B = BS.View.Pointee;
     OS << "(Block) " << B << " {";
 
     if (isRoot())
-      OS << "rootptr(" << BS.Base << "), ";
+      OS << "rootptr(" << BS.View.Base << "), ";
     else
-      OS << BS.Base << ", ";
+      OS << BS.View.Base << ", ";
 
     if (isElementPastEnd())
       OS << "pastend, ";
     else
-      OS << Offset << ", ";
+      OS << BS.View.Offset << ", ";
 
     if (B)
       OS << B->getSize();
@@ -489,27 +487,27 @@ void Pointer::print(llvm::raw_ostream &OS) const {
     OS << "}";
   } break;
   case Storage::Int:
-    OS << "(Int) {" << Int.Value << " + " << Offset << ", " << Int.getType()
-       << ", " << (Int.isNull() ? "null" : "nonnull") << '}';
+    OS << "(Int) {" << Int.Value << " + " << Int.Offset << ", "
+       << Int.getType() << ", " << (Int.isNull() ? "null" : "nonnull") << '}';
     break;
   case Storage::Fn:
-    OS << "(Fn) { " << Fn.Func << " + " << Offset << " }";
+    OS << "(Fn) { " << Fn.Func << " + " << Fn.Offset << " }";
     break;
   case Storage::Typeid:
     OS << "(Typeid) { " << (const void *)asTypeidPointer().TypePtr << ", "
-       << (const void *)asTypeidPointer().TypeInfoType << " + " << Offset
-       << "}";
+       << (const void *)asTypeidPointer().TypeInfoType << " + "
+       << Typeid.Offset << "}";
     break;
   case Storage::String:
     OS << "(String) { " << (const void *)Str.getLiteral() << ' ';
     Str.getLiteral()->outputString(OS);
-    OS << ". ID: " << Str.ID << " + " << Offset << "}";
+    OS << ". ID: " << Str.ID << " + " << Str.Offset << "}";
     break;
   case Storage::Opaque:
     OS << "(Opaque) { Base: " << Opaque.Base << ", "
        << Opaque.FieldType.getPointer() << " Length: " << Opaque.PathLength
        << ". PastEnd: " << Opaque.isOnePastEnd();
-    OS << "} + " << Offset;
+    OS << "} + " << Opaque.Offset;
     break;
   }
 }
@@ -527,16 +525,17 @@ std::optional<size_t>
 Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
   switch (StorageKind) {
   case Storage::Int:
-    return Int.Value + Offset;
+    return Int.Value + Int.Offset;
   case Storage::Block:
     // See below.
     break;
   case Storage::Fn:
     return getIntegerRepresentation();
   case Storage::Typeid:
-    return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+    return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) +
+           Typeid.Offset;
   case Storage::String:
-    return reinterpret_cast<uintptr_t>(Str.getLiteral()) + Offset;
+    return reinterpret_cast<uintptr_t>(Str.getLiteral()) + Str.Offset;
   case Storage::Opaque:
     return computeLayoutOffset(ASTCtx);
   }
@@ -548,7 +547,7 @@ Pointer::computeOffsetForComparison(const ASTContext &ASTCtx) const {
   };
 
   size_t Result = 0;
-  PtrView P = view();
+  PtrView P = BS.View;
   while (true) {
     if (P.isVirtualBaseClass()) {
       Result += getInlineDesc()->Offset;
@@ -608,22 +607,23 @@ std::optional<size_t>
 Pointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
   switch (StorageKind) {
   case Storage::Int:
-    return Int.Value + Offset;
+    return Int.Value + Int.Offset;
   case Storage::Block:
     // See below.
     break;
   case Storage::Fn:
     return getIntegerRepresentation();
   case Storage::Typeid:
-    return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) + Offset;
+    return reinterpret_cast<uintptr_t>(asTypeidPointer().TypePtr) +
+           Typeid.Offset;
   case Storage::String:
-    return Offset * Str.getLiteral()->getCharByteWidth();
+    return Str.Offset * Str.getLiteral()->getCharByteWidth();
   case Storage::Opaque:
     if (auto O = Opaque.computeLayoutOffset(ASTCtx)) {
       size_t TypeSize = 0;
       if (QualType FT = Opaque.getFieldType(); validType(FT))
         TypeSize = ASTCtx.getTypeSizeInChars(FT).getQuantity();
-      return *O + (Offset * TypeSize);
+      return *O + (Opaque.Offset * TypeSize);
     }
     return std::nullopt;
   }
@@ -646,7 +646,7 @@ Pointer::computeLayoutOffset(const ASTContext &ASTCtx) const {
   };
 
   size_t Result = 0;
-  PtrView P = view();
+  PtrView P = BS.View;
   while (true) {
     if (P.isBaseClass()) {
       const CXXRecordDecl *BaseRD = getRecordDecl(P.getBase());
@@ -718,7 +718,7 @@ std::string Pointer::toDiagnosticString(const ASTContext &Ctx) const {
     return "nullptr";
 
   if (isIntegralPointer())
-    return (Twine("&(") + Twine(asIntPointer().Value + Offset) + ")").str();
+    return (Twine("&(") + Twine(Int.Value + Int.Offset) + ")").str();
 
   QualType Ty = getType();
   if (Ty->isLValueReferenceType())
@@ -874,11 +874,11 @@ bool Pointer::allElementsAlive() const {
   assert(getFieldDesc()->isPrimitiveArray());
   assert(isArrayRoot());
 
-  if (isStatic() && BS.Base == 0)
+  if (isStatic() && BS.View.Base == 0)
     return true;
 
-  if (isRoot() && BS.Base == sizeof(GlobalInlineDescriptor) &&
-      Offset == BS.Base) {
+  if (isRoot() && BS.View.Base == sizeof(GlobalInlineDescriptor) &&
+      BS.View.Offset == BS.View.Base) {
     const auto &GD = block()->getBlockDesc<GlobalInlineDescriptor>();
     return GD.InitState == GlobalInitState::Initialized;
   }
@@ -974,7 +974,7 @@ bool Pointer::hasSameBase(const Pointer &A, const Pointer &B) {
   case Storage::Int:
     return true;
   case Storage::Block:
-    return A.BS.Pointee == B.BS.Pointee;
+    return A.BS.View.Pointee == B.BS.View.Pointee;
   case Storage::Fn:
     return true;
   case Storage::Typeid:
@@ -1004,7 +1004,7 @@ bool Pointer::elemsOfSameArray(const Pointer &A, const Pointer &B) {
   assert(A.isBlockPointer());
   assert(B.isBlockPointer());
 
-  if (A.BS.Base == B.BS.Base)
+  if (A.BS.View.Base == B.BS.View.Base)
     return true;
 
   if (A.isBaseClass() || B.isBaseClass())
@@ -1066,7 +1066,7 @@ Pointer::computeSplitPoint(const Pointer &A, const Pointer &B) {
   if (!A.isBlockPointer() || !B.isBlockPointer())
     return std::nullopt;
 
-  if (A.asBlockPointer().Pointee != B.asBlockPointer().Pointee)
+  if (A.asBlockPointer().View.Pointee != B.asBlockPointer().View.Pointee)
     return std::nullopt;
   if (A.isRoot() && B.isRoot())
     return std::nullopt;
@@ -1304,7 +1304,7 @@ std::optional<APValue> Pointer::toRValue(const Context &Ctx,
 
   // Return the composite type.
   APValue Result;
-  if (!::toRValue(Ctx, ResultType, view(), Result))
+  if (!::toRValue(Ctx, ResultType, BS.View, Result))
     return std::nullopt;
   return Result;
 }

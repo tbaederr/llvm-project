@@ -2661,7 +2661,8 @@ std::optional<Pointer> OffsetHelper(InterpState &S, CodePtr OpPC,
   if (Result == 0 && Ptr.isOnePastEnd()) {
     if (Ptr.getFieldDesc()->isArray())
       return Ptr.atIndex(0);
-    return Pointer(Ptr.asBlockPointer().Pointee, Ptr.asBlockPointer().Base);
+    return Pointer(Ptr.asBlockPointer().View.Pointee,
+                   Ptr.asBlockPointer().View.Base);
   }
 
   return Ptr.atIndex(static_cast<uint64_t>(Result));

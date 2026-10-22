@@ -49,7 +49,7 @@ void Block::removePointer(Pointer *P) {
     BP.Prev->BS.Next = BP.Next;
   if (BP.Next)
     BP.Next->BS.Prev = BP.Prev;
-  P->BS.Pointee = nullptr;
+  P->BS.View.Pointee = nullptr;
 #ifndef NDEBUG
   assert(!hasPointer(P));
 #endif
@@ -82,8 +82,8 @@ void Block::replacePointer(Pointer *Old, Pointer *New) {
   if (Pointers == Old)
     Pointers = New;
 
-  OldBP.Pointee = nullptr;
-  NewBP.Pointee = this;
+  OldBP.View.Pointee = nullptr;
+  NewBP.View.Pointee = this;
 #ifndef NDEBUG
   assert(!hasPointer(Old));
   assert(hasPointer(New));
@@ -106,7 +106,7 @@ void Block::movePointersTo(Block *B) {
   while (Pointers) {
     Pointer *P = Pointers;
     this->removePointer(P);
-    P->BS.Pointee = B;
+    P->BS.View.Pointee = B;
     B->addPointer(P);
   }
   assert(!this->hasPointers());
@@ -116,7 +116,7 @@ void Block::removePointers() {
   Pointer *P = Pointers;
   while (P) {
     Pointer *Next = P->BS.Next;
-    P->BS.Pointee = nullptr;
+    P->BS.View.Pointee = nullptr;
     P->BS.Prev = nullptr;
     P->BS.Next = nullptr;
     P = Next;
@@ -141,7 +141,7 @@ DeadBlock::DeadBlock(DeadBlock *&Root, Block *Blk)
   // Transfer pointers.
   B.Pointers = Blk->Pointers;
   for (Pointer *P = Blk->Pointers; P; P = P->asBlockPointer().Next)
-    P->BS.Pointee = &B;
+    P->BS.View.Pointee = &B;
   Blk->Pointers = nullptr;
 }
 

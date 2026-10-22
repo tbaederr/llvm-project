@@ -26,8 +26,8 @@ std::optional<Pointer> MemberPointer::toPointer(const Context &Ctx) const {
 
   if (PtrOffset >= 0) {
     // If the resulting base would be too small, return nullopt.
-    if (Base.BS.Base < static_cast<unsigned>(PtrOffset) ||
-        (Base.BS.Base - PtrOffset < BlockMDSize))
+    if (Base.BS.View.Base < static_cast<unsigned>(PtrOffset) ||
+        (Base.BS.View.Base - PtrOffset < BlockMDSize))
       return std::nullopt;
   }
 

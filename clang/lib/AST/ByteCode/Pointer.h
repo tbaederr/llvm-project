@@ -347,10 +347,7 @@ struct PtrView {
 };
 
 struct BlockPointer {
-  /// The block the pointer is pointing to.
-  Block *Pointee;
-  /// Start of the current subfield.
-  unsigned Base;
+  PtrView View;
   /// Previous link in the pointer chain.
   Pointer *Prev;
   /// Next link in the pointer chain.
@@ -360,6 +357,7 @@ struct BlockPointer {
 struct IntPointer {
   llvm::PointerIntPair<const Type *, 1, bool> TypeAndIsNull;
   uint64_t Value;
+  uint64_t Offset = 0;
 
   std::optional<IntPointer> atOffset(const Context &Ctx, unsigned Offset) const;
   IntPointer baseCast(const Context &Ctx, unsigned BaseOffset) const;
@@ -383,17 +381,20 @@ struct IntPointer {
 
 struct FunctionPointer {
   const Function *Func;
+  uint64_t Offset = 0;
 };
 
 struct TypeidPointer {
   const Type *TypePtr;
   const Type *TypeInfoType;
+  uint64_t Offset = 0;
 };
 
 struct StringPointer {
   const Expr *Base = nullptr;
   unsigned ID = 0;
   bool Decayed = false;
+  uint64_t Offset = 0;
 
   StringPointer decay() const { return StringPointer{Base, ID, true}; }
   const StringLiteral *getLiteral() const {
@@ -446,6 +447,7 @@ struct OpaquePointer {
   llvm::PointerIntPair<const Type *, 2, unsigned> FieldType = {};
   const PointerPathEntry *Path = nullptr;
   unsigned PathLength = 0;
+  uint64_t Offset = 0;
 
   ArrayRef<PointerPathEntry> path() const { return ArrayRef(Path, PathLength); }
   bool hasDeclBase() const { return Base.isDecl(); }
@@ -554,29 +556,35 @@ public:
   Pointer(Pointer &&P);
   Pointer(uint64_t Address, const Type *Ty, uint64_t Offset = 0,
           std::optional<bool> IsNull = std::nullopt)
-      : Offset(Offset), StorageKind(Storage::Int),
-        Int{{Ty, IsNull.value_or(Address == 0)}, Address} {}
+      : StorageKind(Storage::Int),
+        Int{{Ty, IsNull.value_or(Address == 0)}, Address, Offset} {}
   Pointer(const Function *F, uint64_t Offset = 0)
-      : Offset(Offset), StorageKind(Storage::Fn), Fn{F} {}
+      : StorageKind(Storage::Fn), Fn{F, Offset} {}
   Pointer(const Type *TypePtr, const Type *TypeInfoType, uint64_t Offset = 0)
-      : Offset(Offset), StorageKind(Storage::Typeid) {
+      : StorageKind(Storage::Typeid) {
     Typeid.TypePtr = TypePtr;
     Typeid.TypeInfoType = TypeInfoType;
+    Typeid.Offset = Offset;
   }
   Pointer(const Expr *Base, unsigned Id)
-      : Offset(0), StorageKind(Storage::String), Str{Base, Id} {}
-  Pointer(StringPointer Str, uint64_t Offset = 0)
-      : Offset(Offset), StorageKind(Storage::String), Str(Str) {}
+      : StorageKind(Storage::String), Str{Base, Id} {}
+  Pointer(StringPointer S, uint64_t Offset = 0)
+      : StorageKind(Storage::String), Str(S) {
+    Str.Offset = Offset;
+  }
 
   Pointer(DeclOrExpr DOE, bool ConstexprUnknown = false)
-      : Offset(0), StorageKind(Storage::Opaque) {
+      : StorageKind(Storage::Opaque) {
     Opaque.Base = DOE;
     Opaque.FieldType = {DOE.getType().getTypePtr(), ConstexprUnknown ? 2u : 0u};
     Opaque.Path = nullptr;
     Opaque.PathLength = 0;
+    Opaque.Offset = 0;
   }
   Pointer(OpaquePointer OP, uint64_t Offset = 0)
-      : Offset(Offset), StorageKind(Storage::Opaque), Opaque(OP) {}
+      : StorageKind(Storage::Opaque), Opaque(OP) {
+    Opaque.Offset = Offset;
+  }
 
   Pointer(Block *Pointee, unsigned Base, uint64_t Offset);
   explicit Pointer(PtrView V) : Pointer(V.Pointee, V.Base, V.Offset) {}
@@ -596,15 +604,15 @@ public:
 
   uint64_t getIntegerRepresentation() const {
     if (isIntegralPointer())
-      return Int.Value + (Offset * elemSize());
+      return Int.Value + (Int.Offset * elemSize());
     if (isFunctionPointer())
-      return reinterpret_cast<uint64_t>(Fn.Func) + Offset;
-    return reinterpret_cast<uint64_t>(BS.Pointee) + Offset;
+      return reinterpret_cast<uint64_t>(Fn.Func) + Fn.Offset;
+    return reinterpret_cast<uint64_t>(BS.View.Pointee) + BS.View.Offset;
   }
 
   PtrView view() const {
     assert(isBlockPointer());
-    return PtrView{BS.Pointee, BS.Base, Offset};
+    return BS.View;
   }
 
   /// Converts the pointer to an APValue that is an rvalue.
@@ -617,7 +625,7 @@ public:
     case Storage::Int:
       return Pointer(Int.Value, Int.getType(), Idx);
     case Storage::Block:
-      return Pointer(view().atIndex(Idx));
+      return Pointer(BS.View.atIndex(Idx));
     case Storage::Fn:
       return Pointer(Fn.Func, Idx);
     case Storage::String:
@@ -629,29 +637,29 @@ public:
 
   /// Creates a pointer to a field.
   [[nodiscard]] Pointer atField(unsigned Off) const {
-    return Pointer(view().atField(Off));
+    return Pointer(BS.View.atField(Off));
   }
 
   /// Subtract the given offset from the current Base and Offset
   /// of the pointer.
   [[nodiscard]] Pointer atFieldSub(unsigned Off) const {
-    assert(Offset >= Off);
-    unsigned O = Offset - Off;
-    return Pointer(BS.Pointee, O, O);
+    assert(BS.View.Offset >= Off);
+    unsigned O = BS.View.Offset - Off;
+    return Pointer(BS.View.Pointee, O, O);
   }
 
   /// Restricts the scope of an array element pointer.
   [[nodiscard]] Pointer narrow() const {
     if (!isBlockPointer())
       return *this;
-    return Pointer(view().narrow());
+    return Pointer(BS.View.narrow());
   }
 
   /// Expands a pointer to the containing array, undoing narrowing.
   [[nodiscard]] Pointer expand() const {
     if (!isBlockPointer())
       return *this;
-    return Pointer(view().expand());
+    return Pointer(BS.View.expand());
   }
 
   /// Checks if the pointer is null.
@@ -660,7 +668,7 @@ public:
     case Storage::Int:
       return Int.isNull();
     case Storage::Block:
-      return BS.Pointee == nullptr;
+      return BS.View.Pointee == nullptr;
     case Storage::Fn:
       return !Fn.Func;
     case Storage::Typeid:
@@ -674,14 +682,14 @@ public:
   bool isLive() const {
     if (!isBlockPointer())
       return true;
-    return view().isLive();
+    return BS.View.isLive();
   }
   /// Checks if the item is a field in an object.
   bool isField() const {
     if (!isBlockPointer())
       return false;
 
-    return view().isField();
+    return BS.View.isField();
   }
 
   /// Accessor for information about the declaration site.
@@ -690,8 +698,8 @@ public:
       return nullptr;
 
     assert(isBlockPointer());
-    assert(BS.Pointee);
-    return BS.Pointee->Desc;
+    assert(BS.View.Pointee);
+    return BS.View.Pointee->Desc;
   }
   SourceLocation getDeclLoc() const { return getDeclDesc()->getLocation(); }
 
@@ -708,9 +716,11 @@ public:
   }
 
   /// Returns a pointer to the object of which this pointer is a field.
-  [[nodiscard]] Pointer getBase() const { return Pointer(view().getBase()); }
+  [[nodiscard]] Pointer getBase() const { return Pointer(BS.View.getBase()); }
   /// Returns the parent array.
-  [[nodiscard]] Pointer getArray() const { return Pointer(view().getArray()); }
+  [[nodiscard]] Pointer getArray() const {
+    return Pointer(BS.View.getArray());
+  }
 
   /// Accessors for information about the innermost field.
   const Descriptor *getFieldDesc() const {
@@ -728,7 +738,7 @@ public:
     case Storage::Int:
       return Int.getPointeeType();
     case Storage::Block:
-      return view().getType();
+      return BS.View.getType();
     case Storage::Fn:
       return Fn.Func->getType();
     case Storage::Typeid:
@@ -750,7 +760,7 @@ public:
   const ValueDecl *getRootValueDecl() const;
   const Expr *getRootExpr() const;
 
-  [[nodiscard]] Pointer getDeclPtr() const { return Pointer(BS.Pointee); }
+  [[nodiscard]] Pointer getDeclPtr() const { return Pointer(BS.View.Pointee); }
 
   /// Returns the element size of the innermost field.
   size_t elemSize() const {
@@ -761,7 +771,7 @@ public:
     if (isStringPointer())
       return Str.getLiteral()->getCharByteWidth();
 
-    return view().elemSize();
+    return BS.View.elemSize();
   }
   /// Returns the total size of the innermost field.
   size_t getSize() const {
@@ -771,32 +781,32 @@ public:
 
   /// Returns the offset into an array.
   unsigned getOffset() const {
-    assert(Offset != PtrView::PastEndMark && "invalid offset");
-    return view().getOffset();
+    assert(BS.View.Offset != PtrView::PastEndMark && "invalid offset");
+    return BS.View.getOffset();
   }
 
   /// Whether this array refers to an array, but not
   /// to the first element.
-  bool isArrayRoot() const { return view().isArrayRoot(); }
+  bool isArrayRoot() const { return BS.View.isArrayRoot(); }
 
   /// Checks if the innermost field is an array.
   bool inArray() const {
     if (isBlockPointer())
-      return view().inArray();
+      return BS.View.inArray();
     if (isStringPointer())
       return true;
     return false;
   }
   bool inUnion() const {
-    if (isBlockPointer() && BS.Base >= sizeof(InlineDescriptor))
-      return view().inUnion();
+    if (isBlockPointer() && BS.View.Base >= sizeof(InlineDescriptor))
+      return BS.View.inUnion();
     return false;
   };
 
   /// Checks if the structure is a primitive array.
   bool inPrimitiveArray() const {
     if (isBlockPointer())
-      return view().inPrimitiveArray();
+      return BS.View.inPrimitiveArray();
     return false;
   }
   /// Checks if the structure is an array of unknown size.
@@ -812,14 +822,14 @@ public:
     if (!isBlockPointer())
       return false;
 
-    return view().isArrayElement();
+    return BS.View.isArrayElement();
   }
   /// Pointer points directly to a block.
   bool isRoot() const {
     if (isZero())
       return true;
     if (isBlockPointer())
-      return view().isRoot();
+      return BS.View.isRoot();
     if (isOpaquePointer())
       return Opaque.isRoot();
     return true;
@@ -829,7 +839,7 @@ public:
     if (!isBlockPointer())
       return false;
 
-    return BS.Pointee && BS.Base > 0;
+    return BS.View.Pointee && BS.View.Base > 0;
   }
 
   [[nodiscard]] const BlockPointer &asBlockPointer() const {
@@ -868,10 +878,10 @@ public:
   const Record *getRecord() const {
     if (!isBlockPointer())
       return nullptr;
-    return view().getRecord();
+    return BS.View.getRecord();
   }
   /// Returns the element record type, if this is a non-primive array.
-  const Record *getElemRecord() const { return view().getElemRecord(); }
+  const Record *getElemRecord() const { return BS.View.getElemRecord(); }
   /// Returns the field information.
   const FieldDecl *getField() const {
     if (const Descriptor *FD = getFieldDesc())
@@ -882,29 +892,29 @@ public:
   /// Checks if the storage is extern.
   bool isExtern() const {
     if (isBlockPointer())
-      return view().isExtern();
+      return BS.View.isExtern();
     return false;
   }
   /// Checks if the storage is static.
   bool isStatic() const {
     if (!isBlockPointer())
       return true;
-    assert(BS.Pointee);
-    return BS.Pointee->isStatic();
+    assert(BS.View.Pointee);
+    return BS.View.Pointee->isStatic();
   }
   /// Checks if the storage is temporary.
   bool isTemporary() const {
     if (isBlockPointer()) {
-      assert(BS.Pointee);
-      return BS.Pointee->isTemporary();
+      assert(BS.View.Pointee);
+      return BS.View.Pointee->isTemporary();
     }
     return false;
   }
   /// Checks if the storage has been dynamically allocated.
   bool isDynamic() const {
     if (isBlockPointer()) {
-      assert(BS.Pointee);
-      return BS.Pointee->isDynamic();
+      assert(BS.View.Pointee);
+      return BS.View.Pointee->isDynamic();
     }
     return false;
   }
@@ -915,7 +925,7 @@ public:
   bool isMutable() const {
     if (!isBlockPointer())
       return false;
-    return view().isMutable();
+    return BS.View.isMutable();
   }
 
   bool isWeak() const {
@@ -935,17 +945,17 @@ public:
       return false;
 
     assert(isBlockPointer());
-    return BS.Pointee->isWeak();
+    return BS.View.Pointee->isWeak();
   }
   /// Checks if the object is active.
   bool isActive() const {
     if (!isBlockPointer())
       return true;
-    return view().isActive();
+    return BS.View.isActive();
   }
   /// Checks if a structure is a base class.
-  bool isBaseClass() const { return view().isBaseClass(); }
-  bool isVirtualBaseClass() const { return view().isVirtualBaseClass(); }
+  bool isBaseClass() const { return BS.View.isBaseClass(); }
+  bool isVirtualBaseClass() const { return BS.View.isVirtualBaseClass(); }
 
   /// Checks if the pointer points to a dummy value.
   bool isDummy() const { return isOpaquePointer(); }
@@ -958,7 +968,7 @@ public:
       return true;
     if (!isBlockPointer())
       return false;
-    return view().isConst();
+    return BS.View.isConst();
   }
   bool isConstInMutable() const {
     if (!isBlockPointer())
@@ -970,23 +980,23 @@ public:
   bool isVolatile() const {
     if (!isBlockPointer())
       return false;
-    return view().isVolatile();
+    return BS.View.isVolatile();
   }
 
   /// Returns the declaration ID.
   UnsignedOrNone getDeclID() const {
     if (isBlockPointer()) {
-      assert(BS.Pointee);
-      return BS.Pointee->getDeclID();
+      assert(BS.View.Pointee);
+      return BS.View.Pointee->getDeclID();
     }
     return std::nullopt;
   }
 
   /// Returns the byte offset from the start.
   uint64_t getByteOffset() const {
-    if (isBlockPointer())
-      return isOnePastEnd() ? PtrView::PastEndMark : Offset;
-    return Offset;
+    if (isBlockPointer() && isOnePastEnd())
+      return PtrView::PastEndMark;
+    return offset();
   }
 
   /// Returns the number of elements.
@@ -1001,12 +1011,12 @@ public:
     }
     if (!isBlockPointer())
       return ~0u;
-    return view().getNumElems();
+    return BS.View.getNumElems();
   }
 
   const Block *block() const {
     assert(isBlockPointer());
-    return BS.Pointee;
+    return BS.View.Pointee;
   }
 
   /// If backed by actual data (i.e. a block or string pointer), return
@@ -1015,16 +1025,16 @@ public:
     if (isStringPointer()) {
       const StringLiteral *Lit = Str.getLiteral();
       return reinterpret_cast<const std::byte *>(
-          Lit->getBytes().data() + (Offset * Lit->getCharByteWidth()));
+          Lit->getBytes().data() + (Str.Offset * Lit->getCharByteWidth()));
     }
     assert(isBlockPointer());
-    return BS.Pointee->rawData() + Offset;
+    return BS.View.Pointee->rawData() + BS.View.Offset;
   }
 
   /// Returns the index into an array.
   int64_t getIndex() const {
     if (isStringPointer())
-      return Offset;
+      return Str.Offset;
     if (isOpaquePointer()) {
       if (Opaque.isArrayElement())
         return Opaque.Path[Opaque.PathLength - 1].Index;
@@ -1033,23 +1043,23 @@ public:
     if (!isBlockPointer())
       return getIntegerRepresentation();
 
-    return view().getIndex();
+    return BS.View.getIndex();
   }
 
   /// Checks if the index is one past end.
   bool isOnePastEnd() const {
     if (isStringPointer())
-      return Offset == (Str.getLiteral()->getLength() + 1);
+      return Str.Offset == (Str.getLiteral()->getLength() + 1);
     if (isOpaquePointer())
       return Opaque.isOnePastEndOrElementPastEnd();
 
     if (!isBlockPointer())
       return false;
 
-    if (!BS.Pointee)
+    if (!BS.View.Pointee)
       return false;
 
-    return view().isOnePastEnd();
+    return BS.View.isOnePastEnd();
   }
 
   /// Checks if the pointer points past the end of the object.
@@ -1057,13 +1067,13 @@ public:
     if (isIntegralPointer())
       return false;
     if (isStringPointer())
-      return Offset >= (Str.getLiteral()->getLength() + 1);
+      return Str.Offset >= (Str.getLiteral()->getLength() + 1);
 
-    return !isZero() && Offset > BS.Pointee->getSize();
+    return !isZero() && BS.View.Offset > BS.View.Pointee->getSize();
   }
 
   /// Checks if the pointer is an out-of-bounds element pointer.
-  bool isElementPastEnd() const { return Offset == PtrView::PastEndMark; }
+  bool isElementPastEnd() const { return offset() == PtrView::PastEndMark; }
 
   /// Checks if the pointer is pointing to a zero-size array.
   bool isZeroSizeArray() const {
@@ -1103,33 +1113,32 @@ public:
   template <typename T> T &deref() const {
     assert(isLive() && "Invalid pointer");
     assert(isBlockPointer());
-    assert(BS.Pointee);
+    assert(BS.View.Pointee);
     assert(isDereferencable());
-    assert(Offset + sizeof(T) <= BS.Pointee->getSize());
-    return view().deref<T>();
+    assert(BS.View.Offset + sizeof(T) <= BS.View.Pointee->getSize());
+    return BS.View.deref<T>();
   }
 
   template <typename T> T load() const {
     assert(isLive() && "Invalid pointer");
     if (isBlockPointer()) {
-      assert(BS.Pointee);
+      assert(BS.View.Pointee);
       assert(isDereferencable());
-      assert(Offset + sizeof(T) <= BS.Pointee->getSize());
-      return view().deref<T>();
+      assert(BS.View.Offset + sizeof(T) <= BS.View.Pointee->getSize());
+      return BS.View.deref<T>();
     }
 
     if (isStringPointer()) {
       const StringLiteral *Lit = Str.getLiteral();
 
       if constexpr (isFixedSizeIntegralType<T>()) {
-        // The literal does not include the nul byte.
-        if (Offset >= Lit->getLength())
+        if (Str.Offset >= Lit->getLength())
           return T::from('\0');
-        return T::from(Lit->getCodeUnit(Offset));
+        return T::from(Lit->getCodeUnit(Str.Offset));
       } else if constexpr (std::is_integral_v<T>) {
-        if (Offset >= Lit->getLength())
+        if (Str.Offset >= Lit->getLength())
           return '\0';
-        return Lit->getCodeUnit(Offset);
+        return Lit->getCodeUnit(Str.Offset);
       }
     }
 
@@ -1141,28 +1150,28 @@ public:
   template <typename T> T &elem(unsigned I) const {
     assert(isLive() && "Invalid pointer");
     assert(isBlockPointer());
-    assert(BS.Pointee);
+    assert(BS.View.Pointee);
     assert(isDereferencable());
     assert(getFieldDesc()->isPrimitiveArray());
     assert(I < getFieldDesc()->getNumElems());
 
-    return view().elem<T>(I);
+    return BS.View.elem<T>(I);
   }
 
   template <typename T> T loadElem(unsigned I) const {
     assert(isLive() && "Invalid pointer");
     if (isBlockPointer()) {
-      assert(BS.Pointee);
+      assert(BS.View.Pointee);
       assert(isDereferencable());
       assert(getFieldDesc()->isPrimitiveArray());
       assert(I < getFieldDesc()->getNumElems());
 
-      return view().elem<T>(I);
+      return BS.View.elem<T>(I);
     }
 
     assert(isStringPointer());
     const StringLiteral *Lit = Str.getLiteral();
-    unsigned Index = Offset + I;
+    unsigned Index = Str.Offset + I;
     if constexpr (isFixedSizeIntegralType<T>()) {
       // The literal does not include the nul byte.
       if (Index >= Lit->getLength())
@@ -1207,11 +1216,11 @@ public:
   void initialize() const {
     if (!isBlockPointer())
       return;
-    view().initialize();
+    BS.View.initialize();
   }
   /// Initialized the given element of a primitive array.
   void initializeElement(unsigned Index) const {
-    view().initializeElement(Index);
+    BS.View.initializeElement(Index);
   }
   /// Initialize all elements of a primitive array at once. This can be
   /// used in situations where we *know* we have initialized *all* elements
@@ -1222,7 +1231,7 @@ public:
     if (!isBlockPointer())
       return true;
 
-    return view().isInitialized();
+    return BS.View.isInitialized();
   }
 
   /// Like isInitialized(), but for primitive arrays.
@@ -1230,18 +1239,18 @@ public:
     if (!isBlockPointer())
       return true;
 
-    return view().isElementInitialized(Index);
+    return BS.View.isElementInitialized(Index);
   }
   bool allElementsInitialized() const {
     assert(getFieldDesc()->isPrimitiveArray());
     assert(isArrayRoot());
-    return view().allElementsInitialized();
+    return BS.View.allElementsInitialized();
   }
   bool allElementsAlive() const;
   bool isElementAlive(unsigned Index) const;
 
   /// Activates a field.
-  void activate() const { view().activate(); }
+  void activate() const { BS.View.activate(); }
   /// Deactivates an entire strurcutre.
   void deactivate() const {
     // TODO: this only appears in constructors, so nothing to deactivate.
@@ -1250,7 +1259,7 @@ public:
   Lifetime getLifetime() const {
     if (!isBlockPointer())
       return Lifetime::Started;
-    return view().getLifetime();
+    return BS.View.getLifetime();
   }
 
   /// Start the lifetime of this pointer. This works for pointer with an
@@ -1266,14 +1275,14 @@ public:
   void setLifeState(Lifetime L) const {
     if (!isBlockPointer())
       return;
-    view().setLifeState(L);
+    BS.View.setLifeState(L);
   };
 
   /// Strip base casts from this Pointer.
   /// The result is either a root pointer or something
   /// that isn't a base class anymore.
   [[nodiscard]] Pointer stripBaseCasts() const {
-    return Pointer(view().stripBaseCasts());
+    return Pointer(BS.View.stripBaseCasts());
   }
 
   /// Compare two pointers.
@@ -1281,9 +1290,9 @@ public:
     if (!hasSameBase(*this, Other))
       return ComparisonCategoryResult::Unordered;
 
-    if (Offset < Other.Offset)
+    if (offset() < Other.offset())
       return ComparisonCategoryResult::Less;
-    if (Offset > Other.Offset)
+    if (offset() > Other.offset())
       return ComparisonCategoryResult::Greater;
 
     return ComparisonCategoryResult::Equal;
@@ -1332,10 +1341,10 @@ private:
   /// Returns the embedded descriptor preceding a field.
   InlineDescriptor *getInlineDesc() const {
     assert(isBlockPointer());
-    assert(BS.Base != sizeof(GlobalInlineDescriptor));
-    assert(BS.Base <= BS.Pointee->getSize());
-    assert(BS.Base >= sizeof(InlineDescriptor));
-    return getDescriptor(BS.Base);
+    assert(BS.View.Base != sizeof(GlobalInlineDescriptor));
+    assert(BS.View.Base <= BS.View.Pointee->getSize());
+    assert(BS.View.Base >= sizeof(InlineDescriptor));
+    return getDescriptor(BS.View.Base);
   }
 
   /// Returns a descriptor at a given offset.
@@ -1343,18 +1352,33 @@ private:
     assert(Offset != 0 && "Not a nested pointer");
     assert(isBlockPointer());
     assert(!isZero());
-    return view().getDescriptor(Offset);
+    return BS.View.getDescriptor(Offset);
   }
 
   /// Returns a reference to the InitMapPtr which stores the initialization map.
   InitMapPtr &getInitMap() const {
     assert(isBlockPointer());
     assert(!isZero());
-    return view().getInitMap();
+    return BS.View.getInitMap();
   }
 
-  /// Offset into the storage.
-  uint64_t Offset = 0;
+  uint64_t offset() const {
+    switch (StorageKind) {
+    case Storage::Int:
+      return Int.Offset;
+    case Storage::Block:
+      return BS.View.Offset;
+    case Storage::Fn:
+      return Fn.Offset;
+    case Storage::Typeid:
+      return Typeid.Offset;
+    case Storage::String:
+      return Str.Offset;
+    case Storage::Opaque:
+      return Opaque.Offset;
+    }
+    llvm_unreachable("Unknown storage kind");
+  }
 
   Storage StorageKind = Storage::Int;
   union {
