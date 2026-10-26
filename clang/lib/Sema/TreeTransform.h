@@ -8360,6 +8360,7 @@ TreeTransform<Derived>::TransformCompoundStmt(CompoundStmt *S,
   bool SubStmtInvalid = false;
   bool SubStmtChanged = false;
   SmallVector<Stmt*, 8> Statements;
+  Statements.reserve(S->size());
   for (auto *B : S->body()) {
     StmtResult Result = getDerived().TransformStmt(
         B, IsStmtExpr && B == S->body_back() ? StmtDiscardKind::StmtExprResult
@@ -8882,11 +8883,19 @@ template<typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformGCCAsmStmt(GCCAsmStmt *S) {
 
+  unsigned NumOps = S->getNumOutputs() + S->getNumInputs() + S->getNumLabels();
+
   SmallVector<Expr*, 8> Constraints;
+  Constraints.reserve(S->getNumOutputs() + S->getNumInputs());
+
   SmallVector<Expr*, 8> Exprs;
+  Exprs.reserve(NumOps);
+
   SmallVector<IdentifierInfo *, 4> Names;
+  Names.reserve(NumOps);
 
   SmallVector<Expr*, 8> Clobbers;
+  Clobbers.reserve(S->getNumClobbers());
 
   bool ExprsChanged = false;
 
@@ -9218,6 +9227,7 @@ TreeTransform<Derived>::TransformObjCAtTryStmt(ObjCAtTryStmt *S) {
   // Transform the @catch statements (if present).
   bool AnyCatchChanged = false;
   SmallVector<Stmt*, 8> CatchStmts;
+  CatchStmts.reserve(S->getNumCatchStmts());
   for (unsigned I = 0, N = S->getNumCatchStmts(); I != N; ++I) {
     StmtResult Catch = getDerived().TransformStmt(S->getCatchStmt(I));
     if (Catch.isInvalid())
@@ -9441,6 +9451,7 @@ StmtResult TreeTransform<Derived>::TransformCXXTryStmt(CXXTryStmt *S) {
   // Transform the handlers.
   bool HandlerChanged = false;
   SmallVector<Stmt *, 8> Handlers;
+  Handlers.reserve(S->getNumHandlers());
   for (unsigned I = 0, N = S->getNumHandlers(); I != N; ++I) {
     StmtResult Handler = getDerived().TransformCXXCatchStmt(S->getHandler(I));
     if (Handler.isInvalid())
@@ -12434,6 +12445,7 @@ class OpenACCClauseTransform final
 
   llvm::SmallVector<Expr *> VisitVarList(ArrayRef<Expr *> VarList) {
     llvm::SmallVector<Expr *> InstantiatedVarList;
+    InstantiatedVarList.reserve(VarList.size());
     for (Expr *CurVar : VarList) {
       ExprResult VarRef = VisitVar(CurVar);
 
@@ -15704,8 +15716,10 @@ TreeTransform<Derived>::TransformUnresolvedLookupExpr(UnresolvedLookupExpr *Old,
 template<typename Derived>
 ExprResult
 TreeTransform<Derived>::TransformTypeTraitExpr(TypeTraitExpr *E) {
+  bool AlwaysRebuild = getDerived().AlwaysRebuild();
   bool ArgChanged = false;
   SmallVector<TypeSourceInfo *, 4> Args;
+  Args.reserve(E->getNumArgs());
   for (unsigned I = 0, N = E->getNumArgs(); I != N; ++I) {
     TypeSourceInfo *From = E->getArg(I);
     TypeLoc FromTL = From->getTypeLoc();
@@ -15826,7 +15840,7 @@ TreeTransform<Derived>::TransformTypeTraitExpr(TypeTraitExpr *E) {
     Args.push_back(TLB.getTypeSourceInfo(SemaRef.Context, To));
   }
 
-  if (!getDerived().AlwaysRebuild() && !ArgChanged)
+  if (!AlwaysRebuild && !ArgChanged)
     return E;
 
   return getDerived().RebuildTypeTrait(E->getTrait(), E->getBeginLoc(), Args,
@@ -16546,9 +16560,11 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
         TPL->containsUnexpandedParameterPack();
   }
 
+  auto *OldCallOperator = E->getCallOperator();
+
   TypeLocBuilder NewCallOpTLBuilder;
   TypeLoc OldCallOpTypeLoc =
-      E->getCallOperator()->getTypeSourceInfo()->getTypeLoc();
+      OldCallOperator->getTypeSourceInfo()->getTypeLoc();
   QualType NewCallOpType =
       getDerived().TransformType(NewCallOpTLBuilder, OldCallOpTypeLoc);
   if (NewCallOpType.isNull())
@@ -16563,7 +16579,7 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
   auto FPTL = NewCallOpTSI->getTypeLoc().getAsAdjusted<FunctionProtoTypeLoc>();
   assert(FPTL && "Not a FunctionProtoType?");
 
-  AssociatedConstraint TRC = E->getCallOperator()->getTrailingRequiresClause();
+  AssociatedConstraint TRC = OldCallOperator->getTrailingRequiresClause();
   if (TRC) {
     ExprResult E = getDerived().TransformLambdaConstraint(
         const_cast<Expr *>(TRC.ConstraintExpr));
@@ -16574,14 +16590,14 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
 
   LSI->BeforeCompoundStatement = false;
   getSema().CompleteLambdaCallOperator(
-      NewCallOperator, E->getCallOperator()->getLocation(),
-      E->getCallOperator()->getInnerLocStart(), TRC, NewCallOpTSI,
-      E->getCallOperator()->getConstexprKind(),
-      E->getCallOperator()->getStorageClass(), FPTL.getParams(),
+      NewCallOperator, OldCallOperator->getLocation(),
+      OldCallOperator->getInnerLocStart(), TRC, NewCallOpTSI,
+      OldCallOperator->getConstexprKind(),
+      OldCallOperator->getStorageClass(), FPTL.getParams(),
       E->hasExplicitResultType());
 
-  getDerived().transformAttrs(E->getCallOperator(), NewCallOperator);
-  getDerived().transformedLocalDecl(E->getCallOperator(), {NewCallOperator});
+  getDerived().transformAttrs(OldCallOperator, NewCallOperator);
+  getDerived().transformedLocalDecl(OldCallOperator, {NewCallOperator});
 
   {
     // Number the lambda for linkage purposes if necessary.
@@ -16599,7 +16615,7 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
   // evaluation context even if we're not transforming the function body.
   getSema().PushExpressionEvaluationContextForFunction(
       Sema::ExpressionEvaluationContext::PotentiallyEvaluated,
-      E->getCallOperator());
+      OldCallOperator);
 
   StmtResult Body;
   {
@@ -17737,7 +17753,7 @@ TreeTransform<Derived>::TransformObjCMessageExpr(ObjCMessageExpr *E) {
       return SemaRef.MaybeBindToTemporary(E);
 
     // Build a new class message send.
-    SmallVector<SourceLocation, 16> SelLocs;
+    SmallVector<SourceLocation, 4> SelLocs;
     E->getSelectorLocs(SelLocs);
     return getDerived().RebuildObjCMessageExpr(ReceiverTypeInfo,
                                                E->getSelector(),
@@ -17753,7 +17769,7 @@ TreeTransform<Derived>::TransformObjCMessageExpr(ObjCMessageExpr *E) {
       return ExprError();
 
     // Build a new class message send to 'super'.
-    SmallVector<SourceLocation, 16> SelLocs;
+    SmallVector<SourceLocation, 4> SelLocs;
     E->getSelectorLocs(SelLocs);
     return getDerived().RebuildObjCMessageExpr(E->getSuperLoc(),
                                                E->getSelector(),
@@ -17779,7 +17795,7 @@ TreeTransform<Derived>::TransformObjCMessageExpr(ObjCMessageExpr *E) {
     return SemaRef.MaybeBindToTemporary(E);
 
   // Build a new instance message send.
-  SmallVector<SourceLocation, 16> SelLocs;
+  SmallVector<SourceLocation, 4> SelLocs;
   E->getSelectorLocs(SelLocs);
   return getDerived().RebuildObjCMessageExpr(Receiver.get(),
                                              E->getSelector(),
