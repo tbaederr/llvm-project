@@ -4209,9 +4209,11 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
     // C++11 [conv.ptr]p1: A null pointer constant is an integer literal with
     // value zero or a prvalue of type std::nullptr_t.
     // Microsoft mode permits C++98 rules reflecting MSVC behavior.
-    const IntegerLiteral *Lit = dyn_cast<IntegerLiteral>(this);
-    if (Lit && !Lit->getValue())
-      return NPCK_ZeroLiteral;
+    if (const auto *Lit = dyn_cast<IntegerLiteral>(this)) {
+      if (Lit->getValue().isZero())
+        return NPCK_ZeroLiteral;
+      return NPCK_NotNull;
+    }
     if (!Ctx.getLangOpts().MSVCCompat || !isCXX98IntegralConstantExpr(Ctx))
       return NPCK_NotNull;
   } else {
