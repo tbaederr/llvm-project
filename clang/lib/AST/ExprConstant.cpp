@@ -56,6 +56,7 @@
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/Builtins.h"
+#include "clang/Basic/DiagnosticAST.h"
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Basic/TargetBuiltins.h"
 #include "clang/Basic/TargetInfo.h"
@@ -85,6 +86,11 @@ using llvm::APInt;
 using llvm::APSInt;
 using llvm::APFloat;
 using llvm::FixedPointSemantics;
+
+
+#define FFDIAG(A, B, ...) if (Info.diagnosing()) {Info.FFDiag(A, B) __VA_ARGS__; }
+#define CCEDIAG(A, B, ...) if (Info.diagnosing()) {Info.CCEDiag(A, B) __VA_ARGS__; }
+
 
 namespace {
   struct LValue;
@@ -770,6 +776,8 @@ namespace {
     /// CurrentCall - The top of the constexpr call stack.
     CallStackFrame *CurrentCall;
 
+    bool diagnosing() const { return getEvalStatus().Diag != nullptr; }
+
     /// CallStackDepth - The number of calls in the call stack right now.
     unsigned CallStackDepth;
 
@@ -1251,8 +1259,7 @@ bool SubobjectDesignator::checkSubobject(EvalInfo &Info, const Expr *E,
   if (Invalid)
     return false;
   if (isOnePastTheEnd()) {
-    Info.CCEDiag(E, diag::note_constexpr_past_end_subobject)
-      << CSK;
+    CCEDIAG(E, diag::note_constexpr_past_end_subobject, << CSK)
     setInvalid();
     return false;
   }
@@ -1264,7 +1271,7 @@ bool SubobjectDesignator::checkSubobject(EvalInfo &Info, const Expr *E,
 
 void SubobjectDesignator::diagnoseUnsizedArrayPointerArithmetic(EvalInfo &Info,
                                                                 const Expr *E) {
-  Info.CCEDiag(E, diag::note_constexpr_unsized_array_indexed);
+  CCEDIAG(E, diag::note_constexpr_unsized_array_indexed)
   // Do not set the designator as invalid: we can represent this situation,
   // and correct handling of __builtin_object_size requires us to do so.
 }
@@ -1274,13 +1281,13 @@ void SubobjectDesignator::diagnosePointerArithmetic(EvalInfo &Info,
                                                     const APSInt &N) {
   // If we're complaining, we must be able to statically determine the size of
   // the most derived array.
-  if (MostDerivedPathLength == Entries.size() && MostDerivedIsArrayElement)
-    Info.CCEDiag(E, diag::note_constexpr_array_index)
-      << N << /*array*/ 0
-      << static_cast<unsigned>(getMostDerivedArraySize());
-  else
-    Info.CCEDiag(E, diag::note_constexpr_array_index)
-      << N << /*non-array*/ 1;
+  if (MostDerivedPathLength == Entries.size() && MostDerivedIsArrayElement) {
+    CCEDIAG(E, diag::note_constexpr_array_index,
+            << N << /*array*/ 0
+            << static_cast<unsigned>(getMostDerivedArraySize()))
+  } else {
+    CCEDIAG(E, diag::note_constexpr_array_index, << N << /*non-array*/ 1)
+  }
   setInvalid();
 }
 
@@ -1508,17 +1515,18 @@ namespace {
     bool checkNullPointer(EvalInfo &Info, const Expr *E,
                           CheckSubobjectKind CSK) {
       return checkNullPointerDiagnosingWith([&Info, E, CSK] {
-        Info.CCEDiag(E, diag::note_constexpr_null_subobject) << CSK;
+        CCEDIAG(E, diag::note_constexpr_null_subobject, << CSK)
       });
     }
 
     bool checkNullPointerForFoldAccess(EvalInfo &Info, const Expr *E,
                                        AccessKinds AK) {
       return checkNullPointerDiagnosingWith([&Info, E, AK] {
-        if (AK == AccessKinds::AK_Dereference)
-          Info.FFDiag(E, diag::note_constexpr_dereferencing_null);
-        else
-          Info.FFDiag(E, diag::note_constexpr_access_null) << AK;
+        if (AK == AccessKinds::AK_Dereference) {
+          FFDIAG(E, diag::note_constexpr_dereferencing_null)
+        } else {
+          FFDIAG(E, diag::note_constexpr_access_null, << AK)
+        }
       });
     }
 
@@ -1536,7 +1544,7 @@ namespace {
     }
     void addUnsizedArray(EvalInfo &Info, const Expr *E, QualType ElemTy) {
       if (!Designator.Entries.empty()) {
-        Info.CCEDiag(E, diag::note_constexpr_unsupported_unsized_array);
+        CCEDIAG(E, diag::note_constexpr_unsupported_unsized_array)
         Designator.setInvalid();
         return;
       }
@@ -2298,17 +2306,17 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
     }
 
     if (InvalidBaseKind != -1) {
-      Info.FFDiag(Loc, diag::note_constexpr_invalid_template_arg)
-          << IsReferenceType << !Designator.Entries.empty() << InvalidBaseKind
-          << Ident;
+      FFDIAG(Loc, diag::note_constexpr_invalid_template_arg,
+             << IsReferenceType << !Designator.Entries.empty()
+             << InvalidBaseKind << Ident)
       return false;
     }
   }
 
   if (auto *FD = dyn_cast_or_null<FunctionDecl>(BaseVD);
       FD && FD->isImmediateFunction()) {
-    Info.FFDiag(Loc, diag::note_consteval_address_accessible)
-        << !Type->isAnyPointerType();
+    FFDIAG(Loc, diag::note_consteval_address_accessible,
+           << !Type->isAnyPointerType())
     Info.Note(FD->getLocation(), diag::note_declared_at);
     return false;
   }
@@ -2335,7 +2343,7 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
         NoteLValueLocation(Info, Base);
       }
     } else {
-      Info.FFDiag(Loc);
+      FFDIAG(Loc, diag::note_invalid_subexpr_in_const_expr)
     }
     // Don't allow references to temporaries to escape.
     return false;
@@ -2349,14 +2357,14 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
       Info.FFDiag(Loc, diag::note_constexpr_var_init_non_constant, 1) << BaseVD;
       NoteLValueLocation(Info, Base);
     } else {
-      Info.FFDiag(Loc);
+      FFDIAG(Loc, diag::note_invalid_subexpr_in_const_expr)
     }
     return false;
   }
 
   if (Base.is<DynamicAllocLValue>()) {
-    Info.FFDiag(Loc, diag::note_constexpr_dynamic_alloc)
-        << IsReferenceType << !Designator.Entries.empty();
+    FFDIAG(Loc, diag::note_constexpr_dynamic_alloc,
+           << IsReferenceType << !Designator.Entries.empty())
     NoteLValueLocation(Info, Base);
     return false;
   }
@@ -2412,9 +2420,9 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
     if (CheckedTemps.insert(MTE).second) {
       QualType TempType = getType(Base);
       if (TempType.isDestructedType()) {
-        Info.FFDiag(MTE->getExprLoc(),
-                    diag::note_constexpr_unsupported_temporary_nontrivial_dtor)
-            << TempType;
+        FFDIAG(MTE->getExprLoc(),
+               diag::note_constexpr_unsupported_temporary_nontrivial_dtor,
+               << TempType)
         return false;
       }
 
@@ -2435,7 +2443,7 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
   // A reference constant expression must refer to an object.
   if (!Base) {
     // FIXME: diagnostic
-    Info.CCEDiag(Loc);
+    CCEDIAG(Loc, diag::note_invalid_subexpr_in_const_expr)
     return true;
   }
 
@@ -2461,7 +2469,7 @@ static bool CheckMemberPointerConstantExpression(EvalInfo &Info,
   if (!FD)
     return true;
   if (FD->isImmediateFunction()) {
-    Info.FFDiag(Loc, diag::note_consteval_address_accessible) << /*pointer*/ 0;
+    FFDIAG(Loc, diag::note_consteval_address_accessible, << /*pointer*/ 0)
     Info.Note(FD->getLocation(), diag::note_declared_at);
     return false;
   }
@@ -2497,11 +2505,11 @@ static bool CheckLiteralType(EvalInfo &Info, const Expr *E,
     return true;
 
   // Prvalue constant expressions must be of literal types.
-  if (Info.getLangOpts().CPlusPlus11)
-    Info.FFDiag(E, diag::note_constexpr_nonliteral)
-      << E->getType();
-  else
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+  if (Info.getLangOpts().CPlusPlus11) {
+    FFDIAG(E, diag::note_constexpr_nonliteral, << E->getType())
+  } else {
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+  }
   return false;
 }
 
@@ -2514,13 +2522,13 @@ static bool CheckEvaluationResult(CheckEvaluationResultKind CERK,
                                   bool IsCompleteClass) {
   if (!Value.hasValue()) {
     if (SubobjectDecl) {
-      Info.FFDiag(DiagLoc, diag::note_constexpr_uninitialized)
-          << /*(name)*/ 1 << SubobjectDecl;
+      FFDIAG(DiagLoc, diag::note_constexpr_uninitialized,
+             << /*(name)*/ 1 << SubobjectDecl)
       Info.Note(SubobjectDecl->getLocation(),
                 diag::note_constexpr_subobject_declared_here);
     } else {
-      Info.FFDiag(DiagLoc, diag::note_constexpr_uninitialized)
-          << /*of type*/ 0 << Type;
+      FFDIAG(DiagLoc, diag::note_constexpr_uninitialized,
+             << /*of type*/ 0 << Type)
     }
     return false;
   }
@@ -2562,8 +2570,8 @@ static bool CheckEvaluationResult(CheckEvaluationResultKind CERK,
         const APValue &BaseValue = Value.getStructBase(BaseIndex);
         if (!BaseValue.hasValue()) {
           SourceLocation TypeBeginLoc = BS.getBaseTypeLoc();
-          Info.FFDiag(TypeBeginLoc, diag::note_constexpr_uninitialized_base)
-              << BS.getType() << SourceRange(TypeBeginLoc, BS.getEndLoc());
+          FFDIAG(TypeBeginLoc, diag::note_constexpr_uninitialized_base,
+                 << BS.getType() << SourceRange(TypeBeginLoc, BS.getEndLoc()))
           return false;
         }
         if (!CheckEvaluationResult(CERK, Info, DiagLoc, BS.getType(), BaseValue,
@@ -2591,8 +2599,8 @@ static bool CheckEvaluationResult(CheckEvaluationResultKind CERK,
           const APValue &BaseValue = Value.getStructVirtualBase(BaseIndex);
           if (!BaseValue.hasValue()) {
             SourceLocation TypeBeginLoc = BS.getBaseTypeLoc();
-            Info.FFDiag(TypeBeginLoc, diag::note_constexpr_uninitialized_base)
-                << BS.getType() << SourceRange(TypeBeginLoc, BS.getEndLoc());
+            FFDIAG(TypeBeginLoc, diag::note_constexpr_uninitialized_base,
+                   << BS.getType() << SourceRange(TypeBeginLoc, BS.getEndLoc()))
             return false;
           }
           if (!CheckEvaluationResult(CERK, Info, DiagLoc, BS.getType(),
@@ -2654,9 +2662,9 @@ static bool CheckMemoryLeaks(EvalInfo &Info) {
     // We can still fold to a constant despite a compile-time memory leak,
     // so long as the heap allocation isn't referenced in the result (we check
     // that in CheckConstantExpression).
-    Info.CCEDiag(Info.HeapAllocs.begin()->second.AllocExpr,
-                 diag::note_constexpr_memory_leak)
-        << unsigned(Info.HeapAllocs.size() - 1);
+    CCEDIAG(Info.HeapAllocs.begin()->second.AllocExpr,
+            diag::note_constexpr_memory_leak,
+            << unsigned(Info.HeapAllocs.size() - 1))
   }
   return true;
 }
@@ -2734,7 +2742,7 @@ static bool EvaluateAsBooleanCondition(const Expr *E, bool &Result,
 template<typename T>
 static bool HandleOverflow(EvalInfo &Info, const Expr *E,
                            const T &SrcValue, QualType DestType) {
-  Info.CCEDiag(E, diag::note_constexpr_overflow) << SrcValue << DestType;
+  CCEDIAG(E, diag::note_constexpr_overflow, << SrcValue << DestType)
   if (const auto *OBT = DestType->getAs<OverflowBehaviorType>();
       OBT && OBT->isTrapKind()) {
     return false;
@@ -2791,7 +2799,7 @@ static bool checkFloatingPointResultForConstantFolding(EvalInfo &Info,
       FPO.getRoundingMode() == llvm::RoundingMode::Dynamic) {
     // Inexact result means that it depends on rounding mode. If the requested
     // mode is dynamic, the evaluation cannot be made in compile time.
-    Info.FFDiag(E, diag::note_constexpr_dynamic_rounding);
+    FFDIAG(E, diag::note_constexpr_dynamic_rounding)
     return false;
   }
 
@@ -2799,14 +2807,14 @@ static bool checkFloatingPointResultForConstantFolding(EvalInfo &Info,
       (FPO.getRoundingMode() == llvm::RoundingMode::Dynamic ||
        FPO.getExceptionMode() != LangOptions::FPE_Ignore ||
        FPO.getAllowFEnvAccess())) {
-    Info.FFDiag(E, diag::note_constexpr_float_arithmetic_strict);
+    FFDIAG(E, diag::note_constexpr_float_arithmetic_strict)
     return false;
   }
 
   if ((St & APFloat::opStatus::opInvalidOp) &&
       FPO.getExceptionMode() != LangOptions::FPE_Ignore) {
     // There is no usefully definable result.
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -2866,7 +2874,7 @@ static bool truncateBitfieldValue(EvalInfo &Info, const Expr *E,
     // FIXME: In this case, we should provide the diagnostic for casting
     // a pointer to an integer.
     assert(Value.isLValue() && "integral value neither int nor lvalue?");
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -2912,7 +2920,7 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
   bool HandleOverflowResult = true;
   switch (Opcode) {
   default:
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   case BO_Mul:
     return CheckedIntArithmetic(Info, E, LHS, RHS, LHS.getBitWidth() * 2,
@@ -2929,8 +2937,8 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
   case BO_Div:
   case BO_Rem:
     if (RHS == 0) {
-      Info.FFDiag(E, diag::note_expr_divide_by_zero)
-          << E->getRHS()->getSourceRange();
+      FFDIAG(E, diag::note_expr_divide_by_zero,
+             << E->getRHS()->getSourceRange())
       return false;
     }
     // Check for overflow case: INT_MIN / -1 or INT_MIN % -1. APSInt supports
@@ -2950,7 +2958,7 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     else if (RHS.isSigned() && RHS.isNegative()) {
       // During constant-folding, a negative shift is an opposite shift. Such
       // a shift is not a constant expression.
-      Info.CCEDiag(E, diag::note_constexpr_negative_shift) << RHS;
+      CCEDIAG(E, diag::note_constexpr_negative_shift, << RHS)
       if (!Info.noteUndefinedBehavior())
         return false;
       RHS = -RHS;
@@ -2961,8 +2969,8 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     // the shifted type.
     unsigned SA = (unsigned) RHS.getLimitedValue(LHS.getBitWidth()-1);
     if (SA != RHS) {
-      Info.CCEDiag(E, diag::note_constexpr_large_shift)
-        << RHS << E->getType() << LHS.getBitWidth();
+      CCEDIAG(E, diag::note_constexpr_large_shift,
+              << RHS << E->getType() << LHS.getBitWidth())
       if (!Info.noteUndefinedBehavior())
         return false;
     } else if (LHS.isSigned() && !Info.getLangOpts().CPlusPlus20) {
@@ -2971,11 +2979,11 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
       // C++2a [expr.shift]p2: E1 << E2 is the unique value congruent to
       // E1 x 2^E2 module 2^N.
       if (LHS.isNegative()) {
-        Info.CCEDiag(E, diag::note_constexpr_lshift_of_negative) << LHS;
+        CCEDIAG(E, diag::note_constexpr_lshift_of_negative, << LHS)
         if (!Info.noteUndefinedBehavior())
           return false;
       } else if (LHS.countl_zero() < SA) {
-        Info.CCEDiag(E, diag::note_constexpr_lshift_discards);
+        CCEDIAG(E, diag::note_constexpr_lshift_discards)
         if (!Info.noteUndefinedBehavior())
           return false;
       }
@@ -2992,7 +3000,7 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     else if (RHS.isSigned() && RHS.isNegative()) {
       // During constant-folding, a negative shift is an opposite shift. Such a
       // shift is not a constant expression.
-      Info.CCEDiag(E, diag::note_constexpr_negative_shift) << RHS;
+      CCEDIAG(E, diag::note_constexpr_negative_shift, << RHS)
       if (!Info.noteUndefinedBehavior())
         return false;
       RHS = -RHS;
@@ -3003,8 +3011,8 @@ static bool handleIntIntBinOp(EvalInfo &Info, const BinaryOperator *E,
     // shifted type.
     unsigned SA = (unsigned) RHS.getLimitedValue(LHS.getBitWidth()-1);
     if (SA != RHS) {
-      Info.CCEDiag(E, diag::note_constexpr_large_shift)
-        << RHS << E->getType() << LHS.getBitWidth();
+      CCEDIAG(E, diag::note_constexpr_large_shift,
+              << RHS << E->getType() << LHS.getBitWidth())
       if (!Info.noteUndefinedBehavior())
         return false;
     }
@@ -3032,7 +3040,7 @@ static bool handleFloatFloatBinOp(EvalInfo &Info, const BinaryOperator *E,
   APFloat::opStatus St;
   switch (Opcode) {
   default:
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   case BO_Mul:
     St = LHS.multiply(RHS, RM);
@@ -3047,7 +3055,7 @@ static bool handleFloatFloatBinOp(EvalInfo &Info, const BinaryOperator *E,
     // [expr.mul]p4:
     //   If the second operand of / or % is zero the behavior is undefined.
     if (RHS.isZero())
-      Info.CCEDiag(E, diag::note_expr_divide_by_zero);
+      CCEDIAG(E, diag::note_expr_divide_by_zero)
     St = LHS.divide(RHS, RM);
     break;
   }
@@ -3061,7 +3069,7 @@ static bool handleFloatFloatBinOp(EvalInfo &Info, const BinaryOperator *E,
   // because it prevents NaN propagation and the "invalid" status is the
   // responsibility of checkFloatingPointResultForConstantFolding.
   if (LHS.isNaN()) {
-    Info.CCEDiag(E, diag::note_constexpr_float_arithmetic) << LHS.isNaN();
+    CCEDIAG(E, diag::note_constexpr_float_arithmetic, << LHS.isNaN())
     return Info.noteUndefinedBehavior();
   }
 
@@ -3170,7 +3178,7 @@ static bool handleVectorVectorBinOp(EvalInfo &Info, const BinaryOperator *E,
   if (!LHSValue.isVector()) {
     assert(LHSValue.isLValue() &&
            "A vector result that isn't a vector OR uncalculated LValue");
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -3197,7 +3205,7 @@ static bool handleVectorVectorBinOp(EvalInfo &Info, const BinaryOperator *E,
                                     RHSElt.getInt(), EltResult);
 
       if (!Success) {
-        Info.FFDiag(E);
+        FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
         return false;
       }
       ResultElements.emplace_back(EltResult);
@@ -3210,7 +3218,7 @@ static bool handleVectorVectorBinOp(EvalInfo &Info, const BinaryOperator *E,
 
       if (!handleFloatFloatBinOp(Info, E, LHSFloat, Opcode,
                                  RHSElt.getFloat())) {
-        Info.FFDiag(E);
+        FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
         return false;
       }
 
@@ -3391,14 +3399,14 @@ static bool HandleSizeof(EvalInfo &Info, SourceLocation Loc, QualType Type,
   }
 
   if (Type->isDependentType()) {
-    Info.FFDiag(Loc);
+    FFDIAG(Loc, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
   if (!Type->isConstantSizeType()) {
     // sizeof(vla) is not a constantexpr: C99 6.5.3.4p2.
     // FIXME: Better diagnostic.
-    Info.FFDiag(Loc);
+    FFDIAG(Loc, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -3497,7 +3505,7 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
       // constexpr-unknown.
       if (!AllowConstexprUnknown || IsLocalVariable) {
         if (!Info.checkingPotentialConstantExpression())
-          Info.FFDiag(E, diag::note_constexpr_use_uninit_reference);
+          FFDIAG(E, diag::note_constexpr_use_uninit_reference)
         return false;
       }
       Result = nullptr;
@@ -3550,11 +3558,10 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
         !Info.CurrentCall->Callee ||
         !Info.CurrentCall->Callee->Equals(VD->getDeclContext())) {
       if (Info.getLangOpts().CPlusPlus11) {
-        Info.FFDiag(E, diag::note_constexpr_function_param_value_unknown)
-            << VD;
+        FFDIAG(E, diag::note_constexpr_function_param_value_unknown, << VD)
         NoteLValueLocation(Info, Base);
       } else {
-        Info.FFDiag(E);
+        FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       }
     }
     return false;
@@ -3641,14 +3648,14 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
       Info.CCEDiag(E, diag::note_constexpr_var_init_non_constant, 1) << VD;
       NoteLValueLocation(Info, Base);
     } else {
-      Info.CCEDiag(E);
+      CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     }
   }
 
   // Never use the initializer of a weak variable, not even for constant
   // folding. We can't be sure that this is the definition that will be used.
   if (VD->isWeak()) {
-    Info.FFDiag(E, diag::note_constexpr_var_init_weak) << VD;
+    FFDIAG(E, diag::note_constexpr_var_init_weak, << VD)
     NoteLValueLocation(Info, Base);
     return false;
   }
@@ -3950,7 +3957,7 @@ static bool handleScalarCast(EvalInfo &Info, const FPOptions FPO, const Expr *E,
     }
   }
 
-  Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+  FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
   return false;
 }
 
@@ -4052,7 +4059,7 @@ static bool constructAggregate(EvalInfo &Info, const FPOptions FPO,
       llvm::append_range(WorkList, ReverseList);
       continue;
     }
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
   return true;
@@ -4245,7 +4252,7 @@ static bool flattenAPValue(EvalInfo &Info, const Expr *E, APValue Value,
       }
       continue;
     }
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
   return true;
@@ -4310,13 +4317,14 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     // A diagnostic will have already been produced.
     return handler.failed();
   if (Sub.isOnePastTheEnd() || Sub.isMostDerivedAnUnsizedArray()) {
-    if (Info.getLangOpts().CPlusPlus11)
-      Info.FFDiag(E, Sub.isOnePastTheEnd()
-                         ? diag::note_constexpr_access_past_end
-                         : diag::note_constexpr_access_unsized_array)
-          << handler.AccessKind;
-    else
-      Info.FFDiag(E);
+    if (Info.getLangOpts().CPlusPlus11) {
+      FFDIAG(E,
+             Sub.isOnePastTheEnd() ? diag::note_constexpr_access_past_end
+                                   : diag::note_constexpr_access_unsized_array,
+             << handler.AccessKind)
+    } else {
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+    }
     return handler.failed();
   }
 
@@ -4338,9 +4346,9 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       if (I != 0 && handler.AccessKind == AK_IsWithinLifetime)
         return false;
       if (!Info.checkingPotentialConstantExpression()) {
-        Info.FFDiag(E, diag::note_constexpr_access_uninit)
-            << handler.AccessKind << O->isIndeterminate()
-            << E->getSourceRange();
+        FFDIAG(E, diag::note_constexpr_access_uninit, << handler.AccessKind
+                                                      << O->isIndeterminate()
+                                                      << E->getSourceRange())
         NoteLValueLocation(Info, Obj.Base);
       }
       return handler.failed();
@@ -4384,7 +4392,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
               << handler.AccessKind << DiagKind << Decl;
           Info.Note(Loc, diag::note_constexpr_volatile_here) << DiagKind;
         } else {
-          Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
         }
         return handler.failed();
       }
@@ -4430,11 +4438,11 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
           CAT && CAT->getSize().ule(Index)) {
         // Note, it should not be possible to form a pointer with a valid
         // designator which points more than one past the end of the array.
-        if (Info.getLangOpts().CPlusPlus11)
-          Info.FFDiag(E, diag::note_constexpr_access_past_end)
-            << handler.AccessKind;
-        else
-          Info.FFDiag(E);
+        if (Info.getLangOpts().CPlusPlus11) {
+          FFDIAG(E, diag::note_constexpr_access_past_end, << handler.AccessKind)
+        } else {
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+        }
         return handler.failed();
       }
 
@@ -4455,11 +4463,11 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       // Next subobject is a complex number.
       uint64_t Index = Sub.Entries[I].getAsArrayIndex();
       if (Index > 1) {
-        if (Info.getLangOpts().CPlusPlus11)
-          Info.FFDiag(E, diag::note_constexpr_access_past_end)
-            << handler.AccessKind;
-        else
-          Info.FFDiag(E);
+        if (Info.getLangOpts().CPlusPlus11) {
+          FFDIAG(E, diag::note_constexpr_access_past_end, << handler.AccessKind)
+        } else {
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+        }
         return handler.failed();
       }
 
@@ -4479,17 +4487,17 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       uint64_t Index = Sub.Entries[I].getAsArrayIndex();
       unsigned NumElements = VT->getNumElements();
       if (Index == NumElements) {
-        if (Info.getLangOpts().CPlusPlus11)
-          Info.FFDiag(E, diag::note_constexpr_access_past_end)
-              << handler.AccessKind;
-        else
-          Info.FFDiag(E);
+        if (Info.getLangOpts().CPlusPlus11) {
+          FFDIAG(E, diag::note_constexpr_access_past_end, << handler.AccessKind)
+        } else {
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+        }
         return handler.failed();
       }
 
       if (Index > NumElements) {
-        Info.CCEDiag(E, diag::note_constexpr_array_index)
-            << Index << /*array*/ 0 << NumElements;
+        CCEDIAG(E, diag::note_constexpr_array_index,
+                << Index << /*array*/ 0 << NumElements)
         return handler.failed();
       }
 
@@ -4498,7 +4506,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
 
       if (O->isIndeterminate()) {
         if (isRead(handler.AccessKind)) {
-          Info.FFDiag(E);
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
           return handler.failed();
         }
         expandVector(*O, NumElements);
@@ -4531,8 +4539,8 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
             // active union member rather than reporting the prior active union
             // member. We'll need to fix nullptr_t to not use APValue() as its
             // representation first.
-            Info.FFDiag(E, diag::note_constexpr_access_inactive_union_member)
-                << handler.AccessKind << Field << !UnionField << UnionField;
+            FFDIAG(E, diag::note_constexpr_access_inactive_union_member,
+                   << handler.AccessKind << Field << !UnionField << UnionField)
             return handler.failed();
           }
         }
@@ -4609,7 +4617,7 @@ struct ModifySubobjectHandler {
   bool checkConst(QualType QT) {
     // Assigning to a const object has undefined behavior.
     if (QT.isConstQualified()) {
-      Info.FFDiag(E, diag::note_constexpr_modify_const_type) << QT;
+      FFDIAG(E, diag::note_constexpr_modify_const_type, << QT)
       return false;
     }
     return true;
@@ -4628,7 +4636,7 @@ struct ModifySubobjectHandler {
       return false;
     if (!NewVal.isInt()) {
       // Maybe trying to write a cast pointer value into a complex?
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
     Value = NewVal.getInt();
@@ -4717,15 +4725,16 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
                                          AccessKinds AK, const LValue &LVal,
                                          QualType LValType) {
   if (LVal.InvalidBase) {
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return CompleteObject();
   }
 
   if (!LVal.Base) {
-    if (AK == AccessKinds::AK_Dereference)
-      Info.FFDiag(E, diag::note_constexpr_dereferencing_null);
-    else
-      Info.FFDiag(E, diag::note_constexpr_access_null) << AK;
+    if (AK == AccessKinds::AK_Dereference) {
+      FFDIAG(E, diag::note_constexpr_dereferencing_null)
+    } else {
+      FFDIAG(E, diag::note_constexpr_access_null, << AK)
+    }
     return CompleteObject();
   }
 
@@ -4749,11 +4758,11 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
   // apply this rule to C++98, in order to conform to the expected 'volatile'
   // semantics.
   if (isFormalAccess(AK) && LValType.isVolatileQualified()) {
-    if (Info.getLangOpts().CPlusPlus)
-      Info.FFDiag(E, diag::note_constexpr_access_volatile_type)
-        << AK << LValType;
-    else
-      Info.FFDiag(E);
+    if (Info.getLangOpts().CPlusPlus) {
+      FFDIAG(E, diag::note_constexpr_access_volatile_type, << AK << LValType)
+    } else {
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+    }
     return CompleteObject();
   }
 
@@ -4771,13 +4780,12 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
     if (auto *GD = dyn_cast<MSGuidDecl>(D)) {
       if (isModification(AK)) {
         // All the remaining cases do not permit modification of the object.
-        Info.FFDiag(E, diag::note_constexpr_modify_global);
+        FFDIAG(E, diag::note_constexpr_modify_global)
         return CompleteObject();
       }
       APValue &V = GD->getAsAPValue();
       if (V.isAbsent()) {
-        Info.FFDiag(E, diag::note_constexpr_unsupported_layout)
-            << GD->getType();
+        FFDIAG(E, diag::note_constexpr_unsupported_layout, << GD->getType())
         return CompleteObject();
       }
       return CompleteObject(LVal.Base, &V, GD->getType());
@@ -4786,7 +4794,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
     // Allow reading the APValue from an UnnamedGlobalConstantDecl.
     if (auto *GCD = dyn_cast<UnnamedGlobalConstantDecl>(D)) {
       if (isModification(AK)) {
-        Info.FFDiag(E, diag::note_constexpr_modify_global);
+        FFDIAG(E, diag::note_constexpr_modify_global)
         return CompleteObject();
       }
       return CompleteObject(LVal.Base, const_cast<APValue *>(&GCD->getValue()),
@@ -4796,7 +4804,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
     // Allow reading from template parameter objects.
     if (auto *TPO = dyn_cast<TemplateParamObjectDecl>(D)) {
       if (isModification(AK)) {
-        Info.FFDiag(E, diag::note_constexpr_modify_global);
+        FFDIAG(E, diag::note_constexpr_modify_global)
         return CompleteObject();
       }
       return CompleteObject(LVal.Base, const_cast<APValue *>(&TPO->getValue()),
@@ -4816,7 +4824,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
         VD = VDef;
     }
     if (!VD || VD->isInvalidDecl()) {
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return CompleteObject();
     }
 
@@ -4841,17 +4849,17 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
         // evaluation.
       } else if (isModification(AK)) {
         // All the remaining cases do not permit modification of the object.
-        Info.FFDiag(E, diag::note_constexpr_modify_global);
+        FFDIAG(E, diag::note_constexpr_modify_global)
         return CompleteObject();
       } else if (VD->isConstexpr()) {
         // OK, we can read this variable.
       } else if (Info.getLangOpts().C23 && ConstexprVar) {
-        Info.FFDiag(E);
+        FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
         return CompleteObject();
       } else if (VD->isCXXForRangeImplicitVar()) {
         if (!IsAccess)
           return CompleteObject(LVal.getLValueBase(), nullptr, BaseType);
-        Info.FFDiag(E, diag::note_constexpr_ltor_for_range_var) << VD;
+        FFDIAG(E, diag::note_constexpr_ltor_for_range_var, << VD)
         return CompleteObject();
       } else if (BaseType->isIntegralOrEnumerationType()) {
         if (!IsConstant) {
@@ -4861,7 +4869,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
             Info.FFDiag(E, diag::note_constexpr_ltor_non_const_int, 1) << VD;
             Info.Note(VD->getLocation(), diag::note_declared_at);
           } else {
-            Info.FFDiag(E);
+            FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
           }
           return CompleteObject();
         }
@@ -4882,7 +4890,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
               << VD << BaseType;
           Info.Note(VD->getLocation(), diag::note_declared_at);
         } else {
-          Info.CCEDiag(E);
+          CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
         }
       } else {
         // Never allow reading a non-const value.
@@ -4893,7 +4901,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
               << VD << BaseType;
           Info.Note(VD->getLocation(), diag::note_declared_at);
         } else {
-          Info.FFDiag(E);
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
         }
         return CompleteObject();
       }
@@ -4919,7 +4927,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
   } else if (DynamicAllocLValue DA = LVal.Base.dyn_cast<DynamicAllocLValue>()) {
     std::optional<DynAlloc *> Alloc = Info.lookupDynamicAlloc(DA);
     if (!Alloc) {
-      Info.FFDiag(E, diag::note_constexpr_access_deleted_object) << AK;
+      FFDIAG(E, diag::note_constexpr_access_deleted_object, << AK)
       return CompleteObject();
     }
     return CompleteObject(LVal.Base, &(*Alloc)->Value,
@@ -4990,7 +4998,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
         if (QualType CLETy = CLE->getType(); CLETy->isArrayType() &&
                                              !LValType->isArrayType() &&
                                              !CLETy.isConstant(Info.Ctx)) {
-          Info.FFDiag(E);
+          FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
           Info.Note(CLE->getExprLoc(), diag::note_declared_at);
           return CompleteObject();
         }
@@ -5001,10 +5009,10 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
           return CompleteObject(LVal.getLValueBase(), nullptr, BaseType);
         APValue Val;
         LVal.moveInto(Val);
-        Info.FFDiag(E, diag::note_constexpr_access_unreadable_object)
-            << AK
-            << Val.getAsString(Info.Ctx,
-                               Info.Ctx.getLValueReferenceType(LValType));
+        FFDIAG(E, diag::note_constexpr_access_unreadable_object,
+               << AK
+               << Val.getAsString(Info.Ctx,
+                                  Info.Ctx.getLValueReferenceType(LValType)))
         NoteLValueLocation(Info, LVal.Base);
         return CompleteObject();
       }
@@ -5070,14 +5078,15 @@ handleLValueToRValueConversion(EvalInfo &Info, const Expr *Conv, QualType Type,
         // Fail for now for LValue to RValue conversion of an array.
         // (This shouldn't show up in C/C++, but it could be triggered by a
         // weird EvaluateAsRValue call from a tool.)
-        Info.FFDiag(Conv);
+        FFDIAG(Conv, diag::note_invalid_subexpr_in_const_expr)
         return false;
       }
       if (LVal.Designator.isOnePastTheEnd()) {
-        if (Info.getLangOpts().CPlusPlus11)
-          Info.FFDiag(Conv, diag::note_constexpr_access_past_end) << AK;
-        else
-          Info.FFDiag(Conv);
+        if (Info.getLangOpts().CPlusPlus11) {
+          FFDIAG(Conv, diag::note_constexpr_access_past_end, << AK)
+        } else {
+          FFDIAG(Conv, diag::note_invalid_subexpr_in_const_expr)
+        }
         return false;
       }
       uint64_t CharIndex = LVal.Designator.Entries[0].getAsArrayIndex();
@@ -5121,7 +5130,7 @@ static bool handleAssignment(EvalInfo &Info, const Expr *E, const LValue &LVal,
     return false;
 
   if (!Info.getLangOpts().CPlusPlus14) {
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -5144,7 +5153,7 @@ struct CompoundAssignSubobjectHandler {
   bool checkConst(QualType QT) {
     // Assigning to a const object has undefined behavior.
     if (QT.isConstQualified()) {
-      Info.FFDiag(E, diag::note_constexpr_modify_const_type) << QT;
+      FFDIAG(E, diag::note_constexpr_modify_const_type, << QT)
       return false;
     }
     return true;
@@ -5160,21 +5169,21 @@ struct CompoundAssignSubobjectHandler {
     case APValue::ComplexInt:
     case APValue::ComplexFloat:
       // FIXME: Implement complex compound assignment.
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     case APValue::LValue:
       return foundPointer(Subobj, SubobjType);
     case APValue::Vector:
       return foundVector(Subobj, SubobjType);
     case APValue::Indeterminate:
-      Info.FFDiag(E, diag::note_constexpr_access_uninit)
-          << /*read of=*/0 << /*uninitialized object=*/1
-          << E->getLHS()->getSourceRange();
+      FFDIAG(E, diag::note_constexpr_access_uninit,
+             << /*read of=*/0 << /*uninitialized object=*/1
+             << E->getLHS()->getSourceRange())
       NoteLValueLocation(Info, Base);
       return false;
     default:
       // FIXME: can this happen?
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
   }
@@ -5184,7 +5193,7 @@ struct CompoundAssignSubobjectHandler {
       return false;
 
     if (!SubobjType->isVectorType()) {
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
     return handleVectorVectorBinOp(Info, E, Opcode, Value, RHS);
@@ -5197,7 +5206,7 @@ struct CompoundAssignSubobjectHandler {
     if (!SubobjType->isIntegerType()) {
       // We don't support compound assignment on integer-cast-to-pointer
       // values.
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
 
@@ -5219,7 +5228,7 @@ struct CompoundAssignSubobjectHandler {
                                   Value);
     }
 
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
   bool found(APFloat &Value, QualType SubobjType) {
@@ -5239,7 +5248,7 @@ struct CompoundAssignSubobjectHandler {
 
     if (PointeeType.isNull() || !RHS.isInt() ||
         (Opcode != BO_Add && Opcode != BO_Sub)) {
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
 
@@ -5270,7 +5279,7 @@ static bool handleCompoundAssignment(EvalInfo &Info,
     return false;
 
   if (!Info.getLangOpts().CPlusPlus14) {
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -5292,7 +5301,7 @@ struct IncDecSubobjectHandler {
   bool checkConst(QualType QT) {
     // Assigning to a const object has undefined behavior.
     if (QT.isConstQualified()) {
-      Info.FFDiag(E, diag::note_constexpr_modify_const_type) << QT;
+      FFDIAG(E, diag::note_constexpr_modify_const_type, << QT)
       return false;
     }
     return true;
@@ -5324,7 +5333,7 @@ struct IncDecSubobjectHandler {
       return foundPointer(Subobj, SubobjType);
     default:
       // FIXME: can this happen?
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
   }
@@ -5335,7 +5344,7 @@ struct IncDecSubobjectHandler {
     if (!SubobjType->isIntegerType()) {
       // We don't support increment / decrement on integer-cast-to-pointer
       // values.
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
 
@@ -5396,7 +5405,7 @@ struct IncDecSubobjectHandler {
     if (const PointerType *PT = SubobjType->getAs<PointerType>())
       PointeeType = PT->getPointeeType();
     else {
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
 
@@ -5418,7 +5427,7 @@ static bool handleIncDec(EvalInfo &Info, const Expr *E, const LValue &LVal,
     return false;
 
   if (!Info.getLangOpts().CPlusPlus14) {
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -5443,7 +5452,7 @@ static bool EvaluateObjectArgument(EvalInfo &Info, const Expr *Object,
   if (Object->getType()->isRecordType() && Object->isPRValue())
     return EvaluateTemporary(Object, This, Info);
 
-  Info.FFDiag(Object, diag::note_constexpr_nonliteral) << Object->getType();
+  FFDIAG(Object, diag::note_constexpr_nonliteral, << Object->getType())
   return false;
 }
 
@@ -5471,7 +5480,7 @@ static const ValueDecl *HandleMemberPointerAccess(EvalInfo &Info,
   // member value, the behavior is undefined.
   if (!MemPtr.getDecl()) {
     // FIXME: Specific diagnostic.
-    Info.FFDiag(RHS);
+    FFDIAG(RHS, diag::note_invalid_subexpr_in_const_expr)
     return nullptr;
   }
 
@@ -5484,7 +5493,7 @@ static const ValueDecl *HandleMemberPointerAccess(EvalInfo &Info,
     //   not contain the member to which E2 refers, the behavior is undefined.
     if (LV.Designator.MostDerivedPathLength + MemPtr.Path.size() >
         LV.Designator.Entries.size()) {
-      Info.FFDiag(RHS);
+      FFDIAG(RHS, diag::note_invalid_subexpr_in_const_expr)
       return nullptr;
     }
     unsigned PathLengthToMember =
@@ -5494,7 +5503,7 @@ static const ValueDecl *HandleMemberPointerAccess(EvalInfo &Info,
           LV.Designator.Entries[PathLengthToMember + I]);
       const CXXRecordDecl *MPDecl = MemPtr.Path[I];
       if (LVDecl->getCanonicalDecl() != MPDecl->getCanonicalDecl()) {
-        Info.FFDiag(RHS);
+        FFDIAG(RHS, diag::note_invalid_subexpr_in_const_expr)
         return nullptr;
       }
     }
@@ -5513,7 +5522,7 @@ static const ValueDecl *HandleMemberPointerAccess(EvalInfo &Info,
             : LV.Designator.MostDerivedType->getAsCXXRecordDecl();
     const CXXRecordDecl *LastMPDecl = MemPtr.getContainingRecord();
     if (LastLVDecl->getCanonicalDecl() != LastMPDecl->getCanonicalDecl()) {
-      Info.FFDiag(RHS);
+      FFDIAG(RHS, diag::note_invalid_subexpr_in_const_expr)
       return nullptr;
     }
 
@@ -5594,8 +5603,8 @@ static bool HandleBaseToDerivedCast(EvalInfo &Info, const CastExpr *E,
   auto InvalidCast = [&]() {
     if (!Info.checkingPotentialConstantExpression() ||
         !Result.AllowConstexprUnknown) {
-      Info.CCEDiag(E, diag::note_constexpr_invalid_downcast)
-          << D.MostDerivedType << TargetQT;
+      CCEDIAG(E, diag::note_constexpr_invalid_downcast,
+              << D.MostDerivedType << TargetQT)
     }
     return false;
   };
@@ -5723,7 +5732,7 @@ static bool EvaluateInitForDeclOfReferenceType(EvalInfo &Info,
   // does not point to an object, a reference in a well-defined program cannot
   // refer to such things;
   if (!Result.Designator.Invalid && Result.Designator.isOnePastTheEnd()) {
-    Info.FFDiag(Init, diag::note_constexpr_access_past_end) << AK_Dereference;
+    FFDIAG(Init, diag::note_constexpr_access_past_end, << AK_Dereference)
     return false;
   }
 
@@ -5984,8 +5993,7 @@ static EvalStmtResult EvaluateSwitch(StmtResult &Result, EvalInfo &Info,
   case ESR_CaseNotFound:
     // This can only happen if the switch case is nested within a statement
     // expression. We have no intention of supporting that.
-    Info.FFDiag(Found->getBeginLoc(),
-                diag::note_constexpr_stmt_expr_unsupported);
+    FFDIAG(Found->getBeginLoc(), diag::note_constexpr_stmt_expr_unsupported)
     return ESR_Failed;
   }
   llvm_unreachable("Invalid EvalStmtResult!");
@@ -5998,8 +6006,8 @@ static bool CheckLocalVariableDeclaration(EvalInfo &Info, const VarDecl *VD) {
   // unless that variable is usable in constant expressions.
   if (VD->isLocalVarDecl() && VD->isStaticLocal() &&
       !VD->isUsableInConstantExpressions(Info.Ctx)) {
-    Info.CCEDiag(VD->getLocation(), diag::note_constexpr_static_local)
-        << (VD->getTSCSpec() == TSCS_unspecified ? 0 : 1) << VD;
+    CCEDIAG(VD->getLocation(), diag::note_constexpr_static_local,
+            << (VD->getTSCSpec() == TSCS_unspecified ? 0 : 1) << VD)
     return false;
   }
   return true;
@@ -6155,7 +6163,8 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       return ESR_Succeeded;
     }
 
-    Info.FFDiag(S->getBeginLoc()) << S->getSourceRange();
+    FFDIAG(S->getBeginLoc(), diag::note_invalid_subexpr_in_const_expr,
+           << S->getSourceRange())
     return ESR_Failed;
 
   case Stmt::NullStmtClass:
@@ -6491,9 +6500,9 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       // May be null if the named loop is outside of the
       // current evaluation context, i.e. not a valid target.
       if (!LoopOrSwitch) {
-        Info.FFDiag(S->getBeginLoc(),
-                    diag::note_break_continue_label_outside_context)
-            << isa<ContinueStmt>(B);
+        FFDIAG(S->getBeginLoc(),
+               diag::note_break_continue_label_outside_context,
+               << isa<ContinueStmt>(B))
         return ESR_Failed;
       }
     }
@@ -6530,8 +6539,8 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
         if (!EvaluateAsBooleanCondition(Assumption, Value, Info))
           return ESR_Failed;
         if (!Value) {
-          Info.CCEDiag(Assumption->getExprLoc(),
-                       diag::note_constexpr_assumption_failed);
+          CCEDIAG(Assumption->getExprLoc(),
+                  diag::note_constexpr_assumption_failed)
           return ESR_Failed;
         }
       }
@@ -6570,7 +6579,7 @@ static bool CheckTrivialDefaultConstructor(EvalInfo &Info, SourceLocation Loc,
         << /*IsConstexpr*/0 << /*IsConstructor*/1 << CD;
       Info.Note(CD->getLocation(), diag::note_declared_at);
     } else {
-      Info.CCEDiag(Loc, diag::note_invalid_subexpr_in_const_expr);
+      CCEDIAG(Loc, diag::note_invalid_subexpr_in_const_expr)
     }
   }
   return true;
@@ -6592,7 +6601,7 @@ static bool CheckConstexprFunction(EvalInfo &Info, SourceLocation CallLoc,
   // have produced a relevant diagnostic while parsing it, so just
   // note the problematic sub-expression.
   if (Declaration->isInvalidDecl()) {
-    Info.FFDiag(CallLoc, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(CallLoc, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -6601,10 +6610,10 @@ static bool CheckConstexprFunction(EvalInfo &Info, SourceLocation CallLoc,
   // call.
   if (!Info.Ctx.getLangOpts().CPlusPlus20 && isa<CXXMethodDecl>(Declaration) &&
       cast<CXXMethodDecl>(Declaration)->isVirtual())
-    Info.CCEDiag(CallLoc, diag::note_constexpr_virtual_call);
+    CCEDIAG(CallLoc, diag::note_constexpr_virtual_call)
 
   if (Definition && Definition->isInvalidDecl()) {
-    Info.FFDiag(CallLoc, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(CallLoc, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -6624,7 +6633,7 @@ static bool CheckConstexprFunction(EvalInfo &Info, SourceLocation CallLoc,
     bool AssertFailed =
         Name == "__assert_rtn" || Name == "__assert_fail" || Name == "_wassert";
     if (AssertFailed) {
-      Info.FFDiag(CallLoc, diag::note_constexpr_assert_failed);
+      FFDIAG(CallLoc, diag::note_constexpr_assert_failed)
       return false;
     }
   }
@@ -6650,7 +6659,7 @@ static bool CheckConstexprFunction(EvalInfo &Info, SourceLocation CallLoc,
         << DiagDecl->isConstexpr() << (bool)CD << DiagDecl;
     Info.Note(DiagDecl->getLocation(), diag::note_declared_at);
   } else {
-    Info.FFDiag(CallLoc, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(CallLoc, diag::note_invalid_subexpr_in_const_expr)
   }
   return false;
 }
@@ -6686,10 +6695,11 @@ static bool checkDynamicType(EvalInfo &Info, const Expr *E, const LValue &This,
     // are. We can still check for a one-past-the-end lvalue.
     if (This.Designator.isOnePastTheEnd() ||
         This.Designator.isMostDerivedAnUnsizedArray()) {
-      Info.FFDiag(E, This.Designator.isOnePastTheEnd()
-                         ? diag::note_constexpr_access_past_end
-                         : diag::note_constexpr_access_unsized_array)
-          << AK;
+      FFDIAG(E,
+             This.Designator.isOnePastTheEnd()
+                 ? diag::note_constexpr_access_past_end
+                 : diag::note_constexpr_access_unsized_array,
+             << AK)
       return false;
     } else if (Polymorphic) {
       // Conservatively refuse to perform a polymorphic operation if we would
@@ -6700,8 +6710,8 @@ static bool checkDynamicType(EvalInfo &Info, const Expr *E, const LValue &This,
         This.moveInto(Val);
         QualType StarThisType =
             Info.Ctx.getLValueReferenceType(This.Designator.getType(Info.Ctx));
-        Info.FFDiag(E, diag::note_constexpr_polymorphic_unknown_dynamic_type)
-            << AK << Val.getAsString(Info.Ctx, StarThisType);
+        FFDIAG(E, diag::note_constexpr_polymorphic_unknown_dynamic_type,
+               << AK << Val.getAsString(Info.Ctx, StarThisType))
       }
       return false;
     }
@@ -6760,7 +6770,7 @@ static std::optional<DynamicType> ComputeDynamicType(EvalInfo &Info,
   const CXXRecordDecl *Class =
       This.Designator.MostDerivedType->getAsCXXRecordDecl();
   if (!Class || (!Info.getLangOpts().CPlusPlus26 && Class->getNumVBases())) {
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return std::nullopt;
   }
 
@@ -6793,7 +6803,7 @@ static std::optional<DynamicType> ComputeDynamicType(EvalInfo &Info,
   // CWG issue 1517: we're constructing a base class of the object described by
   // 'This', so that object has not yet begun its period of construction and
   // any polymorphic operation on it results in undefined behavior.
-  Info.FFDiag(E);
+  FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
   return std::nullopt;
 }
 
@@ -6964,10 +6974,10 @@ static bool HandleDynamicCast(EvalInfo &Info, const ExplicitCastExpr *E,
       assert(Paths->front().Access != AS_public && "why did the cast fail?");
       DiagKind = 3;
     }
-    Info.FFDiag(E, diag::note_constexpr_dynamic_cast_to_reference_failed)
-        << DiagKind << Ptr.Designator.getType(Info.Ctx)
-        << Info.Ctx.getCanonicalTagType(DynType->Type)
-        << E->getType().getUnqualifiedType();
+    FFDIAG(E, diag::note_constexpr_dynamic_cast_to_reference_failed,
+           << DiagKind << Ptr.Designator.getType(Info.Ctx)
+           << Info.Ctx.getCanonicalTagType(DynType->Type)
+           << E->getType().getUnqualifiedType())
     return false;
   };
 
@@ -7036,8 +7046,7 @@ struct StartLifetimeOfUnionMemberHandler {
       // We're currently in the process of initializing a different union
       // member.  If we carried on, that initialization would attempt to
       // store to an inactive union member, resulting in undefined behavior.
-      Info.FFDiag(LHSExpr,
-                  diag::note_constexpr_union_member_change_during_init);
+      FFDIAG(LHSExpr, diag::note_constexpr_union_member_change_during_init)
       return false;
     }
     APValue Result;
@@ -7181,7 +7190,7 @@ static bool EvaluateCallArg(const ParmVarDecl *PVD, const Expr *Arg,
   // Passing a null pointer to an __attribute__((nonnull)) parameter results in
   // undefined behavior, so is non-constant.
   if (NonNull && V.isLValue() && V.isNullPointer()) {
-    Info.CCEDiag(Arg, diag::note_non_null_attribute_failed);
+    CCEDIAG(Arg, diag::note_non_null_attribute_failed)
     return false;
   }
 
@@ -7241,7 +7250,7 @@ static bool handleTrivialCopy(EvalInfo &Info, const ParmVarDecl *Param,
   CallStackFrame *Frame = Info.CurrentCall;
   APValue *RefValue = Info.getParamSlot(Frame->Arguments, Param);
   if (!RefValue) {
-    Info.FFDiag(E);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -7343,7 +7352,7 @@ static bool HandleFunctionCall(SourceLocation CallLoc,
   if (ESR == ESR_Succeeded) {
     if (Callee->getReturnType()->isVoidType())
       return true;
-    Info.FFDiag(Callee->getEndLoc(), diag::note_constexpr_no_return);
+    FFDIAG(Callee->getEndLoc(), diag::note_constexpr_no_return)
   }
   return ESR == ESR_Returned;
 }
@@ -7382,7 +7391,7 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
 
   const CXXRecordDecl *RD = Definition->getParent();
   if (!Info.getLangOpts().CPlusPlus26 && RD->getNumVBases()) {
-    Info.FFDiag(CallLoc, diag::note_constexpr_virtual_base) << RD;
+    FFDIAG(CallLoc, diag::note_constexpr_virtual_base, << RD)
     return false;
   }
 
@@ -7612,9 +7621,9 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
   if (Value.isAbsent() && !T->isNullPtrType()) {
     APValue Printable;
     This.moveInto(Printable);
-    Info.FFDiag(CallRange.getBegin(),
-                diag::note_constexpr_destroy_out_of_lifetime)
-        << Printable.getAsString(Info.Ctx, Info.Ctx.getLValueReferenceType(T));
+    FFDIAG(
+        CallRange.getBegin(), diag::note_constexpr_destroy_out_of_lifetime,
+        << Printable.getAsString(Info.Ctx, Info.Ctx.getLValueReferenceType(T)))
     return false;
   }
 
@@ -7658,9 +7667,8 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
   const CXXRecordDecl *RD = T->getAsCXXRecordDecl();
   if (!RD) {
     if (T.isDestructedType()) {
-      Info.FFDiag(CallRange.getBegin(),
-                  diag::note_constexpr_unsupported_destruction)
-          << T;
+      FFDIAG(CallRange.getBegin(), diag::note_constexpr_unsupported_destruction,
+             << T)
       return false;
     }
 
@@ -7669,7 +7677,7 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
   }
 
   if (!Info.getLangOpts().CPlusPlus26 && RD->getNumVBases()) {
-    Info.FFDiag(CallRange.getBegin(), diag::note_constexpr_virtual_base) << RD;
+    FFDIAG(CallRange.getBegin(), diag::note_constexpr_virtual_base, << RD)
     return false;
   }
 
@@ -7683,7 +7691,7 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
 
   const CXXDestructorDecl *DD = RD->getDestructor();
   if (!DD && !RD->hasTrivialDestructor()) {
-    Info.FFDiag(CallRange.getBegin());
+    FFDIAG(CallRange.getBegin(), diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -7725,7 +7733,7 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
     // (Note that formally the lifetime ends when the period of destruction
     // begins, even though certain uses of the object remain valid until the
     // period of destruction ends.)
-    Info.FFDiag(CallRange.getBegin(), diag::note_constexpr_double_destroy);
+    FFDIAG(CallRange.getBegin(), diag::note_constexpr_double_destroy)
     return false;
   }
 
@@ -7823,11 +7831,11 @@ struct DestroyObjectHandler {
                                  SubobjType);
   }
   bool found(APSInt &Value, QualType SubobjType) {
-    Info.FFDiag(E, diag::note_constexpr_destroy_complex_elem);
+    FFDIAG(E, diag::note_constexpr_destroy_complex_elem)
     return false;
   }
   bool found(APFloat &Value, QualType SubobjType) {
-    Info.FFDiag(E, diag::note_constexpr_destroy_complex_elem);
+    FFDIAG(E, diag::note_constexpr_destroy_complex_elem)
     return false;
   }
 };
@@ -7866,17 +7874,16 @@ static bool HandleOperatorNewCall(EvalInfo &Info, const CallExpr *E,
   // This is permitted only within a call to std::allocator<T>::allocate.
   auto Caller = Info.getStdAllocatorCaller("allocate");
   if (!Caller) {
-    Info.FFDiag(E->getExprLoc(), Info.getLangOpts().CPlusPlus20
-                                     ? diag::note_constexpr_new_untyped
-                                     : diag::note_constexpr_new);
+    FFDIAG(E->getExprLoc(), Info.getLangOpts().CPlusPlus20
+                                ? diag::note_constexpr_new_untyped
+                                : diag::note_constexpr_new)
     return false;
   }
 
   QualType ElemType = Caller.ElemType;
   if (ElemType->isIncompleteType() || ElemType->isFunctionType()) {
-    Info.FFDiag(E->getExprLoc(),
-                diag::note_constexpr_new_not_complete_object_type)
-        << (ElemType->isIncompleteType() ? 0 : 1) << ElemType;
+    FFDIAG(E->getExprLoc(), diag::note_constexpr_new_not_complete_object_type,
+           << (ElemType->isIncompleteType() ? 0 : 1) << ElemType)
     return false;
   }
 
@@ -7897,8 +7904,8 @@ static bool HandleOperatorNewCall(EvalInfo &Info, const CallExpr *E,
   APInt::udivrem(ByteSize, ElemSizeAP, Size, Remainder);
   if (Remainder != 0) {
     // This likely indicates a bug in the implementation of 'std::allocator'.
-    Info.FFDiag(E->getExprLoc(), diag::note_constexpr_operator_new_bad_size)
-        << ByteSize << APSInt(ElemSizeAP, true) << ElemType;
+    FFDIAG(E->getExprLoc(), diag::note_constexpr_operator_new_bad_size,
+           << ByteSize << APSInt(ElemSizeAP, true) << ElemType)
     return false;
   }
 
@@ -7947,8 +7954,7 @@ static std::optional<DynAlloc *> CheckDeleteKind(EvalInfo &Info, const Expr *E,
 
   DynamicAllocLValue DA = Pointer.Base.dyn_cast<DynamicAllocLValue>();
   if (!DA) {
-    Info.FFDiag(E, diag::note_constexpr_delete_not_heap_alloc)
-        << PointerAsString();
+    FFDIAG(E, diag::note_constexpr_delete_not_heap_alloc, << PointerAsString())
     if (Pointer.Base)
       NoteLValueLocation(Info, Pointer.Base);
     return std::nullopt;
@@ -7956,14 +7962,14 @@ static std::optional<DynAlloc *> CheckDeleteKind(EvalInfo &Info, const Expr *E,
 
   std::optional<DynAlloc *> Alloc = Info.lookupDynamicAlloc(DA);
   if (!Alloc) {
-    Info.FFDiag(E, diag::note_constexpr_double_delete);
+    FFDIAG(E, diag::note_constexpr_double_delete)
     return std::nullopt;
   }
 
   if (DeallocKind != (*Alloc)->getKind()) {
     QualType AllocType = Pointer.Base.getDynamicAllocType();
-    Info.FFDiag(E, diag::note_constexpr_new_delete_mismatch)
-        << DeallocKind << (*Alloc)->getKind() << AllocType;
+    FFDIAG(E, diag::note_constexpr_new_delete_mismatch,
+           << DeallocKind << (*Alloc)->getKind() << AllocType)
     NoteLValueLocation(Info, Pointer.Base);
     return std::nullopt;
   }
@@ -7977,8 +7983,8 @@ static std::optional<DynAlloc *> CheckDeleteKind(EvalInfo &Info, const Expr *E,
                 Pointer.Designator.Entries[0].getAsArrayIndex() != 0;
   }
   if (Subobject) {
-    Info.FFDiag(E, diag::note_constexpr_delete_subobject)
-        << PointerAsString() << Pointer.Designator.isOnePastTheEnd();
+    FFDIAG(E, diag::note_constexpr_delete_subobject,
+           << PointerAsString() << Pointer.Designator.isOnePastTheEnd())
     return std::nullopt;
   }
 
@@ -7993,7 +7999,7 @@ static bool HandleOperatorDeleteCall(EvalInfo &Info, const CallExpr *E) {
 
   // This is permitted only within a call to std::allocator<T>::deallocate.
   if (!Info.getStdAllocatorCaller("deallocate")) {
-    Info.FFDiag(E->getExprLoc());
+    FFDIAG(E->getExprLoc(), diag::note_invalid_subexpr_in_const_expr)
     return true;
   }
 
@@ -8009,7 +8015,7 @@ static bool HandleOperatorDeleteCall(EvalInfo &Info, const CallExpr *E) {
   // Deleting a null pointer would have no effect, but it's not permitted by
   // std::allocator<T>::deallocate's contract.
   if (Pointer.isNullPointer()) {
-    Info.CCEDiag(E->getExprLoc(), diag::note_constexpr_deallocate_null);
+    CCEDIAG(E->getExprLoc(), diag::note_constexpr_deallocate_null)
     return true;
   }
 
@@ -8126,9 +8132,8 @@ class APValueToBufferConverter {
     case APValue::MemberPointer:
     case APValue::AddrLabelDiff:
     case APValue::Reflection: {
-      Info.FFDiag(BCE->getBeginLoc(),
-                  diag::note_constexpr_bit_cast_unsupported_type)
-          << Ty;
+      FFDIAG(BCE->getBeginLoc(), diag::note_constexpr_bit_cast_unsupported_type,
+             << Ty)
       return false;
     }
     }
@@ -8162,8 +8167,8 @@ class APValueToBufferConverter {
     unsigned FieldIdx = 0;
     for (FieldDecl *FD : RD->fields()) {
       if (FD->isBitField()) {
-        Info.FFDiag(BCE->getBeginLoc(),
-                    diag::note_constexpr_bit_cast_unsupported_bitfield);
+        FFDIAG(BCE->getBeginLoc(),
+               diag::note_constexpr_bit_cast_unsupported_bitfield)
         return false;
       }
 
@@ -8320,16 +8325,15 @@ class BufferToAPValueConverter {
   // with an invalid type, so anything left is a deficiency on our part (FIXME).
   // Ideally this will be unreachable.
   std::nullopt_t unsupportedType(QualType Ty) {
-    Info.FFDiag(BCE->getBeginLoc(),
-                diag::note_constexpr_bit_cast_unsupported_type)
-        << Ty;
+    FFDIAG(BCE->getBeginLoc(), diag::note_constexpr_bit_cast_unsupported_type,
+           << Ty)
     return std::nullopt;
   }
 
   std::nullopt_t unrepresentableValue(QualType Ty, const APSInt &Val) {
-    Info.FFDiag(BCE->getBeginLoc(),
-                diag::note_constexpr_bit_cast_unrepresentable_value)
-        << Ty << toString(Val, /*Radix=*/10);
+    FFDIAG(BCE->getBeginLoc(),
+           diag::note_constexpr_bit_cast_unrepresentable_value,
+           << Ty << toString(Val, /*Radix=*/10))
     return std::nullopt;
   }
 
@@ -8367,9 +8371,8 @@ class BufferToAPValueConverter {
                          T->isSpecificBuiltinType(BuiltinType::Char_U));
       if (!IsStdByte && !IsUChar) {
         QualType DisplayType(EnumSugar ? (const Type *)EnumSugar : T, 0);
-        Info.FFDiag(BCE->getExprLoc(),
-                    diag::note_constexpr_bit_cast_indet_dest)
-            << DisplayType << Info.Ctx.getLangOpts().CharIsSigned;
+        FFDIAG(BCE->getExprLoc(), diag::note_constexpr_bit_cast_indet_dest,
+               << DisplayType << Info.Ctx.getLangOpts().CharIsSigned)
         return std::nullopt;
       }
 
@@ -8434,8 +8437,8 @@ class BufferToAPValueConverter {
       // FIXME: We don't currently support bit-fields. A lot of the logic for
       // this is in CodeGen, so we need to factor it around.
       if (FD->isBitField()) {
-        Info.FFDiag(BCE->getBeginLoc(),
-                    diag::note_constexpr_bit_cast_unsupported_bitfield);
+        FFDIAG(BCE->getBeginLoc(),
+               diag::note_constexpr_bit_cast_unsupported_bitfield)
         return std::nullopt;
       }
 
@@ -8807,7 +8810,7 @@ public:
   /// Report an evaluation error. This should only be called when an error is
   /// first discovered. When propagating an error, just return false.
   bool Error(const Expr *E, diag::kind D) {
-    Info.FFDiag(E, D) << E->getSourceRange();
+    FFDIAG(E, D, << E->getSourceRange())
     return false;
   }
   bool Error(const Expr *E) {
@@ -9047,7 +9050,7 @@ public:
         This = &ObjectArg;
       } else if (const auto *PDE = dyn_cast<CXXPseudoDestructorExpr>(Callee)) {
         if (!Info.getLangOpts().CPlusPlus20)
-          Info.CCEDiag(PDE, diag::note_constexpr_pseudo_destructor);
+          CCEDIAG(PDE, diag::note_constexpr_pseudo_destructor)
         return EvaluateObjectArgument(Info, PDE->getBase(), ObjectArg) &&
                HandleDestruction(Info, PDE, ObjectArg, PDE->getDestroyedType());
       } else
@@ -9061,8 +9064,8 @@ public:
       if (!CalleeLV.getLValueOffset().isZero())
         return Error(Callee);
       if (CalleeLV.isNullPointer()) {
-        Info.FFDiag(Callee, diag::note_constexpr_null_callee)
-            << const_cast<Expr *>(Callee);
+        FFDIAG(Callee, diag::note_constexpr_null_callee,
+               << const_cast<Expr *>(Callee))
         return false;
       }
       FD = dyn_cast_or_null<FunctionDecl>(
@@ -9407,8 +9410,8 @@ public:
       if (BI + 1 == BE) {
         const Expr *FinalExpr = dyn_cast<Expr>(*BI);
         if (!FinalExpr) {
-          Info.FFDiag((*BI)->getBeginLoc(),
-                      diag::note_constexpr_stmt_expr_unsupported);
+          FFDIAG((*BI)->getBeginLoc(),
+                 diag::note_constexpr_stmt_expr_unsupported)
           return false;
         }
         return this->Visit(FinalExpr) && Scope.destroy();
@@ -9422,8 +9425,8 @@ public:
         // 'break', or 'continue', it would be nice to propagate that to
         // the outer statement evaluation rather than bailing out.
         if (ESR != ESR_Failed)
-          Info.FFDiag((*BI)->getBeginLoc(),
-                      diag::note_constexpr_stmt_expr_unsupported);
+          FFDIAG((*BI)->getBeginLoc(),
+                 diag::note_constexpr_stmt_expr_unsupported)
         return false;
       }
     }
@@ -9936,9 +9939,9 @@ bool LValueExprEvaluator::VisitCXXTypeidExpr(const CXXTypeidExpr *E) {
       TypeInfo = TypeInfoLValue(E->getExprOperand()->getType().getTypePtr());
   } else {
     if (!Info.Ctx.getLangOpts().CPlusPlus20) {
-      Info.CCEDiag(E, diag::note_constexpr_typeid_polymorphic)
-        << E->getExprOperand()->getType()
-        << E->getExprOperand()->getSourceRange();
+      CCEDIAG(E, diag::note_constexpr_typeid_polymorphic,
+              << E->getExprOperand()->getType()
+              << E->getExprOperand()->getSourceRange())
     }
 
     if (!Visit(E->getExprOperand()))
@@ -10270,10 +10273,11 @@ public:
   }
   bool VisitCXXThisExpr(const CXXThisExpr *E) {
     auto DiagnoseInvalidUseOfThis = [&] {
-      if (Info.getLangOpts().CPlusPlus11)
-        Info.FFDiag(E, diag::note_constexpr_this) << E->isImplicit();
-      else
-        Info.FFDiag(E);
+      if (Info.getLangOpts().CPlusPlus11) {
+        FFDIAG(E, diag::note_constexpr_this, << E->isImplicit())
+      } else {
+        FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+      }
     };
 
     // Can't look at 'this' when checking a potential constant expression.
@@ -10704,14 +10708,14 @@ static bool getAlignmentArgument(const Expr *E, QualType ForType,
   if (!EvaluateInteger(E, Alignment, Info))
     return false;
   if (Alignment < 0 || !Alignment.isPowerOf2()) {
-    Info.FFDiag(E, diag::note_constexpr_invalid_alignment) << Alignment;
+    FFDIAG(E, diag::note_constexpr_invalid_alignment, << Alignment)
     return false;
   }
   unsigned SrcWidth = Info.Ctx.getIntWidth(ForType);
   APSInt MaxValue(APInt::getOneBitSet(SrcWidth, SrcWidth - 1));
   if (APSInt::compareValues(Alignment, MaxValue) > 0) {
-    Info.FFDiag(E, diag::note_constexpr_alignment_too_big)
-        << MaxValue << ForType << Alignment;
+    FFDIAG(E, diag::note_constexpr_alignment_too_big,
+           << MaxValue << ForType << Alignment)
     return false;
   }
   // Ensure both alignment and source value have the same bit width so that we
@@ -10829,8 +10833,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       // Non-null pointers without a base (for example, integer-to-pointer
       // casts such as (void *)32) do not have enough information to perform
       // pointer arithmetic during constant evaluation.
-      Info.FFDiag(E->getArg(0), diag::note_constexpr_alignment_adjust)
-          << Alignment;
+      FFDIAG(E->getArg(0), diag::note_constexpr_alignment_adjust, << Alignment)
       return false;
     }
 
@@ -10859,8 +10862,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       return true;
     }
     // Otherwise, we cannot constant-evaluate the result.
-    Info.FFDiag(E->getArg(0), diag::note_constexpr_alignment_adjust)
-        << Alignment;
+    FFDIAG(E->getArg(0), diag::note_constexpr_alignment_adjust, << Alignment)
     return false;
   }
   case Builtin::BI__builtin_operator_new:
@@ -10871,12 +10873,13 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BIwcschr:
   case Builtin::BImemchr:
   case Builtin::BIwmemchr:
-    if (Info.getLangOpts().CPlusPlus11)
-      Info.CCEDiag(E, diag::note_constexpr_invalid_function)
-          << /*isConstexpr*/ 0 << /*isConstructor*/ 0
-          << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
-    else
-      Info.CCEDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    if (Info.getLangOpts().CPlusPlus11) {
+      CCEDIAG(E, diag::note_constexpr_invalid_function,
+              << /*isConstexpr*/ 0 << /*isConstructor*/ 0
+              << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp))
+    } else {
+      CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+    }
     [[fallthrough]];
   case Builtin::BI__builtin_strchr:
   case Builtin::BI__builtin_wcschr:
@@ -10912,14 +10915,14 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
                CharTy, E->getArg(0)->getType()->getPointeeType()));
     // Pointers to const void may point to objects of incomplete type.
     if (IsRawByte && CharTy->isIncompleteType()) {
-      Info.FFDiag(E, diag::note_constexpr_ltor_incomplete_type) << CharTy;
+      FFDIAG(E, diag::note_constexpr_ltor_incomplete_type, << CharTy)
       return false;
     }
     // Give up on byte-oriented matching against multibyte elements.
     // FIXME: We can compare the bytes in the correct order.
     if (IsRawByte && !isOneByteCharacterType(CharTy)) {
-      Info.FFDiag(E, diag::note_constexpr_memchr_unsupported)
-          << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp) << CharTy;
+      FFDIAG(E, diag::note_constexpr_memchr_unsupported,
+             << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp) << CharTy)
       return false;
     }
     // Figure out what value we're actually looking for (after converting to
@@ -10971,12 +10974,13 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BImemmove:
   case Builtin::BIwmemcpy:
   case Builtin::BIwmemmove:
-    if (Info.getLangOpts().CPlusPlus11)
-      Info.CCEDiag(E, diag::note_constexpr_invalid_function)
-          << /*isConstexpr*/ 0 << /*isConstructor*/ 0
-          << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
-    else
-      Info.CCEDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    if (Info.getLangOpts().CPlusPlus11) {
+      CCEDIAG(E, diag::note_constexpr_invalid_function,
+              << /*isConstexpr*/ 0 << /*isConstructor*/ 0
+              << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp))
+    } else {
+      CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+    }
     [[fallthrough]];
   case Builtin::BI__builtin_memcpy:
   case Builtin::BI__builtin_memmove:
@@ -11016,9 +11020,9 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (!Src.Base || !Dest.Base) {
       APValue Val;
       (!Src.Base ? Src : Dest).moveInto(Val);
-      Info.FFDiag(E, diag::note_constexpr_memcpy_null)
-          << Move << WChar << !!Src.Base
-          << Val.getAsString(Info.Ctx, E->getArg(0)->getType());
+      FFDIAG(E, diag::note_constexpr_memcpy_null,
+             << Move << WChar << !!Src.Base
+             << Val.getAsString(Info.Ctx, E->getArg(0)->getType()))
       return false;
     }
     if (Src.Designator.Invalid || Dest.Designator.Invalid)
@@ -11031,15 +11035,15 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     QualType SrcT = Src.Designator.getType(Info.Ctx);
     if (!Info.Ctx.hasSameUnqualifiedType(T, SrcT)) {
       // FIXME: Consider using our bit_cast implementation to support this.
-      Info.FFDiag(E, diag::note_constexpr_memcpy_type_pun) << Move << SrcT << T;
+      FFDIAG(E, diag::note_constexpr_memcpy_type_pun, << Move << SrcT << T)
       return false;
     }
     if (T->isIncompleteType()) {
-      Info.FFDiag(E, diag::note_constexpr_memcpy_incomplete_type) << Move << T;
+      FFDIAG(E, diag::note_constexpr_memcpy_incomplete_type, << Move << T)
       return false;
     }
     if (!T.isTriviallyCopyableType(Info.Ctx)) {
-      Info.FFDiag(E, diag::note_constexpr_memcpy_nontrivial) << Move << T;
+      FFDIAG(E, diag::note_constexpr_memcpy_nontrivial, << Move << T)
       return false;
     }
 
@@ -11052,9 +11056,9 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       llvm::APInt OrigN = N;
       llvm::APInt::udivrem(OrigN, TSize, N, Remainder);
       if (Remainder) {
-        Info.FFDiag(E, diag::note_constexpr_memcpy_unsupported)
-            << Move << WChar << 0 << T << toString(OrigN, 10, /*Signed*/false)
-            << (unsigned)TSize;
+        FFDIAG(E, diag::note_constexpr_memcpy_unsupported,
+               << Move << WChar << 0 << T
+               << toString(OrigN, 10, /*Signed*/ false) << (unsigned)TSize)
         return false;
       }
     }
@@ -11065,9 +11069,9 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     uint64_t RemainingSrcSize = Src.Designator.validIndexAdjustments().second;
     uint64_t RemainingDestSize = Dest.Designator.validIndexAdjustments().second;
     if (N.ugt(RemainingSrcSize) || N.ugt(RemainingDestSize)) {
-      Info.FFDiag(E, diag::note_constexpr_memcpy_unsupported)
-          << Move << WChar << (N.ugt(RemainingSrcSize) ? 1 : 2) << T
-          << toString(N, 10, /*Signed*/false);
+      FFDIAG(E, diag::note_constexpr_memcpy_unsupported,
+             << Move << WChar << (N.ugt(RemainingSrcSize) ? 1 : 2) << T
+             << toString(N, 10, /*Signed*/ false))
       return false;
     }
     uint64_t NElems = N.getZExtValue();
@@ -11081,7 +11085,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       if (DestOffset >= SrcOffset && DestOffset - SrcOffset < NBytes) {
         // Dest is inside the source region.
         if (!Move) {
-          Info.FFDiag(E, diag::note_constexpr_memcpy_overlap) << WChar;
+          FFDIAG(E, diag::note_constexpr_memcpy_overlap, << WChar)
           return false;
         }
         // For memmove and friends, copy backwards.
@@ -11092,7 +11096,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       } else if (!Move && SrcOffset >= DestOffset &&
                  SrcOffset - DestOffset < NBytes) {
         // Src is inside the destination region for memcpy: invalid.
-        Info.FFDiag(E, diag::note_constexpr_memcpy_overlap) << WChar;
+        FFDIAG(E, diag::note_constexpr_memcpy_overlap, << WChar)
         return false;
       }
     }
@@ -11129,7 +11133,7 @@ static bool EvaluateArrayNewConstructExpr(EvalInfo &Info, LValue &This,
 
 bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
   if (!Info.getLangOpts().CPlusPlus20)
-    Info.CCEDiag(E, diag::note_constexpr_new);
+    CCEDIAG(E, diag::note_constexpr_new)
 
   // We cannot speculatively evaluate a delete expression.
   if (Info.SpeculativeEvaluationDepth)
@@ -11167,21 +11171,21 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
       TargetType = E->getPlacementArg(0)->getType();
       IsPlacement = true;
     } else {
-      Info.FFDiag(E, diag::note_constexpr_new_placement)
-          << /*C++26 feature*/ 1 << E->getSourceRange();
+      FFDIAG(E, diag::note_constexpr_new_placement,
+             << /*C++26 feature*/ 1 << E->getSourceRange())
       return false;
     }
   } else if (E->getNumPlacementArgs() && !HasNothrowArg) {
-    Info.FFDiag(E, diag::note_constexpr_new_placement)
-        << /*Unsupported*/ 0 << E->getSourceRange();
+    FFDIAG(E, diag::note_constexpr_new_placement,
+           << /*Unsupported*/ 0 << E->getSourceRange())
     return false;
   } else if (!OperatorNew
                   ->isUsableAsGlobalAllocationFunctionInConstantEvaluation()) {
     // [expr.const] only permits new-expressions that select a replaceable
     // global allocation function. Check this before evaluating a
     // (std::nothrow) placement argument.
-    Info.FFDiag(E, diag::note_constexpr_new_non_replaceable)
-        << isa<CXXMethodDecl>(OperatorNew) << OperatorNew;
+    FFDIAG(E, diag::note_constexpr_new_non_replaceable,
+           << isa<CXXMethodDecl>(OperatorNew) << OperatorNew)
     return false;
   } else if (HasNothrowArg) {
     LValue Nothrow;
@@ -11215,8 +11219,8 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
       if (IsNothrow)
         return ZeroInitialization(E);
 
-      Info.FFDiag(*ArraySize, diag::note_constexpr_new_negative)
-          << ArrayBound << (*ArraySize)->getSourceRange();
+      FFDIAG(*ArraySize, diag::note_constexpr_new_negative,
+             << ArrayBound << (*ArraySize)->getSourceRange())
       return false;
     }
 
@@ -11253,10 +11257,10 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
         if (IsNothrow)
           return ZeroInitialization(E);
 
-        Info.FFDiag(*ArraySize, diag::note_constexpr_new_too_small)
-            << toString(AllocBound, 10, /*Signed=*/false)
-            << toString(InitBound, 10, /*Signed=*/false)
-            << (*ArraySize)->getSourceRange();
+        FFDIAG(*ArraySize, diag::note_constexpr_new_too_small,
+               << toString(AllocBound, 10, /*Signed=*/false)
+               << toString(InitBound, 10, /*Signed=*/false)
+               << (*ArraySize)->getSourceRange())
         return false;
       }
 
@@ -11294,7 +11298,7 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
       bool failed() { return false; }
       bool checkConst(QualType QT) {
         if (QT.isConstQualified()) {
-          Info.FFDiag(E, diag::note_constexpr_modify_const_type) << QT;
+          FFDIAG(E, diag::note_constexpr_modify_const_type, << QT)
           return false;
         }
         return true;
@@ -11306,19 +11310,19 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
         // FIXME: Reject the cases where [basic.life]p8 would not permit the
         // old name of the object to be used to name the new object.
         if (!Info.Ctx.hasSimilarType(SubobjType, AllocType)) {
-          Info.FFDiag(E, diag::note_constexpr_placement_new_wrong_type)
-              << SubobjType << AllocType;
+          FFDIAG(E, diag::note_constexpr_placement_new_wrong_type,
+                 << SubobjType << AllocType)
           return false;
         }
         Value = &Subobj;
         return true;
       }
       bool found(APSInt &Value, QualType SubobjType) {
-        Info.FFDiag(E, diag::note_constexpr_construct_complex_elem);
+        FFDIAG(E, diag::note_constexpr_construct_complex_elem)
         return false;
       }
       bool found(APFloat &Value, QualType SubobjType) {
-        Info.FFDiag(E, diag::note_constexpr_construct_complex_elem);
+        FFDIAG(E, diag::note_constexpr_construct_complex_elem)
         return false;
       }
     } Handler = {Info, E, AllocType, AK, nullptr};
@@ -11691,7 +11695,7 @@ bool RecordExprEvaluator::ZeroInitialization(const Expr *E, QualType T) {
   if (!Info.getLangOpts().CPlusPlus26) {
     if (const auto *CXXRD = dyn_cast<CXXRecordDecl>(RD);
         CXXRD && CXXRD->getNumVBases()) {
-      Info.FFDiag(E, diag::note_constexpr_virtual_base) << RD;
+      FFDIAG(E, diag::note_constexpr_virtual_base, << RD)
       return false;
     }
   }
@@ -11902,7 +11906,7 @@ bool RecordExprEvaluator::VisitCXXParenListOrInitListExpr(
         if (!CAT->isZeroSize()) {
           // Bail out for now. This might sort of "work", but the rest of the
           // code isn't really prepared to handle it.
-          Info.FFDiag(Init, diag::note_constexpr_unsupported_flexible_array);
+          FFDIAG(Init, diag::note_constexpr_unsupported_flexible_array)
           return false;
         }
       }
@@ -12270,9 +12274,9 @@ bool VectorExprEvaluator::VisitCastExpr(const CastExpr *E) {
     if (!SVal.isInt() && !SVal.isFloat() && !SVal.isVector()) {
       // Give up if the input isn't an int, float, or vector.  For example, we
       // reject "(v4i16)(intptr_t)&a".
-      Info.FFDiag(E, diag::note_constexpr_invalid_cast)
-          << diag::ConstexprInvalidCastKind::ThisConversionOrReinterpret
-          << Info.Ctx.getLangOpts().CPlusPlus;
+      FFDIAG(E, diag::note_constexpr_invalid_cast,
+             << diag::ConstexprInvalidCastKind::ThisConversionOrReinterpret
+             << Info.Ctx.getLangOpts().CPlusPlus)
       return false;
     }
 
@@ -12590,8 +12594,8 @@ static bool handleVectorElementCast(EvalInfo &Info, const FPOptions FPO,
     }
   }
 
-  Info.FFDiag(E, diag::err_convertvector_constexpr_unsupported_vector_cast)
-      << SourceTy << DestTy;
+  FFDIAG(E, diag::err_convertvector_constexpr_unsupported_vector_cast,
+         << SourceTy << DestTy)
   return false;
 }
 
@@ -12726,11 +12730,11 @@ static bool ConvertDoubleToFloatStrict(EvalInfo &Info, const Expr *E,
                                        APFloat OrigVal, APValue &Result) {
 
   if (OrigVal.isInfinity()) {
-    Info.CCEDiag(E, diag::note_constexpr_float_arithmetic) << 0;
+    CCEDIAG(E, diag::note_constexpr_float_arithmetic, << 0)
     return false;
   }
   if (OrigVal.isNaN()) {
-    Info.CCEDiag(E, diag::note_constexpr_float_arithmetic) << 1;
+    CCEDIAG(E, diag::note_constexpr_float_arithmetic, << 1)
     return false;
   }
 
@@ -12740,12 +12744,12 @@ static bool ConvertDoubleToFloatStrict(EvalInfo &Info, const Expr *E,
       APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven, &LosesInfo);
 
   if (LosesInfo || Val.isDenormal()) {
-    Info.CCEDiag(E, diag::note_constexpr_float_arithmetic_strict);
+    CCEDIAG(E, diag::note_constexpr_float_arithmetic_strict)
     return false;
   }
 
   if (Status != APFloat::opOK) {
-    Info.CCEDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -14538,9 +14542,9 @@ bool VectorExprEvaluator::VisitCallExpr(const CallExpr *E) {
       if (!LHS) {
         // Without a fallback, a zero element is undefined
         if (!Fallback) {
-          Info.FFDiag(E, diag::note_constexpr_countzeroes_zero)
-              << /*IsTrailing=*/(BuiltinOp ==
-                                 Builtin::BI__builtin_elementwise_ctzg);
+          FFDIAG(E, diag::note_constexpr_countzeroes_zero,
+                 << /*IsTrailing=*/(BuiltinOp ==
+                                    Builtin::BI__builtin_elementwise_ctzg))
           return false;
         }
         ResultElements.push_back(Fallback->getVectorElt(EltNum));
@@ -15439,7 +15443,7 @@ bool VectorExprEvaluator::VisitCallExpr(const CallExpr *E) {
       APFloat::opStatus St = SrcVal.convert(HalfSem, RM, &LostInfo);
 
       if (UseMXCSR && IsFPConstrained && St != APFloat::opOK) {
-        Info.FFDiag(E, diag::note_constexpr_dynamic_rounding);
+        FFDIAG(E, diag::note_constexpr_dynamic_rounding)
         return false;
       }
 
@@ -15578,9 +15582,8 @@ static bool handleVectorShuffle(EvalInfo &Info, const ShuffleVectorExpr *E,
   // which is prohibited from being a top-level constant value. Emit a
   // diagnostic instead.
   if (index == -1) {
-    Info.FFDiag(
-        E, diag::err_shufflevector_minus_one_is_undefined_behavior_constexpr)
-        << EltNum;
+    FFDIAG(E, diag::err_shufflevector_minus_one_is_undefined_behavior_constexpr,
+           << EltNum)
     return false;
   }
 
@@ -16324,7 +16327,7 @@ public:
     if (Info.ArrayInitIndex == uint64_t(-1)) {
       // We were asked to evaluate this subexpression independent of the
       // enclosing ArrayInitLoopExpr. We can't do that.
-      Info.FFDiag(E);
+      FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
       return false;
     }
     return Success(Info.ArrayInitIndex, E);
@@ -16441,7 +16444,7 @@ static bool EvaluateInteger(const Expr *E, APSInt &Result, EvalInfo &Info) {
   if (!Val.isInt()) {
     // FIXME: It would be better to produce the diagnostic for casting
     //        a pointer to an integer.
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
   Result = Val.getInt();
@@ -17147,7 +17150,7 @@ static bool getBuiltinAlignArguments(const CallExpr *E, EvalInfo &Info,
       return false;
     Ptr.moveInto(Val);
   } else if (!SrcTy->isIntegralOrEnumerationType()) {
-    Info.FFDiag(E->getArg(0));
+    FFDIAG(E->getArg(0), diag::note_invalid_subexpr_in_const_expr)
     return false;
   } else {
     APSInt SrcInt;
@@ -17183,9 +17186,9 @@ static bool EvaluateStdcLoad8(EvalInfo &Info, const CallExpr *E, bool IsBE,
     CharUnits BaseAlignment = getBaseAlignment(Info, Ptr);
     CharUnits PtrAlign = BaseAlignment.alignmentAtOffset(Ptr.Offset);
     if (PtrAlign < RequiredAlign) {
-      Info.FFDiag(E, diag::note_constexpr_load8_unaligned)
-          << Info.Ctx.BuiltinInfo.getQuotedName(E->getBuiltinCallee())
-          << RequiredAlign.getQuantity() << PtrAlign.getQuantity();
+      FFDIAG(E, diag::note_constexpr_load8_unaligned,
+             << Info.Ctx.BuiltinInfo.getQuotedName(E->getBuiltinCallee())
+             << RequiredAlign.getQuantity() << PtrAlign.getQuantity())
       return false;
     }
   }
@@ -17317,8 +17320,8 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (!EvaluateInteger(E->getArg(1), TypeValue, Info))
       return false;
     if (TypeValue < 0 || TypeValue > 3) {
-      Info.FFDiag(E->getArg(1), diag::note_constexpr_builtin_arg_out_of_range)
-          << TypeValue << 0 << 3;
+      FFDIAG(E->getArg(1), diag::note_constexpr_builtin_arg_out_of_range,
+             << TypeValue << 0 << 3)
       return false;
     }
     unsigned Type = TypeValue.getZExtValue();
@@ -17367,8 +17370,8 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
         if (Ptr.Offset.isZero())
           return Success(1, E);
 
-        Info.FFDiag(E->getArg(0), diag::note_constexpr_alignment_compute)
-            << Alignment;
+        FFDIAG(E->getArg(0), diag::note_constexpr_alignment_compute,
+               << Alignment)
         // Reject non-null pointers without an underlying object.
         // Do not interpret the pointer offset as an integer address.
         return false;
@@ -17392,8 +17395,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       // Otherwise we can't infer whether the value is sufficiently aligned.
       // TODO: __builtin_is_aligned(__builtin_align_{down,up{(expr, N), N)
       //  in cases where we can't fully evaluate the pointer.
-      Info.FFDiag(E->getArg(0), diag::note_constexpr_alignment_compute)
-          << Alignment;
+      FFDIAG(E->getArg(0), diag::note_constexpr_alignment_compute, << Alignment)
       return false;
     }
     assert(Src.isInt());
@@ -17565,8 +17567,8 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
                              BuiltinOp != Builtin::BI__lzcnt64;
 
       if (BuiltinOp == Builtin::BI__builtin_elementwise_clzg) {
-        Info.FFDiag(E, diag::note_constexpr_countzeroes_zero)
-            << /*IsTrailing=*/false;
+        FFDIAG(E, diag::note_constexpr_countzeroes_zero,
+               << /*IsTrailing=*/false)
       }
 
       if (ZeroIsUndefined)
@@ -17586,7 +17588,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       // a branch on __builtin_constant_p(expr).
       return Success(false, E);
     }
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -17650,8 +17652,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
         return Success(*Fallback, E);
 
       if (BuiltinOp == Builtin::BI__builtin_elementwise_ctzg) {
-        Info.FFDiag(E, diag::note_constexpr_countzeroes_zero)
-            << /*IsTrailing=*/true;
+        FFDIAG(E, diag::note_constexpr_countzeroes_zero, << /*IsTrailing=*/true)
       }
       return Error(E);
     }
@@ -18230,12 +18231,13 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BIstrlen:
   case Builtin::BIwcslen:
     // A call to strlen is not a constant expression.
-    if (Info.getLangOpts().CPlusPlus11)
-      Info.CCEDiag(E, diag::note_constexpr_invalid_function)
-          << /*isConstexpr*/ 0 << /*isConstructor*/ 0
-          << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
-    else
-      Info.CCEDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    if (Info.getLangOpts().CPlusPlus11) {
+      CCEDIAG(E, diag::note_constexpr_invalid_function,
+              << /*isConstexpr*/ 0 << /*isConstructor*/ 0
+              << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp))
+    } else {
+      CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+    }
     [[fallthrough]];
   case Builtin::BI__builtin_strlen:
   case Builtin::BI__builtin_wcslen: {
@@ -18255,12 +18257,13 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BIbcmp:
   case Builtin::BIwmemcmp:
     // A call to strlen is not a constant expression.
-    if (Info.getLangOpts().CPlusPlus11)
-      Info.CCEDiag(E, diag::note_constexpr_invalid_function)
-          << /*isConstexpr*/ 0 << /*isConstructor*/ 0
-          << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
-    else
-      Info.CCEDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    if (Info.getLangOpts().CPlusPlus11) {
+      CCEDIAG(E, diag::note_constexpr_invalid_function,
+              << /*isConstexpr*/ 0 << /*isConstructor*/ 0
+              << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp))
+    } else {
+      CCEDIAG(E, diag::note_invalid_subexpr_in_const_expr)
+    }
     [[fallthrough]];
   case Builtin::BI__builtin_strcmp:
   case Builtin::BI__builtin_wcscmp:
@@ -18312,9 +18315,9 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (IsRawByte &&
         !(isOneByteCharacterType(CharTy1) && isOneByteCharacterType(CharTy2))) {
       // FIXME: Consider using our bit_cast implementation to support this.
-      Info.FFDiag(E, diag::note_constexpr_memcmp_unsupported)
-          << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp) << CharTy1
-          << CharTy2;
+      FFDIAG(E, diag::note_constexpr_memcmp_unsupported,
+             << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp) << CharTy1
+             << CharTy2)
       return false;
     }
 
@@ -19533,7 +19536,7 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
           E->getType()->isIntegralOrEnumerationType()) &&
          "unsupported binary expression evaluation");
   auto Error = [&](const Expr *E) {
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   };
 
@@ -19633,7 +19636,7 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
         APFloatCmpResult == APFloat::cmpUnordered &&
         E->getFPFeaturesInEffect(Info.Ctx.getLangOpts()).isFPConstrained()) {
       // Note: Compares may raise invalid in some cases involving NaN or sNaN.
-      Info.FFDiag(E, diag::note_constexpr_float_arithmetic_strict);
+      FFDIAG(E, diag::note_constexpr_float_arithmetic_strict)
       return false;
     }
     auto GetCmpRes = [&]() {
@@ -19673,8 +19676,7 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
       auto DiagComparison = [&] (unsigned DiagID, bool Reversed = false) {
         std::string LHS = LHSValue.toString(Info.Ctx, E->getLHS()->getType());
         std::string RHS = RHSValue.toString(Info.Ctx, E->getRHS()->getType());
-        Info.FFDiag(E, DiagID)
-            << (Reversed ? RHS : LHS) << (Reversed ? LHS : RHS);
+        FFDIAG(E, DiagID, << (Reversed ? RHS : LHS) << (Reversed ? LHS : RHS))
         return false;
       };
       // Inequalities and subtractions between unrelated pointers have
@@ -19765,22 +19767,22 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
           Mismatch < RHSDesignator.Entries.size()) {
         const FieldDecl *LF = getAsField(LHSDesignator.Entries[Mismatch]);
         const FieldDecl *RF = getAsField(RHSDesignator.Entries[Mismatch]);
-        if (!LF && !RF)
-          Info.CCEDiag(E, diag::note_constexpr_pointer_comparison_base_classes);
-        else if (!LF)
-          Info.CCEDiag(E, diag::note_constexpr_pointer_comparison_base_field)
-              << getAsBaseClass(LHSDesignator.Entries[Mismatch])
-              << RF->getParent() << RF;
-        else if (!RF)
-          Info.CCEDiag(E, diag::note_constexpr_pointer_comparison_base_field)
-              << getAsBaseClass(RHSDesignator.Entries[Mismatch])
-              << LF->getParent() << LF;
-        else if (!LF->getParent()->isUnion() &&
-                 LF->getAccess() != RF->getAccess())
-          Info.CCEDiag(E,
-                       diag::note_constexpr_pointer_comparison_differing_access)
-              << LF << LF->getAccess() << RF << RF->getAccess()
-              << LF->getParent();
+        if (!LF && !RF) {
+          CCEDIAG(E, diag::note_constexpr_pointer_comparison_base_classes)
+        } else if (!LF) {
+          CCEDIAG(E, diag::note_constexpr_pointer_comparison_base_field,
+                  << getAsBaseClass(LHSDesignator.Entries[Mismatch])
+                  << RF->getParent() << RF)
+        } else if (!RF) {
+          CCEDIAG(E, diag::note_constexpr_pointer_comparison_base_field,
+                  << getAsBaseClass(RHSDesignator.Entries[Mismatch])
+                  << LF->getParent() << LF)
+        } else if (!LF->getParent()->isUnion() &&
+                   LF->getAccess() != RF->getAccess()) {
+          CCEDIAG(E, diag::note_constexpr_pointer_comparison_differing_access,
+                  << LF << LF->getAccess() << RF << RF->getAccess()
+                  << LF->getParent())
+        }
       }
     }
 
@@ -19830,13 +19832,13 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
     // If either operand is a pointer to a weak function, the comparison is not
     // constant.
     if (LHSValue.getDecl() && LHSValue.getDecl()->isWeak()) {
-      Info.FFDiag(E, diag::note_constexpr_mem_pointer_weak_comparison)
-          << LHSValue.getDecl();
+      FFDIAG(E, diag::note_constexpr_mem_pointer_weak_comparison,
+             << LHSValue.getDecl())
       return false;
     }
     if (RHSValue.getDecl() && RHSValue.getDecl()->isWeak()) {
-      Info.FFDiag(E, diag::note_constexpr_mem_pointer_weak_comparison)
-          << RHSValue.getDecl();
+      FFDIAG(E, diag::note_constexpr_mem_pointer_weak_comparison,
+             << RHSValue.getDecl())
       return false;
     }
 
@@ -19852,10 +19854,10 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
     //   result is unspecified.
     if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(LHSValue.getDecl()))
       if (MD->isVirtual())
-        Info.CCEDiag(E, diag::note_constexpr_compare_virtual_mem_ptr) << MD;
+        CCEDIAG(E, diag::note_constexpr_compare_virtual_mem_ptr, << MD)
     if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(RHSValue.getDecl()))
       if (MD->isVirtual())
-        Info.CCEDiag(E, diag::note_constexpr_compare_virtual_mem_ptr) << MD;
+        CCEDIAG(E, diag::note_constexpr_compare_virtual_mem_ptr, << MD)
 
     //   Otherwise they compare equal if and only if they would refer to the
     //   same member of the same most derived object or the same subobject if
@@ -20034,7 +20036,7 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
       auto DiagArith = [&](unsigned DiagID) {
         std::string LHS = LHSValue.toString(Info.Ctx, E->getLHS()->getType());
         std::string RHS = RHSValue.toString(Info.Ctx, E->getRHS()->getType());
-        Info.FFDiag(E, DiagID) << LHS << RHS;
+        FFDIAG(E, DiagID, << LHS << RHS)
         if (LHSExpr && LHSExpr == RHSExpr)
           Info.Note(LHSExpr->getExprLoc(),
                     diag::note_constexpr_repeated_literal_eval)
@@ -20071,7 +20073,7 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
     if (!LHSDesignator.Invalid && !RHSDesignator.Invalid &&
         !AreElementsOfSameArray(getType(LHSValue.Base), LHSDesignator,
                                 RHSDesignator))
-      Info.CCEDiag(E, diag::note_constexpr_pointer_subtraction_not_same_array);
+      CCEDIAG(E, diag::note_constexpr_pointer_subtraction_not_same_array)
 
     QualType Type = E->getLHS()->getType();
     QualType ElementType = Type->castAs<PointerType>()->getPointeeType();
@@ -20084,8 +20086,8 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
     // C, array of zero length). Pointer subtraction in such cases has
     // undefined behavior, so is not constant.
     if (ElementSize.isZero()) {
-      Info.FFDiag(E, diag::note_constexpr_pointer_subtraction_zero_size)
-          << ElementType;
+      FFDIAG(E, diag::note_constexpr_pointer_subtraction_zero_size,
+             << ElementType)
       return false;
     }
 
@@ -20182,8 +20184,8 @@ bool IntExprEvaluator::VisitUnaryExprOrTypeTraitExpr(
 
     assert(Ty->isSizelessVectorType());
     if (Info.InConstantContext)
-      Info.CCEDiag(E, diag::note_constexpr_non_const_vectorelements)
-          << E->getSourceRange();
+      CCEDIAG(E, diag::note_constexpr_non_const_vectorelements,
+              << E->getSourceRange())
 
     return false;
   }
@@ -20209,7 +20211,7 @@ bool IntExprEvaluator::VisitUnaryExprOrTypeTraitExpr(
       // Variable array size expression could be missing (e.g. int a[*][10]) In
       // that case, it can't be a constant expression.
       if (!VAT->getSizeExpr()) {
-        Info.FFDiag(E->getBeginLoc());
+        FFDIAG(E->getBeginLoc(), diag::note_invalid_subexpr_in_const_expr)
         return false;
       }
 
@@ -20227,7 +20229,7 @@ bool IntExprEvaluator::VisitUnaryExprOrTypeTraitExpr(
 
     // Definitely a variable-length type, which is not an ICE.
     // FIXME: Better diagnostic.
-    Info.FFDiag(E->getBeginLoc());
+    FFDIAG(E->getBeginLoc(), diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
   }
@@ -20517,15 +20519,16 @@ bool IntExprEvaluator::VisitCastExpr(const CastExpr *E) {
 
         if (ED->getNumNegativeBits() &&
             (Max.slt(Result.getInt().getSExtValue()) ||
-             Min.sgt(Result.getInt().getSExtValue())))
-          Info.CCEDiag(E, diag::note_constexpr_unscoped_enum_out_of_range)
-              << llvm::toString(Result.getInt(), 10) << Min.getSExtValue()
-              << Max.getSExtValue() << ED;
-        else if (!ED->getNumNegativeBits() &&
-                 Max.ult(Result.getInt().getZExtValue()))
-          Info.CCEDiag(E, diag::note_constexpr_unscoped_enum_out_of_range)
-              << llvm::toString(Result.getInt(), 10) << Min.getZExtValue()
-              << Max.getZExtValue() << ED;
+             Min.sgt(Result.getInt().getSExtValue()))) {
+          CCEDIAG(E, diag::note_constexpr_unscoped_enum_out_of_range,
+                  << llvm::toString(Result.getInt(), 10) << Min.getSExtValue()
+                  << Max.getSExtValue() << ED)
+        } else if (!ED->getNumNegativeBits() &&
+                   Max.ult(Result.getInt().getZExtValue())) {
+          CCEDIAG(E, diag::note_constexpr_unscoped_enum_out_of_range,
+                  << llvm::toString(Result.getInt(), 10) << Min.getZExtValue()
+                  << Max.getZExtValue() << ED)
+        }
       }
     }
 
@@ -20793,7 +20796,7 @@ bool FixedPointExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
   }
   case BO_Div: {
     if (RHSFX.getValue() == 0) {
-      Info.FFDiag(E, diag::note_expr_divide_by_zero);
+      FFDIAG(E, diag::note_expr_divide_by_zero)
       return false;
     }
     Result = LHSFX.div(RHSFX, &OpOverflow)
@@ -20811,11 +20814,12 @@ bool FixedPointExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
     // Embedded-C 4.1.6.2.2:
     //   The right operand must be nonnegative and less than the total number
     //   of (nonpadding) bits of the fixed-point operand ...
-    if (RHSVal.isNegative())
-      Info.CCEDiag(E, diag::note_constexpr_negative_shift) << RHSVal;
-    else if (Amt != RHSVal)
-      Info.CCEDiag(E, diag::note_constexpr_large_shift)
-          << RHSVal << E->getType() << ShiftBW;
+    if (RHSVal.isNegative()) {
+      CCEDIAG(E, diag::note_constexpr_negative_shift, << RHSVal)
+    } else if (Amt != RHSVal) {
+      CCEDIAG(E, diag::note_constexpr_large_shift,
+              << RHSVal << E->getType() << ShiftBW)
+    }
 
     if (E->getOpcode() == BO_Shl)
       Result = LHSFX.shl(Amt, &OpOverflow);
@@ -22051,8 +22055,8 @@ bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
   FunctionDecl *OperatorDelete = E->getOperatorDelete();
   if (!OperatorDelete
            ->isUsableAsGlobalAllocationFunctionInConstantEvaluation()) {
-    Info.FFDiag(E, diag::note_constexpr_new_non_replaceable)
-        << isa<CXXMethodDecl>(OperatorDelete) << OperatorDelete;
+    FFDIAG(E, diag::note_constexpr_new_non_replaceable,
+           << isa<CXXMethodDecl>(OperatorDelete) << OperatorDelete)
     return false;
   }
 
@@ -22070,7 +22074,7 @@ bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
     // the only other way we can succeed is if we find a dynamic allocation,
     // and we will have warned when we allocated it in that case.
     if (!Info.getLangOpts().CPlusPlus20)
-      Info.CCEDiag(E, diag::note_constexpr_new);
+      CCEDIAG(E, diag::note_constexpr_new)
     return true;
   }
 
@@ -22085,8 +22089,8 @@ bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
   // does not have a virtual destructor.
   if (!E->isArrayForm() && Pointer.Designator.Entries.size() != 0 &&
       !hasVirtualDestructor(Arg->getType()->getPointeeType())) {
-    Info.FFDiag(E, diag::note_constexpr_delete_base_nonvirt_dtor)
-        << Arg->getType()->getPointeeType() << AllocType;
+    FFDIAG(E, diag::note_constexpr_delete_base_nonvirt_dtor,
+           << Arg->getType()->getPointeeType() << AllocType)
     return false;
   }
 
@@ -22097,8 +22101,8 @@ bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
     if (VirtualDelete &&
         !VirtualDelete
              ->isUsableAsGlobalAllocationFunctionInConstantEvaluation()) {
-      Info.FFDiag(E, diag::note_constexpr_new_non_replaceable)
-          << isa<CXXMethodDecl>(VirtualDelete) << VirtualDelete;
+      FFDIAG(E, diag::note_constexpr_new_non_replaceable,
+             << isa<CXXMethodDecl>(VirtualDelete) << VirtualDelete)
       return false;
     }
   }
@@ -22112,7 +22116,7 @@ bool VoidExprEvaluator::VisitCXXDeleteExpr(const CXXDeleteExpr *E) {
     // deleted the object.
     // FIXME: This probably results in undefined behavior before we get this
     // far, and should be diagnosed elsewhere first.
-    Info.FFDiag(E, diag::note_constexpr_double_delete);
+    FFDIAG(E, diag::note_constexpr_double_delete)
     return false;
   }
 
@@ -22190,8 +22194,7 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
     Result = Value;
   } else if (T->isVoidType()) {
     if (!Info.getLangOpts().CPlusPlus11)
-      Info.CCEDiag(E, diag::note_constexpr_nonliteral)
-        << E->getType();
+      CCEDIAG(E, diag::note_constexpr_nonliteral, << E->getType())
     if (!EvaluateVoid(E, Info))
       return false;
   } else if (T->isAtomicType()) {
@@ -22208,10 +22211,10 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
         return false;
     }
   } else if (Info.getLangOpts().CPlusPlus11) {
-    Info.FFDiag(E, diag::note_constexpr_nonliteral) << E->getType();
+    FFDIAG(E, diag::note_constexpr_nonliteral, << E->getType())
     return false;
   } else {
-    Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+    FFDIAG(E, diag::note_invalid_subexpr_in_const_expr)
     return false;
   }
 
@@ -23971,12 +23974,12 @@ std::optional<bool> EvaluateBuiltinIsWithinLifetime(IntExprEvaluator &IEE,
       const IdentifierInfo *Identifier = Callee->getIdentifier();
       CalledFromStd = Identifier && Identifier->isStr("is_within_lifetime");
     }
-    Info.CCEDiag(CalledFromStd ? Info.CurrentCall->getCallRange().getBegin()
-                               : E->getExprLoc(),
-                 diag::err_invalid_is_within_lifetime)
-        << (CalledFromStd ? "std::is_within_lifetime"
-                          : "__builtin_is_within_lifetime")
-        << Diag;
+    CCEDIAG(CalledFromStd ? Info.CurrentCall->getCallRange().getBegin()
+                          : E->getExprLoc(),
+            diag::err_invalid_is_within_lifetime,
+            << (CalledFromStd ? "std::is_within_lifetime"
+                              : "__builtin_is_within_lifetime")
+            << Diag)
     return std::nullopt;
   };
   // C++2c [meta.const.eval]p4:
