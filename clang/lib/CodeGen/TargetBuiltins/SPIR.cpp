@@ -64,7 +64,7 @@ Value *CodeGenFunction::EmitSPIRVBuiltinExpr(unsigned BuiltinID,
     Value *eta = EmitScalarExpr(E->getArg(2));
     assert(E->getArg(0)->getType()->hasFloatingRepresentation() &&
            E->getArg(1)->getType()->hasFloatingRepresentation() &&
-           E->getArg(2)->getType()->isFloatingType() &&
+           E->getArg(2)->getType()->isFloatingOrComplexType() &&
            "refract operands must have a float representation");
     return Builder.CreateIntrinsic(
         /*ReturnType=*/I->getType(), Intrinsic::spv_refract,

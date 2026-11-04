@@ -212,7 +212,7 @@ void VerifyEncodingAndBitSize(TypeSystemClang &clang_context,
     EXPECT_TRUE(type_ptr->isUnsignedIntegerType());
     break;
   case eEncodingIEEE754:
-    EXPECT_TRUE(type_ptr->isFloatingType());
+    EXPECT_TRUE(type_ptr->isFloatingOrComplexType());
     break;
   default:
     FAIL() << "Unexpected encoding";

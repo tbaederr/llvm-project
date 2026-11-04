@@ -22541,7 +22541,7 @@ static bool actOnOMPReductionKindClause(
         continue;
       }
       if ((BOK == BO_OrAssign || BOK == BO_AndAssign || BOK == BO_XorAssign) &&
-          !S.getLangOpts().CPlusPlus && Type->isFloatingType()) {
+          !S.getLangOpts().CPlusPlus && Type->isFloatingOrComplexType()) {
         S.Diag(ELoc, diag::err_omp_clause_floating_type_arg)
             << getOpenMPClauseNameForDiag(ClauseKind);
         if (!ASE && !OASE) {
@@ -22674,7 +22674,7 @@ static bool actOnOMPReductionKindClause(
         QualType OrigType = Type;
         if (auto *ComplexTy = OrigType->getAs<ComplexType>())
           Type = ComplexTy->getElementType();
-        if (Type->isRealFloatingType()) {
+        if (Type->isFloatingType()) {
           llvm::APFloat InitValue = llvm::APFloat::getAllOnesValue(
               Context.getFloatTypeSemantics(Type));
           Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
@@ -22718,7 +22718,7 @@ static bool actOnOMPReductionKindClause(
               continue;
             Init = CastExpr.get();
           }
-        } else if (Type->isRealFloatingType()) {
+        } else if (Type->isFloatingType()) {
           llvm::APFloat InitValue = llvm::APFloat::getLargest(
               Context.getFloatTypeSemantics(Type), BOK != BO_LT);
           Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,

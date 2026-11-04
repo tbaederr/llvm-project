@@ -3224,7 +3224,7 @@ Stmt *RewriteModernObjC::SynthMessageExpr(ObjCMessageExpr *Exp,
     QualType resultType = mDecl->getReturnType();
     if (resultType->isRecordType())
       MsgSendStretFlavor = MsgSendStretFunctionDecl;
-    else if (resultType->isRealFloatingType())
+    else if (resultType->isFloatingType())
       MsgSendFlavor = MsgSendFpretFunctionDecl;
   }
 

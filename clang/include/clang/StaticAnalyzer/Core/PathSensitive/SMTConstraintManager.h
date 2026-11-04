@@ -132,7 +132,7 @@ public:
 
     if (const SymbolData *SD = dyn_cast<SymbolData>(Sym)) {
       QualType Ty = Sym->getType();
-      assert(!Ty->isRealFloatingType());
+      assert(!Ty->isFloatingType());
       llvm::APSInt Value(SMTConv::getSMTBitWidth(Ctx, Ty),
                          !Ty->isSignedIntegerOrEnumerationType());
 
@@ -319,7 +319,7 @@ public:
           &TI.getLongDoubleFormat() == &llvm::APFloat::PPCDoubleDouble())))
       return false;
 
-    if (Ty->isRealFloatingType())
+    if (Ty->isFloatingType())
       return Solver->isFPSupported();
 
     if (isa<SymbolData>(Sym))

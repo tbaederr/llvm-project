@@ -362,7 +362,8 @@ ABIArgInfo MipsABIInfo::classifyComplexReturnType(QualType RetTy,
   // `_Complex long long` is returned in 2 GPRs. For older ABI versions all
   // `_Complex {integer}` types are returned in 2 GPRs.
   uint64_t RegisterWidth = MinABIStackAlignInBytes * 8;
-  if (!isComplexGnuABI() || RetTy->isFloatingType() || Size > RegisterWidth)
+  if (!isComplexGnuABI() || RetTy->isFloatingOrComplexType() ||
+      Size > RegisterWidth)
     return ABIArgInfo::getDirect();
 
   // Match GCC for `_Complex int`, `_Complex short` and `_Complex char` by
@@ -443,7 +444,7 @@ void MipsABIInfo::computeInfo(CGFunctionInfo &FI) const {
 
     if (getContext().getTypeSize(I.type) == 0)
       SawZeroSizedArg = true;
-    else if (SawZeroSizedArg && I.type->isRealFloatingType()) {
+    else if (SawZeroSizedArg && I.type->isFloatingType()) {
       // A zero-sized type ends the leading run of float arguments that is
       // passed in FPRs. Any subsequent floats must be passed via GPRs. Cast the
       // float to an integer now because we drop the zero-sized argument here

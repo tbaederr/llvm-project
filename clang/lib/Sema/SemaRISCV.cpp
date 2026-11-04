@@ -1533,7 +1533,7 @@ bool SemaRISCV::CheckBuiltinFunctionCall(const TargetInfo &TI,
     QualType ValType = PtrType->getPointeeType();
     ValType = ValType.getUnqualifiedType();
     if (!ValType->isIntegerType() && !ValType->isAnyPointerType() &&
-        !ValType->isBlockPointerType() && !ValType->isFloatingType() &&
+        !ValType->isBlockPointerType() && !ValType->isFloatingOrComplexType() &&
         !ValType->isVectorType() && !ValType->isRVVSizelessBuiltinType()) {
       Diag(DRE->getBeginLoc(),
            diag::err_nontemporal_builtin_must_be_pointer_intfltptr_or_vector)

@@ -670,7 +670,7 @@ static bool EvaluateUnaryTypeTrait(Sema &Self, TypeTrait UTT,
   case UTT_IsIntegral:
     return T->isIntegralType(C);
   case UTT_IsFloatingPoint:
-    return T->isFloatingType();
+    return T->isFloatingOrComplexType();
   case UTT_IsArray:
     // Zero-sized arrays aren't considered arrays in partial specializations,
     // so __is_array shouldn't consider them arrays either.
@@ -791,7 +791,7 @@ static bool EvaluateUnaryTypeTrait(Sema &Self, TypeTrait UTT,
   case UTT_IsSigned:
     // Enum types should always return false.
     // Floating points should always return true.
-    return T->isFloatingType() ||
+    return T->isFloatingOrComplexType() ||
            (T->isSignedIntegerType() && !T->isEnumeralType());
   case UTT_IsUnsigned:
     // Enum types should always return false.

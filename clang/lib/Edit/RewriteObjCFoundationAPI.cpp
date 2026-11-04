@@ -836,7 +836,7 @@ static bool rewriteToNumberLiteral(const ObjCMessageExpr *Msg,
   if (ArgRange.getBegin().isMacroID())
     return rewriteToNumericBoxedExpression(Msg, NS, commit);
 
-  bool LitIsFloat = ArgTy->isFloatingType();
+  bool LitIsFloat = ArgTy->isFloatingOrComplexType();
   // For a float passed to integer call, don't try rewriting to objc literal.
   // It is difficult and a very uncommon case anyway.
   // But try with boxed expression.

@@ -28,7 +28,7 @@ clang::getComparisonCategoryForBuiltinCmp(QualType T) {
   if (T->isIntegralOrEnumerationType())
     return CCT::StrongOrdering;
 
-  if (T->isRealFloatingType())
+  if (T->isFloatingType())
     return CCT::PartialOrdering;
 
   // C++2a [expr.spaceship]p8: If the composite pointer type is an object

@@ -104,7 +104,7 @@ bool LoongArchABIInfo::detectFARsEligibleStructHelper(
     QualType Ty, CharUnits CurOff, llvm::Type *&Field1Ty, CharUnits &Field1Off,
     llvm::Type *&Field2Ty, CharUnits &Field2Off) const {
   bool IsInt = Ty->isIntegralOrEnumerationType();
-  bool IsFloat = Ty->isRealFloatingType();
+  bool IsFloat = Ty->isFloatingType();
 
   if (IsInt || IsFloat) {
     uint64_t Size = getContext().getTypeSize(Ty);
@@ -139,7 +139,7 @@ bool LoongArchABIInfo::detectFARsEligibleStructHelper(
     // eligible to be passed in floating-point argument registers. Complex
     // integer types (a GNU extension) should be treated like a normal
     // aggregate and packed into GARs instead.
-    if (!EltTy->isRealFloatingType())
+    if (!EltTy->isFloatingType())
       return false;
     if (getContext().getTypeSize(EltTy) > FRLen)
       return false;
@@ -323,7 +323,7 @@ ABIArgInfo LoongArchABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
     return ABIArgInfo::getIgnore();
 
   // Pass floating point values via FARs if possible.
-  if (IsFixed && Ty->isFloatingType() && !Ty->isComplexType() &&
+  if (IsFixed && Ty->isFloatingOrComplexType() && !Ty->isComplexType() &&
       FRLen >= Size && FARsLeft) {
     FARsLeft--;
     return ABIArgInfo::getDirect();

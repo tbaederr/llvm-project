@@ -205,7 +205,7 @@ getEquivalentForBoolLiteral(const CXXBoolLiteralExpr *BoolLiteral,
     return "0";
   }
 
-  if (DestType->isFloatingType()) {
+  if (DestType->isFloatingOrComplexType()) {
     if (ASTContext::hasSameType(DestType, Context.FloatTy))
       return BoolLiteral->getValue() ? "1.0f" : "0.0f";
     return BoolLiteral->getValue() ? "1.0" : "0.0";

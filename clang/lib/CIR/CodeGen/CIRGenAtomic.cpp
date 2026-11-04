@@ -843,14 +843,14 @@ static void emitAtomicOp(CIRGenFunction &cgf, AtomicExpr *expr, Address dest,
 
   case AtomicExpr::AO__atomic_fetch_fminimum:
   case AtomicExpr::AO__scoped_atomic_fetch_fminimum:
-    assert(expr->getValueType()->isFloatingType() &&
+    assert(expr->getValueType()->isFloatingOrComplexType() &&
            "fminimum operations only support floating-point types");
     handleFetchOp(cir::AtomicFetchKind::Minimum);
     break;
 
   case AtomicExpr::AO__atomic_fetch_fminimum_num:
   case AtomicExpr::AO__scoped_atomic_fetch_fminimum_num:
-    assert(expr->getValueType()->isFloatingType() &&
+    assert(expr->getValueType()->isFloatingOrComplexType() &&
            "fminimum_num operations only support floating-point types");
     handleFetchOp(cir::AtomicFetchKind::MinimumNum);
     break;
@@ -869,14 +869,14 @@ static void emitAtomicOp(CIRGenFunction &cgf, AtomicExpr *expr, Address dest,
 
   case AtomicExpr::AO__atomic_fetch_fmaximum:
   case AtomicExpr::AO__scoped_atomic_fetch_fmaximum:
-    assert(expr->getValueType()->isFloatingType() &&
+    assert(expr->getValueType()->isFloatingOrComplexType() &&
            "fmaximum operations only support floating-point types");
     handleFetchOp(cir::AtomicFetchKind::Maximum);
     break;
 
   case AtomicExpr::AO__atomic_fetch_fmaximum_num:
   case AtomicExpr::AO__scoped_atomic_fetch_fmaximum_num:
-    assert(expr->getValueType()->isFloatingType() &&
+    assert(expr->getValueType()->isFloatingOrComplexType() &&
            "fmaximum_num operations only support floating-point types");
     handleFetchOp(cir::AtomicFetchKind::MaximumNum);
     break;

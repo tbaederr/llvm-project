@@ -421,11 +421,12 @@ mlir::Value ComplexExprEmitter::emitComplexToComplexCast(mlir::Value val,
                             ->getElementType();
 
   cir::CastKind castOpKind;
-  if (srcElemTy->isFloatingType() && destElemTy->isFloatingType())
+  if (srcElemTy->isFloatingOrComplexType() &&
+      destElemTy->isFloatingOrComplexType())
     castOpKind = cir::CastKind::float_complex;
-  else if (srcElemTy->isFloatingType() && destElemTy->isIntegerType())
+  else if (srcElemTy->isFloatingOrComplexType() && destElemTy->isIntegerType())
     castOpKind = cir::CastKind::float_complex_to_int_complex;
-  else if (srcElemTy->isIntegerType() && destElemTy->isFloatingType())
+  else if (srcElemTy->isIntegerType() && destElemTy->isFloatingOrComplexType())
     castOpKind = cir::CastKind::int_complex_to_float_complex;
   else if (srcElemTy->isIntegerType() && destElemTy->isIntegerType())
     castOpKind = cir::CastKind::int_complex;
@@ -441,7 +442,7 @@ mlir::Value ComplexExprEmitter::emitScalarToComplexCast(mlir::Value val,
                                                         QualType destType,
                                                         SourceLocation loc) {
   cir::CastKind castOpKind;
-  if (srcType->isFloatingType())
+  if (srcType->isFloatingOrComplexType())
     castOpKind = cir::CastKind::float_to_complex;
   else if (srcType->isIntegerType())
     castOpKind = cir::CastKind::int_to_complex;
@@ -872,7 +873,7 @@ LValue ComplexExprEmitter::emitCompoundAssignLValue(
   QualType promotionTypeRHS = getPromotionType(rhsTy);
 
   // The RHS should have been converted to the computation type.
-  if (e->getRHS()->getType()->isRealFloatingType()) {
+  if (e->getRHS()->getType()->isFloatingType()) {
     if (!promotionTypeRHS.isNull()) {
       opInfo.rhs = cgf.emitPromotedScalarExpr(e->getRHS(), promotionTypeRHS);
     } else {
@@ -900,7 +901,7 @@ LValue ComplexExprEmitter::emitCompoundAssignLValue(
     mlir::Value lhsVal = cgf.emitLoadOfScalar(lhs, exprLoc);
     // For floating point real operands we can directly pass the scalar form
     // to the binary operator emission and potentially get more efficient code.
-    if (lhsTy->isRealFloatingType()) {
+    if (lhsTy->isFloatingType()) {
       QualType promotedComplexElementTy;
       if (!promotionTypeLHS.isNull()) {
         promotedComplexElementTy =

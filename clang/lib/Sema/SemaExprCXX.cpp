@@ -5079,12 +5079,12 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     QualType FromEl = From->getType()->castAs<ComplexType>()->getElementType();
     QualType ToEl = ToType->castAs<ComplexType>()->getElementType();
     CastKind CK;
-    if (FromEl->isRealFloatingType()) {
-      if (ToEl->isRealFloatingType())
+    if (FromEl->isFloatingType()) {
+      if (ToEl->isFloatingType())
         CK = CK_FloatingComplexCast;
       else
         CK = CK_FloatingComplexToIntegralComplex;
-    } else if (ToEl->isRealFloatingType()) {
+    } else if (ToEl->isFloatingType()) {
       CK = CK_IntegralComplexToFloatingComplex;
     } else {
       CK = CK_IntegralComplexCast;
@@ -5102,7 +5102,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
         FromType->isConstantMatrixType() || ToType->isConstantMatrixType())
       StepTy =
           adjustVectorOrConstantMatrixType(Context, FromType, ToType, &ElTy);
-    if (ElTy->isRealFloatingType())
+    if (ElTy->isFloatingType())
       From = ImpCastExprToType(From, StepTy, CK_IntegralToFloating, VK_PRValue,
                                /*BasePath=*/nullptr, CCK)
                  .get();
@@ -5117,11 +5117,11 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     assert((FromType->isFixedPointType() || ToType->isFixedPointType()) &&
            "Attempting implicit fixed point conversion without a fixed "
            "point operand");
-    if (FromType->isFloatingType())
+    if (FromType->isFloatingOrComplexType())
       From = ImpCastExprToType(From, ToType, CK_FloatingToFixedPoint,
                                VK_PRValue,
                                /*BasePath=*/nullptr, CCK).get();
-    else if (ToType->isFloatingType())
+    else if (ToType->isFloatingOrComplexType())
       From = ImpCastExprToType(From, ToType, CK_FixedPointToFloating,
                                VK_PRValue,
                                /*BasePath=*/nullptr, CCK).get();
@@ -5309,12 +5309,12 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     // Case 1.  x -> _Complex y
     if (const ComplexType *ToComplex = ToType->getAs<ComplexType>()) {
       QualType ElType = ToComplex->getElementType();
-      bool isFloatingComplex = ElType->isRealFloatingType();
+      bool isFloatingComplex = ElType->isFloatingType();
 
       // x -> y
       if (Context.hasSameUnqualifiedType(ElType, From->getType())) {
         // do nothing
-      } else if (From->getType()->isRealFloatingType()) {
+      } else if (From->getType()->isFloatingType()) {
         From = ImpCastExprToType(From, ElType,
                 isFloatingComplex ? CK_FloatingCast : CK_FloatingToIntegral).get();
       } else {
@@ -5331,7 +5331,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     } else {
       auto *FromComplex = From->getType()->castAs<ComplexType>();
       QualType ElType = FromComplex->getElementType();
-      bool isFloatingComplex = ElType->isRealFloatingType();
+      bool isFloatingComplex = ElType->isFloatingType();
 
       // _Complex x -> x
       From = ImpCastExprToType(From, ElType,
@@ -5343,7 +5343,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
       // x -> y
       if (Context.hasSameUnqualifiedType(ElType, ToType)) {
         // do nothing
-      } else if (ToType->isRealFloatingType()) {
+      } else if (ToType->isFloatingType()) {
         From = ImpCastExprToType(From, ToType,
                                  isFloatingComplex ? CK_FloatingCast
                                                    : CK_IntegralToFloating,

@@ -679,14 +679,14 @@ StmtResult Sema::ActOnGCCAsmStmt(SourceLocation AsmLoc, bool IsSimple,
 
     if (InTy->isIntegerType() || InTy->isPointerType())
       InputDomain = AD_Int;
-    else if (InTy->isRealFloatingType())
+    else if (InTy->isFloatingType())
       InputDomain = AD_FP;
     else
       InputDomain = AD_Other;
 
     if (OutTy->isIntegerType() || OutTy->isPointerType())
       OutputDomain = AD_Int;
-    else if (OutTy->isRealFloatingType())
+    else if (OutTy->isFloatingType())
       OutputDomain = AD_FP;
     else
       OutputDomain = AD_Other;

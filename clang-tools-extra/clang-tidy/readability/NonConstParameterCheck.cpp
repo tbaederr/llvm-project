@@ -179,7 +179,7 @@ void NonConstParameterCheck::addParm(const ParmVarDecl *Parm) {
   const QualType T = Parm->getType();
   if (!T->isPointerType() || T->getPointeeType().isConstQualified() ||
       !(T->getPointeeType()->isIntegerType() ||
-        T->getPointeeType()->isFloatingType()))
+        T->getPointeeType()->isFloatingOrComplexType()))
     return;
 
   auto [It, Inserted] = Parameters.try_emplace(Parm);

@@ -54,7 +54,7 @@ static bool areTypesSemiEqual(const QualType L, const QualType R) {
   if (!L->isBuiltinType() || !R->isBuiltinType())
     return false;
 
-  return (L->isFloatingType() && R->isFloatingType()) ||
+  return (L->isFloatingOrComplexType() && R->isFloatingOrComplexType()) ||
          (L->isIntegerType() && R->isIntegerType()) ||
          (L->isBooleanType() && R->isBooleanType());
 }

@@ -1416,7 +1416,7 @@ public:
   static APValue withDestType(ASTContext &Ctx, const Expr *E, QualType SrcType,
                               QualType DestType, const llvm::APSInt &Value) {
     if (!Ctx.hasSameType(SrcType, DestType)) {
-      if (DestType->isFloatingType()) {
+      if (DestType->isFloatingOrComplexType()) {
         llvm::APFloat Result =
             llvm::APFloat(Ctx.getFloatTypeSemantics(DestType), 1);
         llvm::RoundingMode RM =

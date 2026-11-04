@@ -498,8 +498,9 @@ RValue PPC32_SVR4_ABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAList,
   // };
 
   bool isI64 = Ty->isIntegerType() && getContext().getTypeSize(Ty) == 64;
-  bool isInt = !Ty->isFloatingType();
-  bool isF64 = Ty->isFloatingType() && getContext().getTypeSize(Ty) == 64;
+  bool isInt = !Ty->isFloatingOrComplexType();
+  bool isF64 =
+      Ty->isFloatingOrComplexType() && getContext().getTypeSize(Ty) == 64;
 
   // All aggregates are passed indirectly?  That doesn't seem consistent
   // with the argument-lowering code.
@@ -773,9 +774,9 @@ CharUnits PPC64_SVR4_ABIInfo::getParamTypeAlignment(QualType Ty) const {
   if (const ComplexType *CTy = Ty->getAs<ComplexType>())
     Ty = CTy->getElementType();
 
-  auto FloatUsesVector = [this](QualType Ty){
-    return Ty->isRealFloatingType() && &getContext().getFloatTypeSemantics(
-                                           Ty) == &llvm::APFloat::IEEEquad();
+  auto FloatUsesVector = [this](QualType Ty) {
+    return Ty->isFloatingType() && &getContext().getFloatTypeSemantics(Ty) ==
+                                       &llvm::APFloat::IEEEquad();
   };
 
   // Only vector types of size 16 bytes need alignment (larger types are

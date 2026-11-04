@@ -3473,7 +3473,7 @@ static void handleVecTypeHint(Sema &S, Decl *D, const ParsedAttr &AL) {
   QualType ParmType = S.GetTypeFromParser(AL.getTypeArg(), &ParmTSI);
   assert(ParmTSI && "no type source info for attribute argument");
 
-  if (!ParmType->isExtVectorType() && !ParmType->isFloatingType() &&
+  if (!ParmType->isExtVectorType() && !ParmType->isFloatingOrComplexType() &&
       (ParmType->isBooleanType() ||
        !ParmType->isIntegralType(S.getASTContext()))) {
     S.Diag(AL.getLoc(), diag::err_attribute_invalid_argument) << 2 << AL;
@@ -5228,7 +5228,7 @@ void Sema::AddModeAttr(Decl *D, const AttributeCommonInfo &CI,
     if (!OldElemTy->isComplexType())
       Diag(AttrLoc, diag::err_mode_wrong_type);
   } else {
-    if (!OldElemTy->isFloatingType())
+    if (!OldElemTy->isFloatingOrComplexType())
       Diag(AttrLoc, diag::err_mode_wrong_type);
   }
 

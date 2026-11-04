@@ -329,7 +329,7 @@ static bool checkBitcastType(InterpState &S, CodePtr OpPC, QualType T,
       return false;
     }
 
-    if (EltTy->isRealFloatingType() &&
+    if (EltTy->isFloatingType() &&
         &ASTCtx.getFloatTypeSemantics(EltTy) == &APFloat::x87DoubleExtended()) {
       // The layout for x86_fp80 vectors seems to be handled very inconsistently
       // by both clang and LLVM, so for now we won't allow bit_casts involving

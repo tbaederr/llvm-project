@@ -12299,7 +12299,7 @@ static bool getAArch64PBV(QualType QT, ASTContext &C) {
   if (Size != 8 && Size != 16 && Size != 32 && Size != 64 && Size != 128)
     return false;
 
-  if (QT->isFloatingType())
+  if (QT->isFloatingOrComplexType())
     return true;
 
   if (QT->isIntegerType())

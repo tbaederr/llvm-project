@@ -303,8 +303,8 @@ void WalkAST::checkLoopConditionForFloat(const ForStmt *FS) {
     dyn_cast<DeclRefExpr>(B->getRHS()->IgnoreParenLValueCasts());
 
   // Does at least one of the variables have a floating point type?
-  drLHS = drLHS && drLHS->getType()->isRealFloatingType() ? drLHS : nullptr;
-  drRHS = drRHS && drRHS->getType()->isRealFloatingType() ? drRHS : nullptr;
+  drLHS = drLHS && drLHS->getType()->isFloatingType() ? drLHS : nullptr;
+  drRHS = drRHS && drRHS->getType()->isFloatingType() ? drRHS : nullptr;
 
   if (!drLHS && !drRHS)
     return;

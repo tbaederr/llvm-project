@@ -353,7 +353,8 @@ bool SemaARM::BuiltinARMAtomicHintCall(unsigned BuiltinID, CallExpr *TheCall) {
 
   PtrQT = PtrQT.getUnqualifiedType();
   if (!PtrQT->isIntegralType(Context) &&
-      !(IsStore && (PtrQT->isFloatingType() || PtrQT->isMFloat8Type())))
+      !(IsStore &&
+        (PtrQT->isFloatingOrComplexType() || PtrQT->isMFloat8Type())))
     return Diag(TheCall->getBeginLoc(),
                 IsStore ? diag::err_atomic_op_needs_atomic_int_or_fp
                         : diag::err_atomic_op_needs_atomic_int)
@@ -1068,7 +1069,7 @@ bool SemaARM::CheckARMBuiltinExclusiveCall(const TargetInfo &TI,
 
   // In general, we allow ints, floats and pointers to be loaded and stored.
   if (!ValType->isIntegerType() && !ValType->isAnyPointerType() &&
-      !ValType->isBlockPointerType() && !ValType->isFloatingType()) {
+      !ValType->isBlockPointerType() && !ValType->isFloatingOrComplexType()) {
     Diag(DRE->getBeginLoc(), diag::err_atomic_builtin_must_be_pointer_intfltptr)
         << PointerArg->getType() << 0 << PointerArg->getSourceRange();
     return true;
@@ -1366,7 +1367,7 @@ bool SemaARM::CheckAArch64BuiltinFunctionCall(const TargetInfo &TI,
       const Expr *Arg = TheCall->getArg(I);
       QualType Ty = Arg->getType();
       if (!Ty->isIntegerType() && !Ty->isAnyPointerType() &&
-          !Ty->isBlockPointerType() && !Ty->isFloatingType())
+          !Ty->isBlockPointerType() && !Ty->isFloatingOrComplexType())
         return Diag(Arg->getBeginLoc(),
                     diag::err_aarch64_svc_hvc_invalid_arg_type)
                << I + 1 << FD << Ty << Arg->getSourceRange();

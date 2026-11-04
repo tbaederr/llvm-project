@@ -930,7 +930,7 @@ bool SemaHLSL::checkInterpolationModifiers(
 
   T = getScalarComponentType(T);
   if (T->isIntegerType() ||
-      (T->isRealFloatingType() && getASTContext().getTypeSize(T) > 32)) {
+      (T->isFloatingType() && getASTContext().getTypeSize(T) > 32)) {
     Diag(A->getLocation(), diag::err_hlsl_interpolation_type) << T;
     return false;
   }
@@ -1542,8 +1542,8 @@ static QualType castElement(Sema &S, ExprResult &E, QualType Ty) {
 static QualType handleFloatVectorBinOpConversion(
     Sema &SemaRef, ExprResult &LHS, ExprResult &RHS, QualType LHSType,
     QualType RHSType, QualType LElTy, QualType RElTy, bool IsCompAssign) {
-  bool LHSFloat = LElTy->isRealFloatingType();
-  bool RHSFloat = RElTy->isRealFloatingType();
+  bool LHSFloat = LElTy->isFloatingType();
+  bool RHSFloat = RElTy->isFloatingType();
 
   if (LHSFloat && RHSFloat) {
     if (IsCompAssign ||
@@ -1618,13 +1618,13 @@ static QualType handleIntegerVectorBinOpConversion(
 
 static CastKind getScalarCastKind(ASTContext &Ctx, QualType DestTy,
                                   QualType SrcTy) {
-  if (DestTy->isRealFloatingType() && SrcTy->isRealFloatingType())
+  if (DestTy->isFloatingType() && SrcTy->isFloatingType())
     return CK_FloatingCast;
   if (DestTy->isIntegralType(Ctx) && SrcTy->isIntegralType(Ctx))
     return CK_IntegralCast;
-  if (DestTy->isRealFloatingType())
+  if (DestTy->isFloatingType())
     return CK_IntegralToFloating;
-  assert(SrcTy->isRealFloatingType() && DestTy->isIntegralType(Ctx));
+  assert(SrcTy->isFloatingType() && DestTy->isIntegralType(Ctx));
   return CK_FloatingToIntegral;
 }
 
@@ -1685,7 +1685,7 @@ QualType SemaHLSL::handleVectorBinOpConversion(ExprResult &LHS, ExprResult &RHS,
   QualType RElTy = RHSType->castAs<VectorType>()->getElementType();
 
   // Handle conversion for floating point vectors.
-  if (LElTy->isRealFloatingType() || RElTy->isRealFloatingType())
+  if (LElTy->isFloatingType() || RElTy->isFloatingType())
     return handleFloatVectorBinOpConversion(SemaRef, LHS, RHS, LHSType, RHSType,
                                             LElTy, RElTy, IsCompAssign);
 
@@ -2713,8 +2713,9 @@ static bool DiagnoseLocalRegisterBinding(Sema &S, SourceLocation &ArgLoc,
     if (SpecifiedSpace && !DeclaredInCOrTBuffer)
       S.Diag(ArgLoc, diag::err_hlsl_space_on_global_constant);
 
-    if (!DeclaredInCOrTBuffer && (Ty->isIntegralType(S.getASTContext()) ||
-                                  Ty->isFloatingType() || Ty->isVectorType())) {
+    if (!DeclaredInCOrTBuffer &&
+        (Ty->isIntegralType(S.getASTContext()) ||
+         Ty->isFloatingOrComplexType() || Ty->isVectorType())) {
       // Register annotation on default constant buffer declaration ($Globals)
       if (RegType == RegisterType::CBuffer)
         S.Diag(ArgLoc, diag::warn_hlsl_deprecated_register_type_b);
@@ -3968,7 +3969,7 @@ static bool CheckAnyScalarOrVectorOrMatrix(Sema *S, CallExpr *TheCall,
   if (ElementType->isBooleanType())
     return false;
 
-  if (ElementType->isIntegerType() || ElementType->isRealFloatingType()) {
+  if (ElementType->isIntegerType() || ElementType->isFloatingType()) {
     unsigned BitWidth = S->Context.getTypeSize(ElementType);
     if (BitWidth == 16 || BitWidth == 32 || BitWidth == 64)
       return false;

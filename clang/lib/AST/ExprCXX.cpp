@@ -1043,7 +1043,7 @@ UserDefinedLiteral::getLiteralOperatorKind() const {
     return LOK_Character;
   if (ParamTy->isIntegerType())
     return LOK_Integer;
-  if (ParamTy->isFloatingType())
+  if (ParamTy->isFloatingOrComplexType())
     return LOK_Floating;
 
   llvm_unreachable("unknown kind of literal operator");

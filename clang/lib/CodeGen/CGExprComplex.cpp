@@ -318,7 +318,7 @@ public:
                             bool IsComplexDivisor) {
     if (auto *CT = Ty->getAs<ComplexType>()) {
       QualType ElementType = CT->getElementType().getCanonicalType();
-      bool IsFloatingType = ElementType->isFloatingType();
+      bool IsFloatingType = ElementType->isFloatingOrComplexType();
       bool IsComplexRangePromoted = CGF.getLangOpts().getComplexRange() ==
                                     LangOptions::ComplexRangeKind::CX_Promoted;
       bool HasNoComplexRangeOverride = !Features.hasComplexRangeOverride();
@@ -1258,7 +1258,7 @@ LValue ComplexExprEmitter::EmitCompoundAssignLValue(
                        E->getRHS()->getType(), IsComplexDivisor);
 
   // The RHS should have been converted to the computation type.
-  if (E->getRHS()->getType()->isRealFloatingType()) {
+  if (E->getRHS()->getType()->isFloatingType()) {
     if (!PromotionTypeRHS.isNull())
       OpInfo.RHS = ComplexPairTy(
           CGF.EmitPromotedScalarExpr(E->getRHS(), PromotionTypeRHS), nullptr);
@@ -1297,7 +1297,7 @@ LValue ComplexExprEmitter::EmitCompoundAssignLValue(
     llvm::Value *LHSVal = CGF.EmitLoadOfLValue(LHS, Loc).getScalarVal();
     // For floating point real operands we can directly pass the scalar form
     // to the binary operator emission and potentially get more efficient code.
-    if (LHSTy->isRealFloatingType()) {
+    if (LHSTy->isFloatingType()) {
       QualType PromotedComplexElementTy;
       if (!PromotionTypeLHS.isNull()) {
         PromotedComplexElementTy =

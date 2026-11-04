@@ -98,7 +98,7 @@ void InitVariablesCheck::check(const MatchFinder::MatchResult &Result) {
     InitializationString = " = false";
   } else if (TypePtr->isIntegerType()) {
     InitializationString = " = 0";
-  } else if (TypePtr->isFloatingType()) {
+  } else if (TypePtr->isFloatingOrComplexType()) {
     InitializationString = " = NAN";
     AddMathInclude = true;
   } else if (TypePtr->isAnyPointerType() || TypePtr->isMemberPointerType()) {

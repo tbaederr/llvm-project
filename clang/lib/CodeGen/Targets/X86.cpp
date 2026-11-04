@@ -557,8 +557,8 @@ ABIArgInfo X86_32ABIInfo::classifyReturnType(QualType RetTy,
       // We apply a similar transformation for pointer types to improve the
       // quality of the generated IR.
       if (const Type *SeltTy = isSingleElementRecord(RetTy, getContext()))
-        if ((!IsWin32StructABI && SeltTy->isRealFloatingType())
-            || SeltTy->hasPointerRepresentation())
+        if ((!IsWin32StructABI && SeltTy->isFloatingType()) ||
+            SeltTy->hasPointerRepresentation())
           return ABIArgInfo::getDirect(CGT.ConvertType(QualType(SeltTy, 0)));
 
       // FIXME: We should be able to narrow this integer in cases with dead

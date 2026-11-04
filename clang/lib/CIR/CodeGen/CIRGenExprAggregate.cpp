@@ -413,7 +413,7 @@ public:
 
     QualType argTy = e->getLHS()->getType();
 
-    if (!argTy->isIntegralOrEnumerationType() && !argTy->isRealFloatingType() &&
+    if (!argTy->isIntegralOrEnumerationType() && !argTy->isFloatingType() &&
         !argTy->isNullPtrType() && !argTy->isPointerType() &&
         !argTy->isMemberPointerType() && !argTy->isAnyComplexType())
       cgf.cgm.errorNYI(e->getBeginLoc(), "aggregate three-way comparison");

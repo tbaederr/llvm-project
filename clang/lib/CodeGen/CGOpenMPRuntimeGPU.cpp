@@ -1497,7 +1497,7 @@ getReductionAtomicRMWOp(BinaryOperatorKind BOK, QualType Ty) {
   case BO_Sub: // A `-` reduction sums the partials, so it accumulates with add.
     if (IsInt)
       return llvm::AtomicRMWInst::Add;
-    if (Ty->isFloatingType())
+    if (Ty->isFloatingOrComplexType())
       return llvm::AtomicRMWInst::FAdd;
     return std::nullopt;
   case BO_And:

@@ -64,7 +64,7 @@ void DurationConversionCastCheck::check(
   }
 
   // Casting an integer to a double.
-  if (MatchedCast->getTypeAsWritten()->isRealFloatingType() &&
+  if (MatchedCast->getTypeAsWritten()->isFloatingType() &&
       ConversionFuncName.contains("Int64")) {
     const StringRef NewFuncName = getDurationInverseForScale(*Scale).first;
 

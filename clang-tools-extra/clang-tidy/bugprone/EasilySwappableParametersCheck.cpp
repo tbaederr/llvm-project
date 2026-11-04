@@ -992,10 +992,11 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
   // Numeric promotions and conversions.
   const auto *FromBuiltin = WorkType->getAs<BuiltinType>();
   const auto *ToBuiltin = To->getAs<BuiltinType>();
-  const bool FromNumeric = FromBuiltin && (FromBuiltin->isIntegerType() ||
-                                           FromBuiltin->isFloatingType());
-  const bool ToNumeric =
-      ToBuiltin && (ToBuiltin->isIntegerType() || ToBuiltin->isFloatingType());
+  const bool FromNumeric =
+      FromBuiltin &&
+      (FromBuiltin->isIntegerType() || FromBuiltin->isFloatingOrComplexType());
+  const bool ToNumeric = ToBuiltin && (ToBuiltin->isIntegerType() ||
+                                       ToBuiltin->isFloatingOrComplexType());
   if (FromNumeric && ToNumeric) {
     // If both are integral types, the numeric conversion is performed.
     // Reapply the qualifiers of the original type, however, so

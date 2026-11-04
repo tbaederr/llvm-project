@@ -952,12 +952,13 @@ void ExprEngine::VisitUnaryOperator(const UnaryOperator* U, ExplodedNode *Pred,
           if (std::optional<Loc> LV = V.getAs<Loc>()) {
           Loc X = svalBuilder.makeNullWithType(Ex->getType());
           Result = evalBinOp(state, BO_EQ, *LV, X, U->getType());
-          } else if (Ex->getType()->isFloatingType()) {
-          // FIXME: handle floating point types.
-          Result = UnknownVal();
+          } else if (Ex->getType()->isFloatingOrComplexType()) {
+            // FIXME: handle floating point types.
+            Result = UnknownVal();
           } else {
-          nonloc::ConcreteInt X(getBasicVals().getValue(0, Ex->getType()));
-          Result = evalBinOp(state, BO_EQ, V.castAs<NonLoc>(), X, U->getType());
+            nonloc::ConcreteInt X(getBasicVals().getValue(0, Ex->getType()));
+            Result =
+                evalBinOp(state, BO_EQ, V.castAs<NonLoc>(), X, U->getType());
           }
 
           state = state->BindExpr(U, SF, Result);

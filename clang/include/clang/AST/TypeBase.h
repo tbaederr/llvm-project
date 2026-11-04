@@ -2636,12 +2636,13 @@ public:
   bool isUnscopedEnumerationType() const;
 
   /// Floating point categories.
-  bool isRealFloatingType() const; // C99 6.2.5p10 (float, double, long double)
   /// isComplexType() does *not* include complex integers (a GCC extension).
   /// isComplexIntegerType() can be used to test for complex integers.
   bool isComplexType() const;      // C99 6.2.5p11 (complex)
   bool isAnyComplexType() const;   // C99 6.2.5p11 (complex) + Complex Int.
-  bool isFloatingType() const;     // C99 6.2.5p11 (real floating + complex)
+  bool isFloatingType() const;     // C99 6.2.5p10 (float, double, long double)
+  // C99 6.2.5p11 (real floating + complex)
+  bool isFloatingOrComplexType() const;
   bool isHalfType() const;         // OpenCL 6.1.1.1, NEON (IEEE 754-2008 half)
   bool isFloat16Type() const;      // C11 extension ISO/IEC TS 18661
   bool isFloat32Type() const;
@@ -9274,7 +9275,7 @@ inline bool Type::isFixedPointOrIntegerType() const {
 }
 
 inline bool Type::isConvertibleToFixedPointType() const {
-  return isRealFloatingType() || isFixedPointOrIntegerType();
+  return isFloatingType() || isFixedPointOrIntegerType();
 }
 
 inline bool Type::isSaturatedFixedPointType() const {

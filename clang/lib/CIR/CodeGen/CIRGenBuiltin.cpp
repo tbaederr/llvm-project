@@ -1813,7 +1813,8 @@ RValue CIRGenFunction::emitBuiltinExpr(const GlobalDecl &gd, unsigned builtinID,
     QualType argType = arg->getType();
     // FIXME: The allowance for Obj-C pointers and block pointers is historical
     // and likely a mistake.
-    if (!argType->isIntegralOrEnumerationType() && !argType->isFloatingType() &&
+    if (!argType->isIntegralOrEnumerationType() &&
+        !argType->isFloatingOrComplexType() &&
         !argType->isObjCObjectPointerType() && !argType->isBlockPointerType()) {
       // Per the GCC documentation, only numeric constants are recognized after
       // inlining.
@@ -2184,7 +2185,7 @@ RValue CIRGenFunction::emitBuiltinExpr(const GlobalDecl &gd, unsigned builtinID,
           cir::VecReduceUMinOp::create(builder, loc, input).getResult());
     }
 
-    assert(type->isFloatingType() && "must have a float here");
+    assert(type->isFloatingOrComplexType() && "must have a float here");
     cir::FastMathFlagsAttr fastMath =
         getFastMathFlagsAttr(getCurrentFastMathFlags());
     if (isMax)

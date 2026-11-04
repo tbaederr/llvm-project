@@ -17322,7 +17322,7 @@ bool Sema::CheckLiteralOperatorDeclaration(FunctionDecl *FnDecl) {
         return true;
       }
 
-    } else if (ParamType->isRealFloatingType()) {
+    } else if (ParamType->isFloatingType()) {
       Diag(Param->getSourceRange().getBegin(), diag::err_literal_operator_param)
           << ParamType << Context.LongDoubleTy << Param->getSourceRange();
       return true;

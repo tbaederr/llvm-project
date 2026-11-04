@@ -388,7 +388,7 @@ static Value *handleInterlockedOp(CodeGenFunction &CGF, const CallExpr *E,
   Value *Val = CGF.EmitScalarExpr(E->getArg(1));
   [[maybe_unused]] QualType ValTy = E->getArg(1)->getType();
   if (Op == llvm::AtomicRMWInst::Xchg)
-    assert((ValTy->isIntegerType() || ValTy->isFloatingType()) &&
+    assert((ValTy->isIntegerType() || ValTy->isFloatingOrComplexType()) &&
            "InterlockedExchange value operand must be an integer or a float");
   else
     assert(ValTy->isIntegerType() &&
@@ -464,7 +464,7 @@ static Value *emitBufferStride(CodeGenFunction *CGF, const Expr *HandleExpr,
 
 // Return dot product intrinsic that corresponds to the QT scalar type
 static Intrinsic::ID getDotProductIntrinsic(CGHLSLRuntime &RT, QualType QT) {
-  if (QT->isFloatingType())
+  if (QT->isFloatingOrComplexType())
     return RT.getFDotIntrinsic();
   if (QT->isSignedIntegerType())
     return RT.getSDotIntrinsic();
@@ -686,7 +686,7 @@ static Value *emitGetDimensions(CodeGenFunction &CGF, const CallExpr *E,
       Elem = CGF.Builder.CreateExtractElement(DimValue, i);
 
     // Handle float casting if needed
-    if (Arg->getType()->isFloatingType())
+    if (Arg->getType()->isFloatingOrComplexType())
       Elem = CGF.Builder.CreateUIToFP(
           Elem, llvm::Type::getFloatTy(CGF.getLLVMContext()));
 
@@ -1241,7 +1241,7 @@ Value *CodeGenFunction::EmitHLSLBuiltinExpr(unsigned BuiltinID,
       Ty = VecTy->getElementType();
 
     Intrinsic::ID Intr;
-    if (Ty->isFloatingType()) {
+    if (Ty->isFloatingOrComplexType()) {
       Intr = CGM.getHLSLRuntime().getNClampIntrinsic();
     } else if (Ty->isUnsignedIntegerType()) {
       Intr = CGM.getHLSLRuntime().getUClampIntrinsic();

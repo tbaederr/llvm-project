@@ -38,7 +38,7 @@ void FloatLoopCounterCheck::check(const MatchFinder::MatchResult &Result) {
       << Result.Nodes.getNodeAs<DeclRefExpr>("inc")->getSourceRange()
       << Result.Nodes.getNodeAs<DeclRefExpr>("cond")->getSourceRange();
 
-  if (!FS->getInc()->getType()->isRealFloatingType())
+  if (!FS->getInc()->getType()->isFloatingType())
     if (const auto *V = Result.Nodes.getNodeAs<VarDecl>("var"))
       diag(V->getBeginLoc(), "floating-point type loop induction variable",
            DiagnosticIDs::Note);

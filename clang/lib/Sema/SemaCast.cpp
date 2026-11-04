@@ -1474,7 +1474,7 @@ static TryCastResult TryStaticCast(Sema &Self, ExprResult &SrcExpr,
       } else if (DestType->isIntegralType(Self.Context)) {
         Kind = CK_IntegralCast;
         return TC_Success;
-      } else if (DestType->isRealFloatingType()) {
+      } else if (DestType->isFloatingType()) {
         Kind = CK_IntegralToFloating;
         return TC_Success;
       }
@@ -1506,7 +1506,7 @@ static TryCastResult TryStaticCast(Sema &Self, ExprResult &SrcExpr,
     if (SrcType->isIntegralOrEnumerationType()) {
       Kind = DestIsFixedBoolean ? CK_IntegralToBoolean : CK_IntegralCast;
       return TC_Success;
-    } else if (SrcType->isRealFloatingType())   {
+    } else if (SrcType->isFloatingType()) {
       // C++26 [expr.static.cast]p8
       //   A value of floating-point type can also be explicitly converted
       //   to ... the underlying type of the enumeration ([conv.fpint]), and
@@ -2835,7 +2835,7 @@ void CastOperation::CheckCXXCStyleCast(bool FunctionalStyle,
     }
     if (Self.ShouldSplatAltivecScalarInCast(vecTy) &&
         (SrcExpr.get()->getType()->isIntegerType() ||
-         SrcExpr.get()->getType()->isFloatingType())) {
+         SrcExpr.get()->getType()->isFloatingOrComplexType())) {
       Kind = CK_VectorSplat;
       SrcExpr = Self.prepareVectorSplat(DestType, SrcExpr.get());
       return;
@@ -3026,7 +3026,7 @@ static void DiagnoseBadFunctionCast(Sema &Self, const ExprResult &SrcExpr,
       (SrcType->isBooleanType() == DestType->isBooleanType()) &&
       (SrcType->isEnumeralType() == DestType->isEnumeralType()))
     return;
-  if (SrcType->isRealFloatingType() && DestType->isRealFloatingType())
+  if (SrcType->isFloatingType() && DestType->isFloatingType())
     return;
   if (SrcType->isEnumeralType() && DestType->isEnumeralType())
     return;
@@ -3259,7 +3259,7 @@ void CastOperation::CheckCStyleCast() {
       return;
     }
     if (Self.ShouldSplatAltivecScalarInCast(DestVecTy) &&
-        (SrcType->isIntegerType() || SrcType->isFloatingType())) {
+        (SrcType->isIntegerType() || SrcType->isFloatingOrComplexType())) {
       Kind = CK_VectorSplat;
       SrcExpr = Self.prepareVectorSplat(DestType, SrcExpr.get());
     } else if (Self.CheckVectorCast(OpRange, DestType, SrcType, Kind)) {

@@ -3202,7 +3202,7 @@ static bool handleVectorVectorBinOp(EvalInfo &Info, const BinaryOperator *E,
       }
       ResultElements.emplace_back(EltResult);
 
-    } else if (EltTy->isFloatingType()) {
+    } else if (EltTy->isFloatingOrComplexType()) {
       assert(LHSElt.getKind() == APValue::Float &&
              RHSElt.getKind() == APValue::Float &&
              "Mismatched LHS/RHS/Result Type");
@@ -3890,7 +3890,7 @@ static bool handleScalarCast(EvalInfo &Info, const FPOptions FPO, const Expr *E,
       Result = Original;
       return true;
     }
-    if (DestTy->isIntegerType() || DestTy->isRealFloatingType()) {
+    if (DestTy->isIntegerType() || DestTy->isFloatingType()) {
       bool BoolResult;
       if (!HandleConversionToBool(Original, BoolResult))
         return false;
@@ -3900,7 +3900,7 @@ static bool handleScalarCast(EvalInfo &Info, const FPOptions FPO, const Expr *E,
                              : Info.Ctx.getIntTypeForBitwidth(64, false);
       Result = APValue(Info.Ctx.MakeIntValue(IntResult, IntType));
     }
-    if (DestTy->isRealFloatingType()) {
+    if (DestTy->isFloatingType()) {
       APValue Result2 = APValue(APFloat(0.0));
       if (!HandleIntToFloatCast(Info, E, FPO,
                                 Info.Ctx.getIntTypeForBitwidth(64, false),
@@ -3911,7 +3911,7 @@ static bool handleScalarCast(EvalInfo &Info, const FPOptions FPO, const Expr *E,
     return true;
   }
   if (SourceTy->isIntegerType()) {
-    if (DestTy->isRealFloatingType()) {
+    if (DestTy->isFloatingType()) {
       Result = APValue(APFloat(0.0));
       return HandleIntToFloatCast(Info, E, FPO, SourceTy, Original.getInt(),
                                   DestTy, Result.getFloat());
@@ -3929,8 +3929,8 @@ static bool handleScalarCast(EvalInfo &Info, const FPOptions FPO, const Expr *E,
           HandleIntToIntCast(Info, E, DestTy, SourceTy, Original.getInt()));
       return true;
     }
-  } else if (SourceTy->isRealFloatingType()) {
-    if (DestTy->isRealFloatingType()) {
+  } else if (SourceTy->isFloatingType()) {
+    if (DestTy->isFloatingType()) {
       Result = Original;
       return HandleFloatToFloatCast(Info, E, SourceTy, DestTy,
                                     Result.getFloat());
@@ -3969,7 +3969,7 @@ static bool constructAggregate(EvalInfo &Info, const FPOptions FPO,
   while (!WorkList.empty() && ElI < Elements.size()) {
     auto [Res, Type, BitWidth] = WorkList.pop_back_val();
 
-    if (Type->isRealFloatingType()) {
+    if (Type->isFloatingType()) {
       if (!handleScalarCast(Info, FPO, E, ElTypes[ElI], Type, Elements[ElI],
                             *Res))
         return false;
@@ -4086,7 +4086,7 @@ static unsigned elementwiseSize(EvalInfo &Info, QualType BaseTy) {
   unsigned Size = 0;
   while (!WorkList.empty()) {
     QualType Type = WorkList.pop_back_val();
-    if (Type->isRealFloatingType() || Type->isIntegerType() ||
+    if (Type->isFloatingType() || Type->isIntegerType() ||
         Type->isBooleanType()) {
       ++Size;
       continue;
@@ -8347,7 +8347,7 @@ class BufferToAPValueConverter {
     // Work around floating point types that contain unused padding bytes. This
     // is really just `long double` on x86, which is the only fundamental type
     // with padding bytes.
-    if (T->isRealFloatingType()) {
+    if (T->isFloatingType()) {
       const llvm::fltSemantics &Semantics =
           Info.Ctx.getFloatTypeSemantics(QualType(T, 0));
       unsigned NumBits = llvm::APFloatBase::getSizeInBits(Semantics);
@@ -8393,7 +8393,7 @@ class BufferToAPValueConverter {
       return APValue(Val);
     }
 
-    if (T->isRealFloatingType()) {
+    if (T->isFloatingType()) {
       const llvm::fltSemantics &Semantics =
           Info.Ctx.getFloatTypeSemantics(QualType(T, 0));
       return APValue(APFloat(Semantics, Val));
@@ -8652,7 +8652,7 @@ static bool checkBitCastConstexprEligibilityType(SourceLocation Loc,
       return false;
     }
 
-    if (EltTy->isRealFloatingType() &&
+    if (EltTy->isFloatingType() &&
         &Ctx.getFloatTypeSemantics(EltTy) == &APFloat::x87DoubleExtended()) {
       // The layout for x86_fp80 vectors seems to be handled very inconsistently
       // by both clang and LLVM, so for now we won't allow bit_casts involving
@@ -12249,7 +12249,7 @@ bool VectorExprEvaluator::VisitCastExpr(const CastExpr *E) {
       if (!EvaluateInteger(SE, IntResult, Info))
         return false;
       Val = APValue(std::move(IntResult));
-    } else if (SETy->isRealFloatingType()) {
+    } else if (SETy->isFloatingType()) {
       APFloat FloatResult(0.0);
       if (!EvaluateFloat(SE, FloatResult, Info))
         return false;
@@ -12567,7 +12567,7 @@ static bool handleVectorElementCast(EvalInfo &Info, const FPOptions FPO,
                                     QualType DestTy, APValue const &Original,
                                     APValue &Result) {
   if (SourceTy->isIntegerType()) {
-    if (DestTy->isRealFloatingType()) {
+    if (DestTy->isFloatingType()) {
       Result = APValue(APFloat(0.0));
       return HandleIntToFloatCast(Info, E, FPO, SourceTy, Original.getInt(),
                                   DestTy, Result.getFloat());
@@ -12577,8 +12577,8 @@ static bool handleVectorElementCast(EvalInfo &Info, const FPOptions FPO,
           HandleIntToIntCast(Info, E, DestTy, SourceTy, Original.getInt()));
       return true;
     }
-  } else if (SourceTy->isRealFloatingType()) {
-    if (DestTy->isRealFloatingType()) {
+  } else if (SourceTy->isFloatingType()) {
+    if (DestTy->isFloatingType()) {
       Result = Original;
       return HandleFloatToFloatCast(Info, E, SourceTy, DestTy,
                                     Result.getFloat());
@@ -12703,7 +12703,7 @@ static bool evalShuffleGeneric(
     if (SrcIdx < 0) {
       // Zero out this element
       QualType ElemTy = VT->getElementType();
-      if (ElemTy->isRealFloatingType()) {
+      if (ElemTy->isFloatingType()) {
         ResultElements.push_back(
             APValue(APFloat::getZero(Info.Ctx.getFloatTypeSemantics(ElemTy))));
       } else if (ElemTy->isIntegerType()) {
@@ -13028,7 +13028,7 @@ bool VectorExprEvaluator::VisitCallExpr(const CallExpr *E) {
 
     for (unsigned EltNum = 0; EltNum < SourceLen; ++EltNum) {
       APValue CurrentEle = Source.getVectorElt(EltNum);
-      APValue Val = DestEltTy->isFloatingType()
+      APValue Val = DestEltTy->isFloatingOrComplexType()
                         ? APValue(llvm::abs(CurrentEle.getFloat()))
                         : APValue(APSInt(
                               CurrentEle.getInt().abs(),
@@ -16026,7 +16026,7 @@ bool ArrayExprEvaluator::VisitCXXParenListOrInitListExpr(
         if (DestTy->isIntegerType()) {
           Result.getArrayInitializedElt(ArrayIndex) = APValue(Value);
         } else {
-          assert(DestTy->isFloatingType() && "unexpected type");
+          assert(DestTy->isFloatingOrComplexType() && "unexpected type");
           const FPOptions FPO =
               Init->getFPFeaturesInEffect(Info.Ctx.getLangOpts());
           APFloat FValue(0.0);
@@ -16740,9 +16740,9 @@ static bool EvaluateBuiltinConstantP(EvalInfo &Info, const Expr *Arg) {
   // FIXME: GCC also intends to return 1 for literals of aggregate types, but
   // its support for this did not work prior to GCC 9 and is not yet well
   // understood.
-  if (ArgType->isIntegralOrEnumerationType() || ArgType->isFloatingType() ||
-      ArgType->isAnyComplexType() || ArgType->isPointerType() ||
-      ArgType->isNullPtrType()) {
+  if (ArgType->isIntegralOrEnumerationType() ||
+      ArgType->isFloatingOrComplexType() || ArgType->isAnyComplexType() ||
+      ArgType->isPointerType() || ArgType->isNullPtrType()) {
     APValue V;
     if (!::EvaluateAsRValue(Info, Arg, V) || Info.EvalStatus.HasSideEffects) {
       Fold.keepDiagnostics();
@@ -17253,7 +17253,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       if (ElemQT->isIntegerType()) { // Get value.
         ALane = SourceLHS.getVectorElt(I).getInt();
         BLane = SourceRHS.getVectorElt(I).getInt();
-      } else if (ElemQT->isFloatingType()) { // Get only sign bit.
+      } else if (ElemQT->isFloatingOrComplexType()) { // Get only sign bit.
         ALane =
             SourceLHS.getVectorElt(I).getFloat().bitcastToAPInt().isNegative();
         BLane =
@@ -18701,7 +18701,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
       APInt Elem;
       if (ElemQT->isIntegerType()) {
         Elem = Source.getVectorElt(I).getInt();
-      } else if (ElemQT->isRealFloatingType()) {
+      } else if (ElemQT->isFloatingType()) {
         Elem = Source.getVectorElt(I).getFloat().bitcastToAPInt();
       } else {
         return false;
@@ -19581,7 +19581,7 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
       LValue LV;
       EvaluateLValue(E->getLHS(), LV, Info);
       LHSOK = false;
-    } else if (LHSTy->isRealFloatingType()) {
+    } else if (LHSTy->isFloatingType()) {
       LHSOK = EvaluateFloat(E->getLHS(), LHS.FloatReal, Info);
       if (LHSOK) {
         LHS.makeComplexFloat();
@@ -19593,7 +19593,7 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
     if (!LHSOK && !Info.noteFailure())
       return false;
 
-    if (E->getRHS()->getType()->isRealFloatingType()) {
+    if (E->getRHS()->getType()->isFloatingType()) {
       if (!EvaluateFloat(E->getRHS(), RHS.FloatReal, Info) || !LHSOK)
         return false;
       RHS.makeComplexFloat();
@@ -19616,8 +19616,7 @@ EvaluateComparisonBinaryOperator(EvalInfo &Info, const BinaryOperator *E,
     }
   }
 
-  if (LHSTy->isRealFloatingType() &&
-      RHSTy->isRealFloatingType()) {
+  if (LHSTy->isFloatingType() && RHSTy->isFloatingType()) {
     APFloat RHS(0.0), LHS(0.0);
 
     bool LHSOK = EvaluateFloat(E->getRHS(), RHS, Info);
@@ -20875,7 +20874,7 @@ public:
 
 static bool EvaluateFloat(const Expr* E, APFloat& Result, EvalInfo &Info) {
   assert(!E->isValueDependent());
-  assert(E->isPRValue() && E->getType()->isRealFloatingType());
+  assert(E->isPRValue() && E->getType()->isFloatingType());
   return FloatExprEvaluator(Info, Result).Visit(E);
 }
 
@@ -21257,7 +21256,7 @@ static bool EvaluateComplex(const Expr *E, ComplexValue &Result,
 
 bool ComplexExprEvaluator::ZeroInitialization(const Expr *E) {
   QualType ElemTy = E->getType()->castAs<ComplexType>()->getElementType();
-  if (ElemTy->isRealFloatingType()) {
+  if (ElemTy->isFloatingType()) {
     Result.makeComplexFloat();
     APFloat Zero = APFloat::getZero(Info.Ctx.getFloatTypeSemantics(ElemTy));
     Result.FloatReal = Zero;
@@ -21274,7 +21273,7 @@ bool ComplexExprEvaluator::ZeroInitialization(const Expr *E) {
 bool ComplexExprEvaluator::VisitImaginaryLiteral(const ImaginaryLiteral *E) {
   const Expr* SubExpr = E->getSubExpr();
 
-  if (SubExpr->getType()->isRealFloatingType()) {
+  if (SubExpr->getType()->isFloatingType()) {
     Result.makeComplexFloat();
     APFloat &Imag = Result.FloatImag;
     if (!EvaluateFloat(SubExpr, Imag, Info))
@@ -21677,7 +21676,7 @@ bool ComplexExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
   bool LHSReal = false, RHSReal = false;
 
   bool LHSOK;
-  if (E->getLHS()->getType()->isRealFloatingType()) {
+  if (E->getLHS()->getType()->isFloatingType()) {
     LHSReal = true;
     APFloat &Real = Result.FloatReal;
     LHSOK = EvaluateFloat(E->getLHS(), Real, Info);
@@ -21692,7 +21691,7 @@ bool ComplexExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
     return false;
 
   ComplexValue RHS;
-  if (E->getRHS()->getType()->isRealFloatingType()) {
+  if (E->getRHS()->getType()->isFloatingType()) {
     RHSReal = true;
     APFloat &Real = RHS.FloatReal;
     if (!EvaluateFloat(E->getRHS(), Real, Info) || !LHSOK)
@@ -22156,7 +22155,7 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
     if (!EvaluatePointer(E, LV, Info))
       return false;
     LV.moveInto(Result);
-  } else if (T->isRealFloatingType()) {
+  } else if (T->isFloatingType()) {
     llvm::APFloat F(0.0);
     if (!EvaluateFloat(E, F, Info))
       return false;
@@ -22508,7 +22507,7 @@ bool Expr::EvaluateAsFloat(APFloat &Result, const ASTContext &Ctx,
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
 
-  if (!getType()->isRealFloatingType())
+  if (!getType()->isFloatingType())
     return false;
 
   ExprTimeTraceScope TimeScope(this, Ctx, "EvaluateAsFloat");

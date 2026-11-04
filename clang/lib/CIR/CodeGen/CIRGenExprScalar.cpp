@@ -476,7 +476,7 @@ public:
                                    mlir::Location loc) {
     assert(srcType.isCanonical() && "EmitScalarConversion strips typedefs");
 
-    if (srcType->isRealFloatingType())
+    if (srcType->isFloatingType())
       return emitFloatToBoolConversion(src, loc);
 
     if (llvm::isa<MemberPointerType>(srcType)) {
@@ -693,7 +693,7 @@ public:
 
       // Special case for atomic increment/decrement on floats.
       // Bail out non-power-of-2-sized floating point types (e.g., x86_fp80).
-      if (valType->isFloatingType()) {
+      if (valType->isFloatingOrComplexType()) {
         mlir::Type fpTy = cgf.convertType(valType);
         auto fpType = mlir::cast<cir::FPTypeInterface>(fpTy);
         // Bail on non-power-of-2 types (e.g., x86_fp80 is 80 bits).
@@ -797,7 +797,7 @@ public:
         CIRGenFunction::CIRGenFPOptionsRAII FPOptsRAII(cgf, e);
         value = emitFloatIncOrDec(e, input);
       }
-    } else if (type->isRealFloatingType()) {
+    } else if (type->isFloatingType()) {
       CIRGenFunction::CIRGenFPOptionsRAII FPOptsRAII(cgf, e);
       value = emitFloatIncOrDec(e, input);
     } else if (type->isFixedPointType()) {
@@ -1059,13 +1059,13 @@ public:
       }
 
       if (dstType->isFixedPointType() || dstType->isIntegerType() ||
-          dstType->isRealFloatingType())
+          dstType->isFloatingType())
         return emitFixedPointConversion(src, srcType, dstType, cgf.getLoc(loc));
 
       llvm_unreachable("Unhandled scalar conversion from a fixed point type to "
                        "another type.");
     } else if (dstType->isFixedPointType()) {
-      if (srcType->isIntegerType() || srcType->isRealFloatingType()) {
+      if (srcType->isIntegerType() || srcType->isFloatingType()) {
         // This also includes converting booleans and enums to fixed point
         // types.
         return emitFixedPointConversion(src, srcType, dstType, cgf.getLoc(loc));
@@ -2217,11 +2217,11 @@ mlir::Value ScalarExprEmitter::emitFixedPointConversion(mlir::Value src,
 
   CIRGenFixedPointBuilder fpBuilder(builder, loc);
   mlir::Value result;
-  if (srcTy->isRealFloatingType()) {
+  if (srcTy->isFloatingType()) {
     assert(dstTy->isFixedPointType());
     result = fpBuilder.createFloatingToFixed(
         src, cgf.getContext().getFixedPointSemantics(dstTy));
-  } else if (dstTy->isRealFloatingType()) {
+  } else if (dstTy->isFloatingType()) {
     assert(srcTy->isFixedPointType());
     result = fpBuilder.createFixedToFloating(
         src, cgf.getContext().getFixedPointSemantics(srcTy),
@@ -3096,13 +3096,13 @@ mlir::Value CIRGenFunction::emitComplexToScalarConversion(mlir::Value src,
 
   QualType complexElemTy = srcTy->castAs<ComplexType>()->getElementType();
   if (dstTy->isBooleanType()) {
-    auto kind = complexElemTy->isFloatingType()
+    auto kind = complexElemTy->isFloatingOrComplexType()
                     ? cir::CastKind::float_complex_to_bool
                     : cir::CastKind::int_complex_to_bool;
     return builder.createCast(getLoc(loc), kind, src, convertType(dstTy));
   }
 
-  auto kind = complexElemTy->isFloatingType()
+  auto kind = complexElemTy->isFloatingOrComplexType()
                   ? cir::CastKind::float_complex_to_real
                   : cir::CastKind::int_complex_to_real;
   mlir::Value real =

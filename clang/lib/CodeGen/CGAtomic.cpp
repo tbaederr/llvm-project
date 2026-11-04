@@ -666,30 +666,34 @@ static void EmitAtomicOp(CodeGenFunction &CGF, AtomicExpr *E, Address Dest,
 
   case AtomicExpr::AO__atomic_add_fetch:
   case AtomicExpr::AO__scoped_atomic_add_fetch:
-    PostOp = E->getValueType()->isFloatingType() ? llvm::Instruction::FAdd
-                                                 : llvm::Instruction::Add;
+    PostOp = E->getValueType()->isFloatingOrComplexType()
+                 ? llvm::Instruction::FAdd
+                 : llvm::Instruction::Add;
     [[fallthrough]];
   case AtomicExpr::AO__c11_atomic_fetch_add:
   case AtomicExpr::AO__hip_atomic_fetch_add:
   case AtomicExpr::AO__opencl_atomic_fetch_add:
   case AtomicExpr::AO__atomic_fetch_add:
   case AtomicExpr::AO__scoped_atomic_fetch_add:
-    Op = E->getValueType()->isFloatingType() ? llvm::AtomicRMWInst::FAdd
-                                             : llvm::AtomicRMWInst::Add;
+    Op = E->getValueType()->isFloatingOrComplexType()
+             ? llvm::AtomicRMWInst::FAdd
+             : llvm::AtomicRMWInst::Add;
     break;
 
   case AtomicExpr::AO__atomic_sub_fetch:
   case AtomicExpr::AO__scoped_atomic_sub_fetch:
-    PostOp = E->getValueType()->isFloatingType() ? llvm::Instruction::FSub
-                                                 : llvm::Instruction::Sub;
+    PostOp = E->getValueType()->isFloatingOrComplexType()
+                 ? llvm::Instruction::FSub
+                 : llvm::Instruction::Sub;
     [[fallthrough]];
   case AtomicExpr::AO__c11_atomic_fetch_sub:
   case AtomicExpr::AO__hip_atomic_fetch_sub:
   case AtomicExpr::AO__opencl_atomic_fetch_sub:
   case AtomicExpr::AO__atomic_fetch_sub:
   case AtomicExpr::AO__scoped_atomic_fetch_sub:
-    Op = E->getValueType()->isFloatingType() ? llvm::AtomicRMWInst::FSub
-                                             : llvm::AtomicRMWInst::Sub;
+    Op = E->getValueType()->isFloatingOrComplexType()
+             ? llvm::AtomicRMWInst::FSub
+             : llvm::AtomicRMWInst::Sub;
     break;
 
   case AtomicExpr::AO__atomic_min_fetch:
@@ -701,7 +705,7 @@ static void EmitAtomicOp(CodeGenFunction &CGF, AtomicExpr *E, Address Dest,
   case AtomicExpr::AO__opencl_atomic_fetch_min:
   case AtomicExpr::AO__atomic_fetch_min:
   case AtomicExpr::AO__scoped_atomic_fetch_min:
-    Op = E->getValueType()->isFloatingType()
+    Op = E->getValueType()->isFloatingOrComplexType()
              ? llvm::AtomicRMWInst::FMin
              : (E->getValueType()->isSignedIntegerType()
                     ? llvm::AtomicRMWInst::Min
@@ -710,14 +714,14 @@ static void EmitAtomicOp(CodeGenFunction &CGF, AtomicExpr *E, Address Dest,
 
   case AtomicExpr::AO__atomic_fetch_fminimum:
   case AtomicExpr::AO__scoped_atomic_fetch_fminimum:
-    assert(E->getValueType()->isFloatingType() &&
+    assert(E->getValueType()->isFloatingOrComplexType() &&
            "fminimum operations only support floating-point types");
     Op = llvm::AtomicRMWInst::FMinimum;
     break;
 
   case AtomicExpr::AO__atomic_fetch_fminimum_num:
   case AtomicExpr::AO__scoped_atomic_fetch_fminimum_num:
-    assert(E->getValueType()->isFloatingType() &&
+    assert(E->getValueType()->isFloatingOrComplexType() &&
            "fminimum_num operations only support floating-point types");
     Op = llvm::AtomicRMWInst::FMinimumNum;
     break;
@@ -731,7 +735,7 @@ static void EmitAtomicOp(CodeGenFunction &CGF, AtomicExpr *E, Address Dest,
   case AtomicExpr::AO__opencl_atomic_fetch_max:
   case AtomicExpr::AO__atomic_fetch_max:
   case AtomicExpr::AO__scoped_atomic_fetch_max:
-    Op = E->getValueType()->isFloatingType()
+    Op = E->getValueType()->isFloatingOrComplexType()
              ? llvm::AtomicRMWInst::FMax
              : (E->getValueType()->isSignedIntegerType()
                     ? llvm::AtomicRMWInst::Max
@@ -740,14 +744,14 @@ static void EmitAtomicOp(CodeGenFunction &CGF, AtomicExpr *E, Address Dest,
 
   case AtomicExpr::AO__atomic_fetch_fmaximum:
   case AtomicExpr::AO__scoped_atomic_fetch_fmaximum:
-    assert(E->getValueType()->isFloatingType() &&
+    assert(E->getValueType()->isFloatingOrComplexType() &&
            "fmaximum operations only support floating-point types");
     Op = llvm::AtomicRMWInst::FMaximum;
     break;
 
   case AtomicExpr::AO__atomic_fetch_fmaximum_num:
   case AtomicExpr::AO__scoped_atomic_fetch_fmaximum_num:
-    assert(E->getValueType()->isFloatingType() &&
+    assert(E->getValueType()->isFloatingOrComplexType() &&
            "fmaximum_num operations only support floating-point types");
     Op = llvm::AtomicRMWInst::FMaximumNum;
     break;

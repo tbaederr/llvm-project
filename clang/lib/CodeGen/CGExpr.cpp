@@ -4076,7 +4076,7 @@ llvm::Constant *CodeGenFunction::EmitCheckTypeDescriptor(QualType T) {
       TypeKind = TK_BitInt;
       IsBitInt = true;
     }
-  } else if (T->isFloatingType()) {
+  } else if (T->isFloatingOrComplexType()) {
     TypeKind = TK_Float;
     TypeInfo = getContext().getTypeSize(T);
   }

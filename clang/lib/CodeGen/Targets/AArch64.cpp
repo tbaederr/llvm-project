@@ -1205,7 +1205,7 @@ static void diagnoseIfNeedsFPReg(DiagnosticsEngine &Diags,
                                  SourceLocation loc) {
   const Type *HABase = nullptr;
   uint64_t HAMembers = 0;
-  if (Ty->isFloatingType() || Ty->isVectorType() ||
+  if (Ty->isFloatingOrComplexType() || Ty->isVectorType() ||
       ABIInfo.isHomogeneousAggregate(Ty, HABase, HAMembers)) {
     Diags.Report(loc, diag::err_target_unsupported_type_for_abi)
         << D->getDeclName() << Ty << ABIName;

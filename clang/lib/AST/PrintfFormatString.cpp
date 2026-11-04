@@ -1049,7 +1049,7 @@ bool PrintfSpecifier::fixType(QualType QT, const LangOptions &LangOpt,
     HasPlusPrefix = false;
   }
   // Test for Floating type first as LongDouble can pass isUnsignedIntegerType
-  else if (QT->isRealFloatingType()) {
+  else if (QT->isFloatingType()) {
     CS.setKind(ConversionSpecifier::fArg);
   } else if (QT->isSignedIntegerType()) {
     CS.setKind(ConversionSpecifier::dArg);

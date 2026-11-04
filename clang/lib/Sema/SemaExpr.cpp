@@ -800,7 +800,7 @@ ExprResult Sema::UsualUnaryFPConversions(Expr *E) {
   assert(!Ty.isNull() && "UsualUnaryFPConversions - missing type");
 
   LangOptions::FPEvalMethodKind EvalMethod = CurFPFeatures.getFPEvalMethod();
-  if (EvalMethod != LangOptions::FEM_Source && Ty->isFloatingType() &&
+  if (EvalMethod != LangOptions::FEM_Source && Ty->isFloatingOrComplexType() &&
       (getLangOpts().getFPEvalMethod() !=
            LangOptions::FPEvalMethodKind::FEM_UnsetOnCommandLine ||
        PP.getLastFPEvalPragmaLocation().isValid())) {
@@ -1144,7 +1144,8 @@ static bool handleComplexIntegerToFloatConversion(Sema &S, ExprResult &IntExpr,
                                                   QualType IntTy,
                                                   QualType ComplexTy,
                                                   bool SkipCast) {
-  if (IntTy->isComplexType() || IntTy->isRealFloatingType()) return true;
+  if (IntTy->isComplexType() || IntTy->isFloatingType())
+    return true;
   if (SkipCast) return false;
   if (IntTy->isIntegerType()) {
     QualType fpTy = ComplexTy->castAs<ComplexType>()->getElementType();
@@ -1248,8 +1249,8 @@ static QualType handleIntToFloatConversion(Sema &S, ExprResult &FloatExpr,
 static QualType handleFloatConversion(Sema &S, ExprResult &LHS,
                                       ExprResult &RHS, QualType LHSType,
                                       QualType RHSType, bool IsCompAssign) {
-  bool LHSFloat = LHSType->isRealFloatingType();
-  bool RHSFloat = RHSType->isRealFloatingType();
+  bool LHSFloat = LHSType->isFloatingType();
+  bool RHSFloat = RHSType->isFloatingType();
 
   // N1169 4.1.4: If one of the operands has a floating type and the other
   //              operand has a fixed-point type, the fixed-point operand
@@ -1298,7 +1299,8 @@ static QualType handleFloatConversion(Sema &S, ExprResult &LHS,
 static bool unsupportedTypeConversion(const Sema &S, QualType LHSType,
                                       QualType RHSType) {
   // No issue if either is not a floating point type.
-  if (!LHSType->isFloatingType() || !RHSType->isFloatingType())
+  if (!LHSType->isFloatingOrComplexType() ||
+      !RHSType->isFloatingOrComplexType())
     return false;
 
   // No issue if both have the same 128-bit float semantics.
@@ -1589,8 +1591,8 @@ void Sema::checkEnumArithmeticConversions(Expr *LHS, Expr *RHS,
   bool LEnum = L->isUnscopedEnumerationType(),
        REnum = R->isUnscopedEnumerationType();
   bool IsCompAssign = ACK == ArithConvKind::CompAssign;
-  if ((!IsCompAssign && LEnum && R->isFloatingType()) ||
-      (REnum && L->isFloatingType())) {
+  if ((!IsCompAssign && LEnum && R->isFloatingOrComplexType()) ||
+      (REnum && L->isFloatingOrComplexType())) {
     Diag(Loc, getLangOpts().CPlusPlus26 ? diag::err_arith_conv_enum_float_cxx26
               : getLangOpts().CPlusPlus20
                   ? diag::warn_arith_conv_enum_float_cxx20
@@ -1777,7 +1779,7 @@ QualType Sema::UsualArithmeticConversions(ExprResult &LHS, ExprResult &RHS,
                                    ACK == ArithConvKind::CompAssign);
 
   // Now handle "real" floating types (i.e. float, double, long double).
-  if (LHSType->isRealFloatingType() || RHSType->isRealFloatingType())
+  if (LHSType->isFloatingType() || RHSType->isFloatingType())
     return handleFloatConversion(*this, LHS, RHS, LHSType, RHSType,
                                  ACK == ArithConvKind::CompAssign);
 
@@ -8177,8 +8179,8 @@ bool Sema::areVectorTypesSameSize(QualType SrcTy, QualType DestTy) {
 
   // x87 long double has padding bits, so it cannot be bitcast to another type.
   auto IsX87LongDouble = [&](QualType T) {
-    return T->isRealFloatingType() && &Context.getFloatTypeSemantics(T) ==
-                                          &llvm::APFloat::x87DoubleExtended();
+    return T->isFloatingType() && &Context.getFloatTypeSemantics(T) ==
+                                      &llvm::APFloat::x87DoubleExtended();
   };
   if (IsX87LongDouble(SrcEltTy) != IsX87LongDouble(DestEltTy))
     return false;
@@ -8304,14 +8306,14 @@ ExprResult Sema::prepareVectorSplat(QualType VectorTy, Expr *SplattedExpr) {
   if (DestElemTy == SplattedExpr->getType())
     return SplattedExpr;
 
-  assert(DestElemTy->isFloatingType() ||
+  assert(DestElemTy->isFloatingOrComplexType() ||
          DestElemTy->isIntegralOrEnumerationType());
 
   CastKind CK;
   if (VectorTy->isExtVectorType() && SplattedExpr->getType()->isBooleanType()) {
     // OpenCL requires that we convert `true` boolean expressions to -1, but
     // only when splatting vectors.
-    if (DestElemTy->isFloatingType()) {
+    if (DestElemTy->isFloatingOrComplexType()) {
       // To avoid having to have a CK_BooleanToSignedFloating cast kind, we cast
       // in two steps: boolean to signed integral, then to floating.
       ExprResult CastExprRes = ImpCastExprToType(SplattedExpr, Context.IntTy,
@@ -8337,7 +8339,7 @@ ExprResult Sema::prepareMatrixSplat(QualType MatrixTy, Expr *SplattedExpr) {
   if (DestElemTy == SplattedExpr->getType())
     return SplattedExpr;
 
-  assert(DestElemTy->isFloatingType() ||
+  assert(DestElemTy->isFloatingOrComplexType() ||
          DestElemTy->isIntegralOrEnumerationType());
 
   ExprResult CastExprRes = SplattedExpr;
@@ -8655,7 +8657,7 @@ static bool checkCondition(Sema &S, const Expr *Cond,
   QualType CondTy = Cond->getType();
 
   // OpenCL v1.1 s6.3.i says the condition cannot be a floating point type.
-  if (S.getLangOpts().OpenCL && CondTy->isFloatingType()) {
+  if (S.getLangOpts().OpenCL && CondTy->isFloatingOrComplexType()) {
     S.Diag(QuestionLoc, diag::err_typecheck_cond_expect_nonfloat)
       << CondTy << Cond->getSourceRange();
     return true;
@@ -8934,13 +8936,13 @@ static QualType OpenCLArithmeticConversions(Sema &S, ExprResult &LHS,
   QualType RHSType =
     S.Context.getCanonicalType(RHS.get()->getType()).getUnqualifiedType();
 
-  if (!LHSType->isIntegerType() && !LHSType->isRealFloatingType()) {
+  if (!LHSType->isIntegerType() && !LHSType->isFloatingType()) {
     S.Diag(QuestionLoc, diag::err_typecheck_cond_expect_int_float)
       << LHSType << LHS.get()->getSourceRange();
     return QualType();
   }
 
-  if (!RHSType->isIntegerType() && !RHSType->isRealFloatingType()) {
+  if (!RHSType->isIntegerType() && !RHSType->isFloatingType()) {
     S.Diag(QuestionLoc, diag::err_typecheck_cond_expect_int_float)
       << RHSType << RHS.get()->getSourceRange();
     return QualType();
@@ -8951,7 +8953,7 @@ static QualType OpenCLArithmeticConversions(Sema &S, ExprResult &LHS,
     return LHSType;
 
   // Now handle "real" floating types (i.e. float, double, long double).
-  if (LHSType->isRealFloatingType() || RHSType->isRealFloatingType())
+  if (LHSType->isFloatingType() || RHSType->isFloatingType())
     return handleFloatConversion(S, LHS, RHS, LHSType, RHSType,
                                  /*IsCompAssign = */ false);
 
@@ -10729,25 +10731,25 @@ static bool tryVectorConvertAndSplat(Sema &S, ExprResult *scalar,
   if (vectorEltTy->isBooleanType() && scalarTy->isIntegralType(S.Context)) {
     scalarCast = CK_IntegralToBoolean;
   } else if (vectorEltTy->isIntegralType(S.Context)) {
-    if (S.getLangOpts().OpenCL && (scalarTy->isRealFloatingType() ||
-        (scalarTy->isIntegerType() &&
-         S.Context.getIntegerTypeOrder(vectorEltTy, scalarTy) < 0))) {
+    if (S.getLangOpts().OpenCL &&
+        (scalarTy->isFloatingType() ||
+         (scalarTy->isIntegerType() &&
+          S.Context.getIntegerTypeOrder(vectorEltTy, scalarTy) < 0))) {
       DiagID = diag::err_opencl_scalar_type_rank_greater_than_vector_type;
       return true;
     }
     if (!scalarTy->isIntegralType(S.Context))
       return true;
     scalarCast = CK_IntegralCast;
-  } else if (vectorEltTy->isRealFloatingType()) {
-    if (scalarTy->isRealFloatingType()) {
+  } else if (vectorEltTy->isFloatingType()) {
+    if (scalarTy->isFloatingType()) {
       if (S.getLangOpts().OpenCL &&
           S.Context.getFloatingTypeOrder(vectorEltTy, scalarTy) < 0) {
         DiagID = diag::err_opencl_scalar_type_rank_greater_than_vector_type;
         return true;
       }
       scalarCast = CK_FloatingCast;
-    }
-    else if (scalarTy->isIntegralType(S.Context))
+    } else if (scalarTy->isIntegralType(S.Context))
       scalarCast = CK_IntegralToFloating;
     else
       return true;
@@ -10918,13 +10920,13 @@ static bool tryGCCVectorConvertAndSplat(Sema &S, ExprResult *Scalar,
 
     ScalarCast = CK_IntegralCast;
   } else if (VectorEltTy->isIntegralType(S.Context) &&
-             ScalarTy->isRealFloatingType()) {
+             ScalarTy->isFloatingType()) {
     if (S.Context.getTypeSize(VectorEltTy) == S.Context.getTypeSize(ScalarTy))
       ScalarCast = CK_FloatingToIntegral;
     else
       return true;
-  } else if (VectorEltTy->isRealFloatingType()) {
-    if (ScalarTy->isRealFloatingType()) {
+  } else if (VectorEltTy->isFloatingType()) {
+    if (ScalarTy->isFloatingType()) {
 
       // Reject cases where the scalar type is not a constant and has a higher
       // Order than the vector element type.
@@ -11349,7 +11351,7 @@ static void DetectPrecisionLossInComplexDivision(Sema &S, QualType DivisorTy,
   QualType ElementType = CT->getElementType().getCanonicalType();
   bool IsComplexRangePromoted = S.getLangOpts().getComplexRange() ==
                                 LangOptions::ComplexRangeKind::CX_Promoted;
-  if (!ElementType->isFloatingType() || !IsComplexRangePromoted)
+  if (!ElementType->isFloatingOrComplexType() || !IsComplexRangePromoted)
     return;
 
   ASTContext &Ctx = S.getASTContext();
@@ -11574,7 +11576,7 @@ QualType Sema::CheckRemainderOperands(
 
   if (compType.isNull() ||
       (!compType->isIntegerType() &&
-       !(getLangOpts().HLSL && compType->isFloatingType()))) {
+       !(getLangOpts().HLSL && compType->isFloatingOrComplexType()))) {
     QualType ResultTy = InvalidOperands(Loc, LHS, RHS);
     diagnoseScopedEnums(*this, Loc, LHS, RHS,
                         IsCompAssign ? BO_RemAssign : BO_Rem);
@@ -14293,8 +14295,8 @@ inline QualType Sema::CheckLogicalOperands(ExprResult &LHS, ExprResult &RHS,
     // not operate on the built-in scalar and vector float types.
     if (Context.getLangOpts().OpenCL &&
         Context.getLangOpts().OpenCLVersion < 120) {
-      if (LHS.get()->getType()->isFloatingType() ||
-          RHS.get()->getType()->isFloatingType())
+      if (LHS.get()->getType()->isFloatingOrComplexType() ||
+          RHS.get()->getType()->isFloatingOrComplexType())
         return InvalidOperands(Loc, LHS, RHS);
     }
 

@@ -383,7 +383,7 @@ TEST_F(InterpreterTest, Value) {
   EXPECT_TRUE(V2.hasValue());
   EXPECT_EQ(V2.getDouble(), 3.14);
   EXPECT_EQ(V2.convertTo<double>(), 3.14);
-  EXPECT_TRUE(V2.getType()->isFloatingType());
+  EXPECT_TRUE(V2.getType()->isFloatingOrComplexType());
   EXPECT_EQ(V2.getKind(), Value::K_Double);
   EXPECT_FALSE(V2.isManuallyAlloc());
 

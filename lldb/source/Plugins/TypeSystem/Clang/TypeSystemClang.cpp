@@ -3159,7 +3159,7 @@ TypeSystemClang::IsHomogeneousAggregate(lldb::opaque_compiler_type_t type,
                ++field_pos) {
             clang::QualType field_qual_type = field_pos->getType();
             uint64_t field_bitwidth = getASTContext().getTypeSize(qual_type);
-            if (field_qual_type->isFloatingType()) {
+            if (field_qual_type->isFloatingOrComplexType()) {
               if (field_qual_type->isComplexType())
                 return 0;
               else {
@@ -3521,7 +3521,7 @@ bool TypeSystemClang::IsFloatingPointType(lldb::opaque_compiler_type_t type) {
   if (qual_type.isNull())
     return false;
 
-  return qual_type->isFloatingType();
+  return qual_type->isFloatingOrComplexType();
 }
 
 bool TypeSystemClang::IsDefined(lldb::opaque_compiler_type_t type) {
@@ -3988,7 +3988,7 @@ TypeSystemClang::GetTypeInfo(lldb::opaque_compiler_type_t type,
       clang::QualType complex_element_type(complex_type->getElementType());
       if (complex_element_type->isIntegerType())
         complex_type_flags |= eTypeIsInteger;
-      else if (complex_element_type->isFloatingType())
+      else if (complex_element_type->isFloatingOrComplexType())
         complex_type_flags |= eTypeIsFloat;
     }
     return complex_type_flags;
@@ -4093,7 +4093,7 @@ TypeSystemClang::GetTypeInfo(lldb::opaque_compiler_type_t type,
 
     if (element_type->isIntegerType())
       vector_type_flags |= eTypeIsInteger;
-    else if (element_type->isFloatingType())
+    else if (element_type->isFloatingOrComplexType())
       vector_type_flags |= eTypeIsFloat;
     return vector_type_flags;
   }
@@ -7749,7 +7749,8 @@ void TypeSystemClang::SetFloatingInitializerForVariable(
 
   clang::ASTContext &ast = var->getASTContext();
   QualType qt = var->getType();
-  assert(qt->isFloatingType() && "only floating point types supported");
+  assert(qt->isFloatingOrComplexType() &&
+         "only floating point types supported");
   var->setInit(FloatingLiteral::Create(
       ast, init_value, true, qt.getUnqualifiedType(), SourceLocation()));
 }

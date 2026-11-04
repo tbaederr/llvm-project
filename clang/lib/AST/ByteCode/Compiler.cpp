@@ -634,8 +634,8 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
     // HLSL uses CK_FloatingCast to cast between vectors.
     if (E->getType()->isVectorType())
       return this->emitVectorConversion(E->getSubExpr(), E);
-    if (!SubExpr->getType()->isFloatingType() ||
-        !E->getType()->isFloatingType())
+    if (!SubExpr->getType()->isFloatingOrComplexType() ||
+        !E->getType()->isFloatingOrComplexType())
       return false;
     if (!this->visit(SubExpr))
       return false;
@@ -646,7 +646,7 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
   case CK_IntegralToFloating: {
     if (E->getType()->isVectorType())
       return this->emitVectorConversion(E->getSubExpr(), E);
-    if (!E->getType()->isRealFloatingType())
+    if (!E->getType()->isFloatingType())
       return false;
     if (!this->visit(SubExpr))
       return false;
@@ -658,7 +658,7 @@ bool Compiler<Emitter>::VisitCastExpr(const CastExpr *E) {
   case CK_FloatingToBoolean: {
     if (E->getType()->isVectorType())
       return this->emitVectorConversion(E->getSubExpr(), E);
-    if (!SubExpr->getType()->isRealFloatingType() ||
+    if (!SubExpr->getType()->isFloatingType() ||
         !E->getType()->hasBooleanRepresentation())
       return false;
     if (const auto *FL = dyn_cast<FloatingLiteral>(SubExpr))
@@ -1460,21 +1460,21 @@ bool Compiler<Emitter>::VisitBinaryOperator(const BinaryOperator *E) {
   case BO_GE:
     return MaybeCastToBool(this->emitGE(*LT, E));
   case BO_Sub:
-    if (E->getType()->isFloatingType())
+    if (E->getType()->isFloatingOrComplexType())
       return Discard(this->emitSubf(getFPOptions(E), E));
     return Discard(this->emitSub(*T, E));
   case BO_Add:
-    if (E->getType()->isFloatingType())
+    if (E->getType()->isFloatingOrComplexType())
       return Discard(this->emitAddf(getFPOptions(E), E));
     return Discard(this->emitAdd(*T, E));
   case BO_Mul:
-    if (E->getType()->isFloatingType())
+    if (E->getType()->isFloatingOrComplexType())
       return Discard(this->emitMulf(getFPOptions(E), E));
     return Discard(this->emitMul(*T, E));
   case BO_Rem:
     return Discard(this->emitRem(*T, E));
   case BO_Div:
-    if (E->getType()->isFloatingType())
+    if (E->getType()->isFloatingOrComplexType())
       return Discard(this->emitDivf(getFPOptions(E), E));
     return Discard(this->emitDiv(*T, E));
   case BO_And:
@@ -3308,7 +3308,7 @@ bool Compiler<Emitter>::VisitFloatCompoundAssignOperator(
   OptPrimType LT = classify(LHSComputationType);
   OptPrimType RT = classify(ResultType);
 
-  assert(ResultType->isFloatingType());
+  assert(ResultType->isFloatingOrComplexType());
 
   if (!LT || !RT)
     return false;
@@ -3449,7 +3449,7 @@ bool Compiler<Emitter>::VisitCompoundAssignOperator(
     return VisitPointerCompoundAssignOperator(E);
 
   assert(!E->getType()->isPointerType() && "Handled above");
-  assert(!E->getType()->isFloatingType() && "Handled above");
+  assert(!E->getType()->isFloatingOrComplexType() && "Handled above");
 
   if (isSideEffectFree(RHS)) {
     if (!visit(LHS))
@@ -4799,7 +4799,7 @@ bool Compiler<Emitter>::emitVectorConversion(const Expr *Src, const Expr *E) {
     if (SrcElemT != ElemT) {
       if (!this->emitPrimCast(SrcElemT, ElemT, ElemType, E))
         return false;
-    } else if (ElemType->isFloatingType() && SrcType != ElemType) {
+    } else if (ElemType->isFloatingOrComplexType() && SrcType != ElemType) {
       const auto *TargetSemantics = &Ctx.getFloatSemantics(ElemType);
       if (!this->emitCastFP(TargetSemantics, getRoundingMode(E), E))
         return false;

@@ -348,7 +348,7 @@ static bool BuiltinAlignment(Sema &S, CallExpr *TheCall, unsigned ID) {
       SrcTy->isFunctionPointerType()) {
     S.Diag(Source->getExprLoc(), diag::err_typecheck_expect_scalar_operand)
         << SrcTy;
-    if (SrcTy->isFloatingType())
+    if (SrcTy->isFloatingOrComplexType())
       S.Diag(Source->getExprLoc(), diag::note_alignment_invalid_type);
     else if (SrcTy->isMemberPointerType())
       S.Diag(Source->getExprLoc(), diag::note_alignment_invalid_member_pointer);
@@ -2482,7 +2482,7 @@ checkMathBuiltinElementType(Sema &S, SourceLocation Loc, QualType ArgTy,
     }
     break;
   case Sema::EltwiseBuiltinArgTyRestriction::FloatTy:
-    if (!EltTy->isRealFloatingType()) {
+    if (!EltTy->isFloatingType()) {
       // FIXME: make diagnostic's wording correct for matrices
       return S.Diag(Loc, diag::err_builtin_invalid_arg_type)
              << ArgOrdinal << /* scalar or vector */ 5 << /* no int */ 0
@@ -2497,7 +2497,7 @@ checkMathBuiltinElementType(Sema &S, SourceLocation Loc, QualType ArgTy,
     }
     break;
   case Sema::EltwiseBuiltinArgTyRestriction::SignedIntOrFloatTy:
-    if (!EltTy->isSignedIntegerType() && !EltTy->isRealFloatingType()) {
+    if (!EltTy->isSignedIntegerType() && !EltTy->isFloatingType()) {
       return S.Diag(Loc, diag::err_builtin_invalid_arg_type)
              << 1 << /* scalar or vector */ 5 << /* signed int */ 2
              << /* or fp */ 1 << ArgTy;
@@ -4002,9 +4002,9 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
     QualType Ty1 = Arg1->getType();
     const VectorType *VecTy0 = Ty0->getAs<VectorType>();
     const VectorType *VecTy1 = Ty1->getAs<VectorType>();
-    if (Ty0->isFloatingType() || Ty1->isFloatingType() ||
-        (VecTy0 && VecTy0->getElementType()->isFloatingType()) ||
-        (VecTy1 && VecTy1->getElementType()->isFloatingType()))
+    if (Ty0->isFloatingOrComplexType() || Ty1->isFloatingOrComplexType() ||
+        (VecTy0 && VecTy0->getElementType()->isFloatingOrComplexType()) ||
+        (VecTy1 && VecTy1->getElementType()->isFloatingOrComplexType()))
       Diag(TheCall->getBeginLoc(), diag::warn_deprecated_builtin_no_suggestion)
           << Context.BuiltinInfo.getQuotedName(BuiltinID);
     break;
@@ -4097,7 +4097,7 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
     else if (Arg->getType()->isSizelessVectorType())
       ElTy = Arg->getType()->getSizelessVectorEltType(Context);
 
-    if (ElTy.isNull() || !ElTy->isFloatingType()) {
+    if (ElTy.isNull() || !ElTy->isFloatingOrComplexType()) {
       Diag(Arg->getBeginLoc(), diag::err_builtin_invalid_arg_type)
           << 1 << /* vector of */ 4 << /* no int */ 0 << /* fp */ 1
           << Arg->getType();
@@ -4146,7 +4146,7 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
     TheCall->setArg(0, Vec.get());
 
     QualType ElTy = getVectorElementType(Context, Vec.get()->getType());
-    if (ElTy.isNull() || !ElTy->isRealFloatingType()) {
+    if (ElTy.isNull() || !ElTy->isFloatingType()) {
       Diag(Vec.get()->getBeginLoc(), diag::err_builtin_invalid_arg_type)
           << 1 << /* vector of */ 4 << /* no int */ 0 << /* fp */ 1
           << Vec.get()->getType();
@@ -4158,7 +4158,7 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
       if (StartValue.isInvalid())
         return ExprError();
 
-      if (!StartValue.get()->getType()->isRealFloatingType()) {
+      if (!StartValue.get()->getType()->isFloatingType()) {
         Diag(StartValue.get()->getBeginLoc(),
              diag::err_builtin_invalid_arg_type)
             << 2 << /* scalar */ 1 << /* no int */ 0 << /* fp */ 1
@@ -5510,7 +5510,7 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
         return (AllowedType & AOEVT_Int) || AllowedType != AOEVT_FP;
       if (ValType->isPointerType())
         return AllowedType & AOEVT_Pointer;
-      if (!(ValType->isFloatingType() && (AllowedType & AOEVT_FP)))
+      if (!(ValType->isFloatingOrComplexType() && (AllowedType & AOEVT_FP)))
         return false;
       // LLVM Parser does not allow atomicrmw with x86_fp80 type.
       if (IsX87LongDouble)
@@ -6252,7 +6252,7 @@ ExprResult Sema::BuiltinNontemporalOverloaded(ExprResult TheCallResult) {
   // Strip any qualifiers off ValType.
   ValType = ValType.getUnqualifiedType();
   if (!ValType->isIntegerType() && !ValType->isAnyPointerType() &&
-      !ValType->isBlockPointerType() && !ValType->isFloatingType() &&
+      !ValType->isBlockPointerType() && !ValType->isFloatingOrComplexType() &&
       !ValType->isVectorType()) {
     Diag(DRE->getBeginLoc(),
          diag::err_nontemporal_builtin_must_be_pointer_intfltptr_or_vector)
@@ -6569,7 +6569,7 @@ bool Sema::BuiltinUnorderedCompare(CallExpr *TheCall, unsigned BuiltinID) {
 
   // If the common type isn't a real floating type, then the arguments were
   // invalid for this operation.
-  if (Res.isNull() || !Res->isRealFloatingType())
+  if (Res.isNull() || !Res->isFloatingType())
     return Diag(OrigArg0.get()->getBeginLoc(),
                 diag::err_typecheck_call_invalid_ordered_compare)
            << OrigArg0.get()->getType() << OrigArg1.get()->getType()
@@ -6640,7 +6640,7 @@ bool Sema::BuiltinFPClassification(CallExpr *TheCall, unsigned NumArgs,
   }
 
   // This operation requires a non-_Complex floating-point number.
-  if (!ElementTy->isRealFloatingType())
+  if (!ElementTy->isFloatingType())
     return Diag(OrigArg->getBeginLoc(),
                 diag::err_typecheck_call_invalid_unary_fp)
            << OrigArg->getType() << OrigArg->getSourceRange();
@@ -6686,7 +6686,7 @@ bool Sema::BuiltinComplex(CallExpr *TheCall) {
 
     // Despite supporting _Complex int, GCC requires a real floating point type
     // for the operands of __builtin_complex.
-    if (!T->isRealFloatingType()) {
+    if (!T->isFloatingType()) {
       return Diag(Arg->getBeginLoc(), diag::err_typecheck_call_requires_real_fp)
              << Arg->getType() << Arg->getSourceRange();
     }
@@ -10585,7 +10585,7 @@ enum AbsoluteValueKind {
 static AbsoluteValueKind getAbsoluteValueKind(QualType T) {
   if (T->isIntegralOrEnumerationType())
     return AVK_Integer;
-  if (T->isRealFloatingType())
+  if (T->isFloatingType())
     return AVK_Floating;
   if (T->isAnyComplexType())
     return AVK_Complex;
@@ -10701,7 +10701,7 @@ static void emitReplacement(Sema &S, SourceLocation Loc, SourceRange Range,
     FunctionName = "std::abs";
     if (ArgType->isIntegralOrEnumerationType()) {
       HeaderName = "cstdlib";
-    } else if (ArgType->isRealFloatingType()) {
+    } else if (ArgType->isFloatingType()) {
       HeaderName = "cmath";
     } else {
       llvm_unreachable("Invalid Type");
@@ -10889,8 +10889,8 @@ void Sema::CheckAbsoluteValueFunction(const CallExpr *Call,
 
   // Prevent reaching unreachable code in getAbsoluteValueKind for unsupported
   // types.
-  if (!ArgType->isIntegralOrEnumerationType() &&
-      !ArgType->isRealFloatingType() && !ArgType->isAnyComplexType())
+  if (!ArgType->isIntegralOrEnumerationType() && !ArgType->isFloatingType() &&
+      !ArgType->isAnyComplexType())
     return;
 
   AbsoluteValueKind ArgValueKind = getAbsoluteValueKind(ArgType);
@@ -13926,7 +13926,7 @@ void Sema::CheckImplicitConversion(Expr *E, QualType T, SourceLocation CC,
   // initialization-list syntax, we might lose accuracy if the floating
   // point type has a narrower significand than the integer type.
   if (SourceBT && TargetBT && SourceBT->isIntegerType() &&
-      TargetBT->isFloatingType() && !IsListInit) {
+      TargetBT->isFloatingOrComplexType() && !IsListInit) {
     // Determine the number of precision bits in the source integer type.
     std::optional<IntRange> SourceRange =
         TryGetExprRange(Context, E, isConstantEvaluatedContext(),

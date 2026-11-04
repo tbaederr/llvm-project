@@ -97,7 +97,7 @@ ABIArgInfo CSKYABIInfo::classifyArgumentType(QualType Ty, int &ArgGPRsLeft,
 
   uint64_t Size = getContext().getTypeSize(Ty);
   // Pass floating point values via FPRs if possible.
-  if (Ty->isFloatingType() && !Ty->isComplexType() && FLen >= Size &&
+  if (Ty->isFloatingOrComplexType() && !Ty->isComplexType() && FLen >= Size &&
       ArgFPRsLeft) {
     ArgFPRsLeft--;
     return ABIArgInfo::getDirect();

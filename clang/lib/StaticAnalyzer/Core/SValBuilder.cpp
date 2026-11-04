@@ -947,7 +947,8 @@ public:
         }
       }
 
-      if (!CastTy->isFloatingType() || !SE || SE->getType()->isFloatingType()) {
+      if (!CastTy->isFloatingOrComplexType() || !SE ||
+          SE->getType()->isFloatingOrComplexType()) {
         // FIXME: Correctly support promotions/truncations.
         const unsigned CastSize = Context.getIntWidth(CastTy);
         if (CastSize == V.getNumBits())
@@ -992,8 +993,8 @@ public:
         return simplifySymbolCast(V, CastTy);
       }
       if (!Loc::isLocType(CastTy))
-        if (!IsUnknownOriginalType || !CastTy->isFloatingType() ||
-            T->isFloatingType())
+        if (!IsUnknownOriginalType || !CastTy->isFloatingOrComplexType() ||
+            T->isFloatingOrComplexType())
           return VB.makeNonLoc(SE, T, CastTy);
     }
 

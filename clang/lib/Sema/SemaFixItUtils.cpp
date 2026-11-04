@@ -178,7 +178,7 @@ static std::string getScalarZeroExpressionForType(
   if ((T.isObjCObjectPointerType() || T.isBlockPointerType()) &&
       isMacroDefined(S, Loc, "nil"))
     return "nil";
-  if (T.isRealFloatingType())
+  if (T.isFloatingType())
     return "0.0";
   if (T.isBooleanType() &&
       (S.LangOpts.CPlusPlus || isMacroDefined(S, Loc, "false")))

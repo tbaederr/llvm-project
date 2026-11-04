@@ -144,7 +144,7 @@ bool ConversionChecker::isLossOfPrecision(const ImplicitCastExpr *Cast,
   if (!DestType->isRealType() || !SubType->isIntegerType())
     return false;
 
-  const bool isFloat = DestType->isFloatingType();
+  const bool isFloat = DestType->isFloatingOrComplexType();
 
   const auto &AC = C.getASTContext();
 

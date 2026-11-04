@@ -584,7 +584,7 @@ bool ScanfSpecifier::fixType(QualType QT, QualType RawQT,
   }
 
   // Figure out the conversion specifier.
-  if (PT->isRealFloatingType())
+  if (PT->isFloatingType())
     CS.setKind(ConversionSpecifier::fArg);
   else if (PT->isSignedIntegerType())
     CS.setKind(ConversionSpecifier::dArg);

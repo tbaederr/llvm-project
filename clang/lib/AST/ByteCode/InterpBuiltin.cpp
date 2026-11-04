@@ -1890,7 +1890,7 @@ static bool interp__builtin_elementwise_abs(InterpState &S, CodePtr OpPC,
     return true;
   }
 
-  if (Ty->isFloatingType()) {
+  if (Ty->isFloatingOrComplexType()) {
     Floating Val = S.Stk.pop<Floating>();
     Floating Result = abs(S, Val);
     S.Stk.push<Floating>(Result);
@@ -2707,7 +2707,7 @@ static bool interp__builtin_elementwise_fp_binop(
     bool IsScalar = false) {
   assert((Call->getNumArgs() == 2) || (Call->getNumArgs() == 3));
   const auto *VT = Call->getArg(0)->getType()->castAs<VectorType>();
-  assert(VT->getElementType()->isFloatingType());
+  assert(VT->getElementType()->isFloatingOrComplexType());
   unsigned NumElems = VT->getNumElements();
 
   // Vector case.
@@ -3385,7 +3385,7 @@ static bool interp__builtin_elementwise_triop_fp(
          ElemQT == Arg3Type->castAs<VectorType>()->getElementType());
   assert(NumElems == Arg2Type->castAs<VectorType>()->getNumElements() &&
          NumElems == Arg3Type->castAs<VectorType>()->getNumElements());
-  assert(ElemQT->isRealFloatingType());
+  assert(ElemQT->isFloatingType());
   (void)ElemQT;
 
   const Pointer &VZ = S.Stk.pop<Pointer>();
@@ -3490,7 +3490,7 @@ static bool interp__builtin_ia32_test_op(
         ALane = LHS.elem<T>(I).toAPSInt();
         BLane = RHS.elem<T>(I).toAPSInt();
       });
-    } else if (ElemQT->isFloatingType()) { // Get only sign bit.
+    } else if (ElemQT->isFloatingOrComplexType()) { // Get only sign bit.
       using T = PrimConv<PT_Float>::T;
       ALane = LHS.elem<T>(I).getAPFloat().bitcastToAPInt().isNegative();
       BLane = RHS.elem<T>(I).getAPFloat().bitcastToAPInt().isNegative();
@@ -3521,7 +3521,7 @@ static bool interp__builtin_ia32_movmsk_op(InterpState &S, CodePtr OpPC,
     APInt Elem;
     if (ElemQT->isIntegerType()) {
       INT_TYPE_SWITCH_NO_BOOL(*ElemT, { Elem = Source.elem<T>(I).toAPSInt(); });
-    } else if (ElemQT->isRealFloatingType()) {
+    } else if (ElemQT->isFloatingType()) {
       using T = PrimConv<PT_Float>::T;
       Elem = Source.elem<T>(I).getAPFloat().bitcastToAPInt();
     } else {

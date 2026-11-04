@@ -496,7 +496,7 @@ static bool isIntegerLikeType(QualType Ty, ASTContext &Context,
     return false;
 
   // Float types are never treated as "integer like".
-  if (Ty->isRealFloatingType())
+  if (Ty->isFloatingType())
     return false;
 
   // If this is a builtin or pointer type then it is ok.

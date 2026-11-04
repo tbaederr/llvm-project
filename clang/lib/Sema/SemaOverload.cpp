@@ -416,7 +416,7 @@ NarrowingKind StandardConversionSequence::getNarrowingKind(
   switch (Second) {
   // 'bool' is an integral type; dispatch to the right place to handle it.
   case ICK_Boolean_Conversion:
-    if (FromType->isRealFloatingType())
+    if (FromType->isFloatingType())
       goto FloatingIntegralConversion;
     if (FromType->isIntegralOrUnscopedEnumerationType())
       goto IntegralConversion;
@@ -431,10 +431,10 @@ NarrowingKind StandardConversionSequence::getNarrowingKind(
   //    the original value when converted back to the original type, or
   case ICK_Floating_Integral:
   FloatingIntegralConversion:
-    if (FromType->isRealFloatingType() && ToType->isIntegralType(Ctx)) {
+    if (FromType->isFloatingType() && ToType->isIntegralType(Ctx)) {
       return NK_Type_Narrowing;
     } else if (FromType->isIntegralOrUnscopedEnumerationType() &&
-               ToType->isRealFloatingType()) {
+               ToType->isFloatingType()) {
       if (IgnoreFloatToIntegralConversion)
         return NK_Not_Narrowing;
       const Expr *Initializer = IgnoreNarrowingConversion(Ctx, Converted);
@@ -475,7 +475,7 @@ NarrowingKind StandardConversionSequence::getNarrowingKind(
   //    conversion is within the range of values that can be represented (even
   //    if it cannot be represented exactly), or
   case ICK_Floating_Conversion:
-    if (FromType->isRealFloatingType() && ToType->isRealFloatingType() &&
+    if (FromType->isFloatingType() && ToType->isFloatingType() &&
         Ctx.getFloatingTypeOrder(FromType, ToType) == 1) {
       // FromType is larger than ToType.
       const Expr *Initializer = IgnoreNarrowingConversion(Ctx, Converted);
@@ -2099,7 +2099,7 @@ bool Sema::IsFunctionConversion(QualType FromType, QualType ToType) const {
 ///
 static bool IsFloatingPointConversion(Sema &S, QualType FromType,
                                       QualType ToType) {
-  if (!FromType->isRealFloatingType() || !ToType->isRealFloatingType())
+  if (!FromType->isFloatingType() || !ToType->isFloatingType())
     return false;
   // FIXME: disable conversions between long double, __ibm128 and __float128
   // if their representation is different until there is back end support
@@ -2146,9 +2146,9 @@ static bool IsVectorOrMatrixElementConversion(Sema &S, QualType FromType,
     return true;
   }
 
-  if ((FromType->isRealFloatingType() && ToType->isIntegralType(S.Context)) ||
+  if ((FromType->isFloatingType() && ToType->isIntegralType(S.Context)) ||
       (FromType->isIntegralOrUnscopedEnumerationType() &&
-       ToType->isRealFloatingType())) {
+       ToType->isFloatingType())) {
     ICK = ICK_Floating_Integral;
     return true;
   }
@@ -2622,10 +2622,10 @@ static bool IsStandardConversion(Sema &S, Expr* From, QualType ToType,
     // Floating point conversions (C++ 4.8).
     SCS.Second = ICK_Floating_Conversion;
     FromType = ToType.getUnqualifiedType();
-  } else if ((FromType->isRealFloatingType() &&
+  } else if ((FromType->isFloatingType() &&
               ToType->isIntegralType(S.Context)) ||
              (FromType->isIntegralOrUnscopedEnumerationType() &&
-              ToType->isRealFloatingType())) {
+              ToType->isFloatingType())) {
 
     // Floating-integral conversions (C++ 4.9).
     SCS.Second = ICK_Floating_Integral;

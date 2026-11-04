@@ -1044,7 +1044,7 @@ public:
 Value *ScalarExprEmitter::EmitConversionToBool(Value *Src, QualType SrcType) {
   assert(SrcType.isCanonical() && "EmitScalarConversion strips typedefs");
 
-  if (SrcType->isRealFloatingType())
+  if (SrcType->isFloatingType())
     return EmitFloatToBoolConversion(Src);
 
   if (const MemberPointerType *MPT = dyn_cast<MemberPointerType>(SrcType))
@@ -1067,7 +1067,8 @@ Value *ScalarExprEmitter::EmitConversionToBool(Value *Src, QualType SrcType) {
 void ScalarExprEmitter::EmitFloatConversionCheck(
     Value *OrigSrc, QualType OrigSrcType, Value *Src, QualType SrcType,
     QualType DstType, llvm::Type *DstTy, SourceLocation Loc) {
-  assert(SrcType->isFloatingType() && "not a conversion from floating point");
+  assert(SrcType->isFloatingOrComplexType() &&
+         "not a conversion from floating point");
   if (!isa<llvm::IntegerType>(DstTy))
     return;
 
@@ -1651,13 +1652,13 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
       // behavior.
       return Builder.CreateIsNotNull(Src, "tobool");
     if (DstType->isFixedPointType() || DstType->isIntegerType() ||
-        DstType->isRealFloatingType())
+        DstType->isFloatingType())
       return EmitFixedPointConversion(Src, SrcType, DstType, Loc);
 
     llvm_unreachable(
         "Unhandled scalar conversion from a fixed point type to another type.");
   } else if (DstType->isFixedPointType()) {
-    if (SrcType->isIntegerType() || SrcType->isRealFloatingType())
+    if (SrcType->isIntegerType() || SrcType->isFloatingType())
       // This also includes converting booleans and enums to fixed point types.
       return EmitFixedPointConversion(Src, SrcType, DstType, Loc);
 
@@ -1809,7 +1810,7 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
   // [-inf,+inf], so no overflow can ever happen when the destination type is a
   // floating-point type.
   if (CGF.SanOpts.has(SanitizerKind::FloatCastOverflow) &&
-      OrigSrcType->isFloatingType())
+      OrigSrcType->isFloatingOrComplexType())
     EmitFloatConversionCheck(OrigSrc, OrigSrcType, Src, SrcType, DstType, DstTy,
                              Loc);
 
@@ -1854,10 +1855,10 @@ Value *ScalarExprEmitter::EmitFixedPointConversion(Value *Src, QualType SrcTy,
                                                    SourceLocation Loc) {
   llvm::FixedPointBuilder<CGBuilderTy> FPBuilder(Builder);
   llvm::Value *Result;
-  if (SrcTy->isRealFloatingType())
+  if (SrcTy->isFloatingType())
     Result = FPBuilder.CreateFloatingToFixed(Src,
         CGF.getContext().getFixedPointSemantics(DstTy));
-  else if (DstTy->isRealFloatingType())
+  else if (DstTy->isFloatingType())
     Result = FPBuilder.CreateFixedToFloating(Src,
         CGF.getContext().getFixedPointSemantics(SrcTy),
         ConvertType(DstTy));
@@ -3387,7 +3388,7 @@ ScalarExprEmitter::EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
     }
     // Special case for atomic increment/decrement on floats.
     // Bail out non-power-of-2-sized floating point types (e.g., x86_fp80).
-    if (type->isFloatingType()) {
+    if (type->isFloatingOrComplexType()) {
       llvm::Type *Ty = ConvertType(type);
       if (llvm::has_single_bit(Ty->getScalarSizeInBits())) {
         llvm::AtomicRMWInst::BinOp aop =
@@ -3556,7 +3557,7 @@ ScalarExprEmitter::EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
     }
 
   // Floating point.
-  } else if (type->isRealFloatingType()) {
+  } else if (type->isFloatingType()) {
     // Add the inc/dec to the real part.
     llvm::Value *amt;
     CodeGenFunction::CGFPOptionsRAII FPOptsRAII(CGF, E);
@@ -4106,7 +4107,7 @@ LValue ScalarExprEmitter::EmitCompoundAssignLValue(
     // back as a single atomic operation. Integer promotion is still
     // semantically safe.
     bool CanEmitAtomicRMW;
-    if (AtomicValueTy->isFloatingType()) {
+    if (AtomicValueTy->isFloatingOrComplexType()) {
       llvm::Type *IRTy = CGF.ConvertType(AtomicValueTy);
       uint64_t StoreBits = CGF.CGM.getDataLayout().getTypeStoreSizeInBits(IRTy);
       // Floating atomicrmw operations cannot model constrained FP semantics.
@@ -4126,7 +4127,7 @@ LValue ScalarExprEmitter::EmitCompoundAssignLValue(
     if (CanEmitAtomicRMW) {
       llvm::AtomicRMWInst::BinOp AtomicOp = llvm::AtomicRMWInst::BAD_BINOP;
       llvm::Instruction::BinaryOps Op;
-      if (AtomicValueTy->isFloatingType()) {
+      if (AtomicValueTy->isFloatingOrComplexType()) {
         switch (OpInfo.Opcode) {
         case BO_AddAssign:
           AtomicOp = llvm::AtomicRMWInst::FAdd;
@@ -4333,8 +4334,7 @@ Value *ScalarExprEmitter::EmitDiv(const BinOpInfo &Ops) {
       llvm::Value *Zero = llvm::Constant::getNullValue(ConvertType(Ops.Ty));
       EmitUndefinedBehaviorIntegerDivAndRemCheck(Ops, Zero, true);
     } else if (CGF.SanOpts.has(SanitizerKind::FloatDivideByZero) &&
-               Ops.Ty->isRealFloatingType() &&
-               Ops.mayHaveFloatDivisionByZero()) {
+               Ops.Ty->isFloatingType() && Ops.mayHaveFloatDivisionByZero()) {
       llvm::Value *Zero = llvm::Constant::getNullValue(ConvertType(Ops.Ty));
       llvm::Value *NonZero = Builder.CreateFCmpUNE(Ops.RHS, Zero);
       EmitBinOpCheck(
@@ -5415,7 +5415,7 @@ Value *ScalarExprEmitter::EmitCompare(const BinaryOperator *E,
     }
 
     Value *ResultR, *ResultI;
-    if (CETy->isRealFloatingType()) {
+    if (CETy->isFloatingType()) {
       // As complex comparisons can only be equality comparisons, they
       // are never signaling comparisons.
       ResultR = Builder.CreateFCmp(FCmpOpc, LHS.first, RHS.first, "cmp.r");

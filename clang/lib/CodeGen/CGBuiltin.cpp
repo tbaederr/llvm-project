@@ -4094,7 +4094,8 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     QualType ArgType = Arg->getType();
     // FIXME: The allowance for Obj-C pointers and block pointers is historical
     // and likely a mistake.
-    if (!ArgType->isIntegralOrEnumerationType() && !ArgType->isFloatingType() &&
+    if (!ArgType->isIntegralOrEnumerationType() &&
+        !ArgType->isFloatingOrComplexType() &&
         !ArgType->isObjCObjectPointerType() && !ArgType->isBlockPointerType())
       // Per the GCC documentation, only numeric constants are recognized after
       // inlining.
@@ -4541,7 +4542,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
         return Intrinsic::vector_reduce_smax;
       if (QT->isUnsignedIntegerType())
         return Intrinsic::vector_reduce_umax;
-      assert(QT->isFloatingType() && "must have a float here");
+      assert(QT->isFloatingOrComplexType() && "must have a float here");
       return Intrinsic::vector_reduce_fmax;
     };
     return RValue::get(emitBuiltinWithOneOverloadedType<1>(
@@ -4559,7 +4560,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
         return Intrinsic::vector_reduce_smin;
       if (QT->isUnsignedIntegerType())
         return Intrinsic::vector_reduce_umin;
-      assert(QT->isFloatingType() && "must have a float here");
+      assert(QT->isFloatingOrComplexType() && "must have a float here");
       return Intrinsic::vector_reduce_fmin;
     };
 

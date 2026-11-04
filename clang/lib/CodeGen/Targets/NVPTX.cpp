@@ -130,7 +130,7 @@ bool NVPTXABIInfo::isUnsupportedType(QualType T) const {
     return true;
   if (!Context.getTargetInfo().hasFloat128Type() &&
       (T->isFloat128Type() ||
-       (T->isRealFloatingType() && Context.getTypeSize(T) == 128)))
+       (T->isFloatingType() && Context.getTypeSize(T) == 128)))
     return true;
   if (const auto *EIT = T->getAs<BitIntType>())
     return EIT->getNumBits() >

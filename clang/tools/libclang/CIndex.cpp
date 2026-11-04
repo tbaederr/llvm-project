@@ -4818,7 +4818,7 @@ static const ExprEvalResult *evaluateExpr(Expr *expr, CXCursor C) {
     if (rettype->isVectorType() || callExpr->getNumArgs() > 1)
       return nullptr;
 
-    if (rettype->isIntegralType(ctx) || rettype->isRealFloatingType()) {
+    if (rettype->isIntegralType(ctx) || rettype->isFloatingType()) {
       if (callExpr->getNumArgs() == 1 &&
           !callExpr->getArg(0)->getType()->isIntegralType(ctx))
         return nullptr;

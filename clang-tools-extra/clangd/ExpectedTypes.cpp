@@ -28,7 +28,7 @@ static const Type *toEquivClass(ASTContext &Ctx, QualType T) {
     return Ctx.BoolTy.getTypePtr();
   if (T->isIntegerType() && !T->isEnumeralType())
     return Ctx.IntTy.getTypePtr(); // All integers are equivalent.
-  if (T->isFloatingType() && !T->isComplexType())
+  if (T->isFloatingOrComplexType() && !T->isComplexType())
     return Ctx.FloatTy.getTypePtr(); // All floats are equivalent.
 
   // Do some simple transformations.

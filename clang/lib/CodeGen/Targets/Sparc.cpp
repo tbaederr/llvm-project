@@ -74,7 +74,7 @@ ABIArgInfo SparcV8ABIInfo::classifyReturnType(QualType Ty) const {
   if (const auto *VT = Ty->getAs<VectorType>()) {
     uint64_t Size = getContext().getTypeSize(Ty);
     // Return float vectors and larger integer vectors indirectly.
-    if (VT->getElementType()->isRealFloatingType() || Size > 64)
+    if (VT->getElementType()->isFloatingType() || Size > 64)
       return getNaturalAlignIndirect(Ty, getDataLayout().getAllocaAddrSpace());
 
     // Return smaller integer vectors via float registers.
@@ -100,7 +100,7 @@ ABIArgInfo SparcV8ABIInfo::classifyArgumentType(QualType Ty) const {
   // Pass floating-point vectors and vectors larger than 64 bits by reference.
   if (const auto *VT = Ty->getAs<VectorType>()) {
     uint64_t SizeInBits = getContext().getTypeSize(Ty);
-    if (VT->getElementType()->isRealFloatingType() || SizeInBits > 64)
+    if (VT->getElementType()->isFloatingType() || SizeInBits > 64)
       return getNaturalAlignIndirect(Ty, getDataLayout().getAllocaAddrSpace());
   }
 

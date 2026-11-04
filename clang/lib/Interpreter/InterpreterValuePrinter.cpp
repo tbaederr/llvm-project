@@ -420,7 +420,7 @@ public:
   InterfaceKind VisitBuiltinType(const BuiltinType *Ty) {
     if (Ty->isNullPtrType())
       Args.push_back(E);
-    else if (Ty->isFloatingType())
+    else if (Ty->isFloatingOrComplexType())
       Args.push_back(E);
     else if (Ty->isIntegralOrEnumerationType())
       HandleIntegralOrEnumType(Ty);

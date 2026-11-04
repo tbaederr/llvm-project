@@ -196,7 +196,7 @@ bool RISCVABIInfo::detectFPCCEligibleStructHelper(QualType Ty, CharUnits CurOff,
                                                   llvm::Type *&Field2Ty,
                                                   CharUnits &Field2Off) const {
   bool IsInt = Ty->isIntegralOrEnumerationType();
-  bool IsFloat = Ty->isRealFloatingType();
+  bool IsFloat = Ty->isFloatingType();
 
   if (IsInt || IsFloat) {
     uint64_t Size = getContext().getTypeSize(Ty);
@@ -231,7 +231,7 @@ bool RISCVABIInfo::detectFPCCEligibleStructHelper(QualType Ty, CharUnits CurOff,
     // eligible to be passed in floating-point argument registers. Complex
     // integer types (a GNU extension) should be treated like a normal
     // aggregate and packed into GPRs instead.
-    if (!EltTy->isRealFloatingType())
+    if (!EltTy->isFloatingType())
       return false;
     if (getContext().getTypeSize(EltTy) > FLen)
       return false;
@@ -761,7 +761,7 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
     return ABIArgInfo::getIgnore();
 
   // Pass floating point values via FPRs if possible.
-  if (IsFixed && Ty->isFloatingType() && !Ty->isComplexType() &&
+  if (IsFixed && Ty->isFloatingOrComplexType() && !Ty->isComplexType() &&
       FLen >= Size && ArgFPRsLeft) {
     ArgFPRsLeft--;
     return ABIArgInfo::getDirect();

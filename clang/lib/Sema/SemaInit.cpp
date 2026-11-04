@@ -564,7 +564,7 @@ class InitListChecker {
     // Otherwise try to fill whole array with embed data.
     if (Entity.getKind() == InitializedEntity::EK_ArrayElement &&
         (Entity.getType()->isIntegerType() ||
-         Entity.getType()->isRealFloatingType())) {
+         Entity.getType()->isFloatingType())) {
       unsigned ArrIndex = Entity.getElementIndex();
       auto *AType =
           SemaRef.Context.getAsArrayType(Entity.getParent()->getType());
@@ -2009,7 +2009,7 @@ void InitListChecker::CheckVectorType(const InitializedEntity &Entity,
       const char *typeCode;
       unsigned typeSize = SemaRef.Context.getTypeSize(elementType);
 
-      if (elementType->isFloatingType())
+      if (elementType->isFloatingOrComplexType())
         typeCode = "f";
       else if (elementType->isSignedIntegerType())
         typeCode = "s";
@@ -5231,7 +5231,7 @@ static void TryListInitialization(Sema &S,
         DestType->isEnumeralType() && DestType->castAsEnumDecl()->isFixed() &&
         !S.Context.hasSameUnqualifiedType(E->getType(), DestType) &&
         (E->getType()->isIntegralOrUnscopedEnumerationType() ||
-         E->getType()->isFloatingType())) {
+         E->getType()->isFloatingOrComplexType())) {
       // There are two ways that T(v) can work when T is an enumeration type.
       // If there is either an implicit conversion sequence from v to T or
       // a conversion function that can convert from v to T, then we use that.
@@ -5248,7 +5248,7 @@ static void TryListInitialization(Sema &S,
       // If E is of a floating-point type, then the conversion is ill-formed
       // due to narrowing, but go through the motions in order to produce the
       // right diagnostic.
-      ICS.Standard.Second = E->getType()->isFloatingType()
+      ICS.Standard.Second = E->getType()->isFloatingOrComplexType()
                                 ? ICK_Floating_Integral
                                 : ICK_Integral_Conversion;
       ICS.Standard.setFromType(E->getType());

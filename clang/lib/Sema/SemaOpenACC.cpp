@@ -2727,7 +2727,7 @@ Expr *GenerateReductionInitRecipeExpr(ASTContext &Context,
       // for both ints and floats.
 
       QualType EltTy = Cplx->getElementType();
-      if (EltTy->isFloatingType()) {
+      if (EltTy->isFloatingOrComplexType()) {
         Exprs.push_back(FloatingLiteral::Create(
             Context, getInitFloatValue(Context, InitKind::Zero, EltTy),
             /*isExact=*/true, EltTy, ExprRange.getBegin()));
@@ -2743,7 +2743,7 @@ Expr *GenerateReductionInitRecipeExpr(ASTContext &Context,
             ExprRange.getBegin()));
       }
 
-    } else if (Ty->isFloatingType()) {
+    } else if (Ty->isFloatingOrComplexType()) {
       Exprs.push_back(
           FloatingLiteral::Create(Context, getInitFloatValue(Context, IK, Ty),
                                   /*isExact=*/true, Ty, ExprRange.getBegin()));

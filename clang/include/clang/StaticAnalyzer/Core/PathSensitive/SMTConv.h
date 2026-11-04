@@ -42,7 +42,7 @@ public:
     if (Ty->isBooleanType())
       return Solver->getBoolSort();
 
-    if (Ty->isRealFloatingType())
+    if (Ty->isFloatingType())
       return Solver->getFloatSort(BitWidth);
 
     return Solver->getBitvectorSort(BitWidth);
@@ -306,21 +306,21 @@ public:
       return Exp;
     }
 
-    if (FromTy->isRealFloatingType() && ToTy->isRealFloatingType()) {
+    if (FromTy->isFloatingType() && ToTy->isFloatingType()) {
       if (ToBitWidth != FromBitWidth)
         return Solver->mkFPtoFP(Exp, Solver->getFloatSort(ToBitWidth));
 
       return Exp;
     }
 
-    if (FromTy->isIntegralOrEnumerationType() && ToTy->isRealFloatingType()) {
+    if (FromTy->isIntegralOrEnumerationType() && ToTy->isFloatingType()) {
       llvm::SMTSortRef Sort = Solver->getFloatSort(ToBitWidth);
       return FromTy->isSignedIntegerOrEnumerationType()
                  ? Solver->mkSBVtoFP(Exp, Sort)
                  : Solver->mkUBVtoFP(Exp, Sort);
     }
 
-    if (FromTy->isRealFloatingType() && ToTy->isIntegralOrEnumerationType())
+    if (FromTy->isFloatingType() && ToTy->isIntegralOrEnumerationType())
       return ToTy->isSignedIntegerOrEnumerationType()
                  ? Solver->mkFPtoSBV(Exp, ToBitWidth)
                  : Solver->mkFPtoUBV(Exp, ToBitWidth);
@@ -365,7 +365,7 @@ public:
     if (Ty->isBooleanType())
       return Exp;
 
-    if (Ty->isRealFloatingType()) {
+    if (Ty->isFloatingType()) {
       llvm::APFloat Zero =
           llvm::APFloat::getZero(Ctx.getFloatTypeSemantics(Ty));
       return fromFloatBinOp(Solver, Exp, BO_NE, Solver->mkFloat(Zero));
@@ -417,7 +417,7 @@ public:
     if (LTy->isAnyPointerType() && RTy->isAnyPointerType() && Op == BO_Sub)
       RetTy = Ctx.getPointerDiffType();
 
-    return LTy->isRealFloatingType()
+    return LTy->isFloatingType()
                ? fromFloatBinOp(Solver, NewLHS, Op, NewRHS)
                : fromBinOp(Solver, NewLHS, Op, NewRHS,
                            LTy->isSignedIntegerOrEnumerationType());
@@ -522,7 +522,7 @@ public:
       }
 
       llvm::SMTExprRef UnaryExp =
-          OperandTy->isRealFloatingType()
+          OperandTy->isFloatingType()
               ? fromFloatUnOp(Solver, USE->getOpcode(), OperandExp.value())
               : fromUnOp(Solver, USE->getOpcode(), OperandExp.value());
 
@@ -569,7 +569,7 @@ public:
                                              ASTContext &Ctx,
                                              const llvm::SMTExprRef &Exp,
                                              QualType Ty, bool Assumption) {
-    if (Ty->isRealFloatingType()) {
+    if (Ty->isFloatingType()) {
       llvm::APFloat Zero =
           llvm::APFloat::getZero(Ctx.getFloatTypeSemantics(Ty));
       return fromFloatBinOp(Solver, Exp, Assumption ? BO_EQ : BO_NE,
@@ -670,7 +670,7 @@ public:
       return;
     }
 
-    if (LTy->isRealFloatingType() || RTy->isRealFloatingType()) {
+    if (LTy->isFloatingType() || RTy->isFloatingType()) {
       SMTConv::doFloatTypeConversion<llvm::SMTExprRef, &fromCast>(
           Solver, Ctx, LHS, LTy, RHS, RTy);
       return;
@@ -821,12 +821,12 @@ public:
     uint64_t RBitWidth = Ctx.getTypeSize(RTy);
 
     // Perform float-point type promotion
-    if (!LTy->isRealFloatingType()) {
+    if (!LTy->isFloatingType()) {
       LHS = (*doCast)(Solver, LHS, RTy, RBitWidth, LTy, LBitWidth);
       LTy = RTy;
       LBitWidth = RBitWidth;
     }
-    if (!RTy->isRealFloatingType()) {
+    if (!RTy->isFloatingType()) {
       RHS = (*doCast)(Solver, RHS, LTy, LBitWidth, RTy, RBitWidth);
       RTy = LTy;
       RBitWidth = LBitWidth;

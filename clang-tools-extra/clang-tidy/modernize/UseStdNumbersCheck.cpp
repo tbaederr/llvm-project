@@ -58,7 +58,7 @@ AST_MATCHER(QualType, isArithmetic) {
   return !Node.isNull() && Node->isArithmeticType();
 }
 AST_MATCHER(QualType, isFloating) {
-  return !Node.isNull() && Node->isFloatingType();
+  return !Node.isNull() && Node->isFloatingOrComplexType();
 }
 
 AST_MATCHER_P(Expr, anyOfExhaustive, std::vector<Matcher<Stmt>>, Exprs) {

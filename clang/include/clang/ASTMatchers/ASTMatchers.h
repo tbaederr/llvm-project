@@ -7211,9 +7211,7 @@ extern const AstTypeMatcher<ComplexType> complexType;
 /// \endcode
 /// realFloatingPointType()
 ///   matches "float f" but not "int i"
-AST_MATCHER(Type, realFloatingPointType) {
-  return Node.isRealFloatingType();
-}
+AST_MATCHER(Type, realFloatingPointType) { return Node.isFloatingType(); }
 
 /// Matches arrays and C99 complex types that have a specific element
 /// type.

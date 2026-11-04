@@ -2350,7 +2350,7 @@ void Sema::checkTypeSupport(QualType Ty, SourceLocation Loc, ValueDecl *D) {
     // Check if we are dealing with two 'long double' but with different
     // semantics.
     bool LongDoubleMismatched = false;
-    if (Ty->isRealFloatingType() && Context.getTypeSize(Ty) == 128) {
+    if (Ty->isFloatingType() && Context.getTypeSize(Ty) == 128) {
       const llvm::fltSemantics &Sem = Context.getFloatTypeSemantics(Ty);
       if ((&Sem != &llvm::APFloat::PPCDoubleDouble() &&
            !Context.getTargetInfo().hasFloat128Type()) ||

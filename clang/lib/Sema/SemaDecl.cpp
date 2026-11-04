@@ -14544,7 +14544,8 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
         Diag(VDecl->getLocation(), diag::err_in_class_initializer_volatile);
 
     // We allow foldable floating-point constants as an extension.
-    } else if (DclT->isFloatingType()) { // also permits complex, which is ok
+    } else if (DclT->isFloatingOrComplexType()) { // also permits complex, which
+                                                  // is ok
       // In C++98, this is a GNU extension. In C++11, it is not, but we support
       // it anyway and provide a fixit to add the 'constexpr'.
       if (getLangOpts().CPlusPlus11) {

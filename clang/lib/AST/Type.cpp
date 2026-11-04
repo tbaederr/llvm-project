@@ -856,7 +856,7 @@ bool Type::isUnionType() const {
 
 bool Type::isComplexType() const {
   if (const auto *CT = getAsCanonical<ComplexType>())
-    return CT->getElementType()->isFloatingType();
+    return CT->getElementType()->isFloatingOrComplexType();
   return false;
 }
 
@@ -2517,23 +2517,23 @@ bool Type::hasUnsignedIntegerRepresentation() const {
 bool Type::isFloatingType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->isFloatingPoint();
+  return false;
+}
+
+bool Type::isFloatingOrComplexType() const {
+  if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
+    return BT->isFloatingPoint();
   if (const auto *CT = dyn_cast<ComplexType>(CanonicalType))
-    return CT->getElementType()->isFloatingType();
+    return CT->getElementType()->isFloatingOrComplexType();
   return false;
 }
 
 bool Type::hasFloatingRepresentation() const {
   if (const auto *VT = dyn_cast<VectorType>(CanonicalType))
-    return VT->getElementType()->isFloatingType();
+    return VT->getElementType()->isFloatingOrComplexType();
   if (const auto *MT = dyn_cast<MatrixType>(CanonicalType))
-    return MT->getElementType()->isFloatingType();
-  return isFloatingType();
-}
-
-bool Type::isRealFloatingType() const {
-  if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->isFloatingPoint();
-  return false;
+    return MT->getElementType()->isFloatingOrComplexType();
+  return isFloatingOrComplexType();
 }
 
 bool Type::isRealType() const {
@@ -2607,7 +2607,7 @@ Type::ScalarTypeKind Type::getScalarTypeKind() const {
     assert(T->castAsEnumDecl()->isComplete());
     return STK_Integral;
   } else if (const auto *CT = dyn_cast<ComplexType>(T)) {
-    if (CT->getElementType()->isRealFloatingType())
+    if (CT->getElementType()->isFloatingType())
       return STK_FloatingComplex;
     return STK_IntegralComplex;
   } else if (isBitIntType()) {
