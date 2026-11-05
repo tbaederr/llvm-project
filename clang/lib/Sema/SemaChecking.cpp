@@ -12893,6 +12893,7 @@ static void AnalyzeComparison(Sema &S, BinaryOperator *E) {
   Expr *RHS = E->getRHS();
 
   if (T->isIntegralType(S.Context)) {
+#if 0
     std::optional<llvm::APSInt> RHSValue =
         RHS->getIntegerConstantExpr(S.Context);
     std::optional<llvm::APSInt> LHSValue =
@@ -12915,6 +12916,7 @@ static void AnalyzeComparison(Sema &S, BinaryOperator *E) {
       if (CheckTautologicalComparison(S, E, Const, Other, Value, RhsConstant))
         return AnalyzeImpConvsInComparison(S, E);
     }
+#endif
   }
 
   if (!T->hasUnsignedIntegerRepresentation()) {
