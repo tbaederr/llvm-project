@@ -118,7 +118,6 @@ void LangOptions::setLangDefaults(LangOptions &Opts, Language Lang,
   Opts.C23 = Std.isC23();
   Opts.C2y = Std.isC2y();
   Opts.CPlusPlus = Std.isCPlusPlus();
-  Opts.CPlusPlus11 = Std.isCPlusPlus11();
   Opts.CPlusPlus14 = Std.isCPlusPlus14();
   Opts.CPlusPlus17 = Std.isCPlusPlus17();
   Opts.CPlusPlus20 = Std.isCPlusPlus20();
@@ -282,10 +281,8 @@ std::optional<uint32_t> LangOptions::getCPlusPlusLangStd() const {
     Std = LangStandard::lang_cxx17;
   else if (CPlusPlus14)
     Std = LangStandard::lang_cxx14;
-  else if (CPlusPlus11)
-    Std = LangStandard::lang_cxx11;
   else
-    Std = LangStandard::lang_cxx98;
+    Std = LangStandard::lang_cxx11;
 
   return LangStandard::getLangStandardForKind(Std).getVersion();
 }

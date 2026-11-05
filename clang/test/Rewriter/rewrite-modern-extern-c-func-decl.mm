@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 -fms-extensions -U__declspec -rewrite-objc -x objective-c++ -fblocks -o %t-rw.cpp %s
-// RUN: %clang_cc1 -fsyntax-only -std=gnu++98 -Werror -Wno-address-of-temporary -Wno-attributes -D"Class=void*" -D"id=void*" -D"SEL=void*" -U__declspec -D"__declspec(X)=" %t-rw.cpp
+// RUN: %clang_cc1 -fsyntax-only -std=gnu++11 -Werror -Wno-address-of-temporary -Wno-attributes -D"Class=void*" -D"id=void*" -D"SEL=void*" -U__declspec -D"__declspec(X)=" %t-rw.cpp
 
 typedef unsigned long size_t;
 extern "C" __declspec(dllexport) void BreakTheRewriter(void) {

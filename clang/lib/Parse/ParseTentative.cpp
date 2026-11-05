@@ -495,7 +495,7 @@ Parser::isCXXConditionDeclarationOrInitStatement(bool CanBeInitStatement,
     // FIXME: Disambiguate properly after an = instead of assuming that it's a
     // valid declaration.
     if (Tok.isOneOf(tok::equal, tok::kw_asm, tok::kw___attribute) ||
-        (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace))) {
+        (getLangOpts().CPlusPlus && Tok.is(tok::l_brace))) {
       State.markNotExpression();
       return State.result();
     }
@@ -587,18 +587,16 @@ bool Parser::isCXXTypeId(TentativeCXXTypeIdContext Context, bool &isAmbiguous) {
       TPR = TPResult::True;
       isAmbiguous = true;
     // We are supposed to be inside a template argument, so if after
-    // the abstract declarator we encounter a '>', '>>' (in C++0x), or
-    // ','; or, in C++0x, an ellipsis immediately preceding such, this
-    // is a type-id. Otherwise, it's an expression.
+    // the abstract declarator we encounter a '>', '>>', or ','; or an
+    // ellipsis immediately preceding such, this is a type-id. Otherwise,
+    // it's an expression.
     } else if (Context == TentativeCXXTypeIdContext::AsTemplateArgument &&
-               (Tok.isOneOf(tok::greater, tok::comma) ||
-                (getLangOpts().CPlusPlus11 &&
-                 (Tok.isOneOf(tok::greatergreater,
-                              tok::greatergreatergreater) ||
-                  (Tok.is(tok::ellipsis) &&
-                   NextToken().isOneOf(tok::greater, tok::greatergreater,
-                                       tok::greatergreatergreater,
-                                       tok::comma)))))) {
+               (Tok.isOneOf(tok::greater, tok::comma, tok::greatergreater,
+                            tok::greatergreatergreater) ||
+                (Tok.is(tok::ellipsis) &&
+                 NextToken().isOneOf(tok::greater, tok::greatergreater,
+                                     tok::greatergreatergreater,
+                                     tok::comma)))) {
       TPR = TPResult::True;
       isAmbiguous = true;
 
@@ -898,7 +896,7 @@ Parser::TPResult Parser::TryParseOperatorId() {
   }
 
   // Maybe this is a literal-operator-id.
-  if (getLangOpts().CPlusPlus11 && isTokenStringLiteral()) {
+  if (isTokenStringLiteral()) {
     bool FoundUDSuffix = false;
     do {
       FoundUDSuffix |= Tok.hasUDSuffix();
@@ -1523,7 +1521,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
       if (isFollowedByParen)
         return TPResult::Ambiguous;
 
-      if (getLangOpts().CPlusPlus11 && isFollowedByBrace)
+      if (getLangOpts().CPlusPlus && isFollowedByBrace)
         return BracedCastResult;
 
       return TPResult::True;
@@ -1572,7 +1570,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     //     enum E : int { a = 4 }; // enum
     //     enum E : int { 4 };     // bit-field
     //   };
-    if (getLangOpts().CPlusPlus11 && NextToken().is(tok::l_brace)) {
+    if (getLangOpts().CPlusPlus && NextToken().is(tok::l_brace)) {
       if (ParsingGenericAssociationType) {
         RevertingTentativeParsingAction PA(*this);
         ConsumeAnyToken(); // skip keyword
@@ -1610,7 +1608,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     if (isFollowedByParen)
       return TPResult::Ambiguous;
 
-    if (getLangOpts().CPlusPlus11 && isFollowedByBrace)
+    if (getLangOpts().CPlusPlus && isFollowedByBrace)
       return BracedCastResult;
 
     return TPResult::True;
@@ -1641,7 +1639,7 @@ Parser::isCXXDeclarationSpecifier(ImplicitTypenameContext AllowImplicitTypename,
     if (Tok.is(tok::l_paren))
       return TPResult::Ambiguous;
 
-    if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace))
+    if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace))
       return BracedCastResult;
 
     return TPResult::True;
@@ -1710,7 +1708,7 @@ bool Parser::isCXXDeclarationSpecifierAType() {
     return true;
 
   case tok::kw_auto:
-    return getLangOpts().CPlusPlus11;
+    return getLangOpts().CPlusPlus;
 
   case tok::kw__Atomic:
     // "_Atomic foo"

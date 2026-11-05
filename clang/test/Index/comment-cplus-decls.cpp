@@ -2,14 +2,11 @@
 // RUN: mkdir %t
 // RUN: c-index-test -test-load-source all -comments-xml-schema=%S/../../bindings/xml/comment-xml-schema.rng -target x86_64-apple-darwin10 %s > %t/out
 // RUN: FileCheck %s < %t/out
-// RUN: c-index-test -test-load-source all -comments-xml-schema=%S/../../bindings/xml/comment-xml-schema.rng -target x86_64-apple-darwin10 -std=c++98 %s > %t/98
-// RUN: FileCheck %s < %t/98
 // RUN: c-index-test -test-load-source all -comments-xml-schema=%S/../../bindings/xml/comment-xml-schema.rng -target x86_64-apple-darwin10 -std=c++11 %s > %t/11
 // RUN: FileCheck %s < %t/11
 
 // Ensure that XML we generate is not invalid.
 // RUN: FileCheck %s -check-prefix=WRONG < %t/out
-// RUN: FileCheck %s -check-prefix=WRONG < %t/98
 // RUN: FileCheck %s -check-prefix=WRONG < %t/11
 // WRONG-NOT: CommentXMLInvalid
 

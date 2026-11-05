@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -no-enable-noundef-analysis -triple x86_64-apple-darwin10 -emit-llvm -std=c++03 -fexceptions -fcxx-exceptions -o - %s | FileCheck %s
-// RUN: %clang_cc1 -no-enable-noundef-analysis -triple i386-apple-darwin10 -emit-llvm -std=c++03 -o - %s | FileCheck --check-prefix=CHECK-2 %s
+// RUN: %clang_cc1 -no-enable-noundef-analysis -triple x86_64-apple-darwin10 -emit-llvm -std=c++11 -fexceptions -fcxx-exceptions -o - %s | FileCheck %s
+// RUN: %clang_cc1 -no-enable-noundef-analysis -triple i386-apple-darwin10 -emit-llvm -std=c++11 -o - %s | FileCheck --check-prefix=CHECK-2 %s
 
 struct Empty {};
 
@@ -293,7 +293,7 @@ CALL_CC(PODLikeMember)
 // CHECK: call void @llvm.memcpy.p0.p0.i64({{.*}} align 4 {{.*}} align 4 {{.*}}i64 16, i1 {{.*}})
 // CHECK: ret void
 // CHECK: landingpad
-// CHECK: invoke void @_ZN7PODLikeD1Ev
+// CHECK: call void @_ZN7PODLikeD1Ev
 
 CALL_CC(PODMember)
 // PODMember copy-constructor:

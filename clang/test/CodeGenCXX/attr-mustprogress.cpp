@@ -1,18 +1,15 @@
-// RUN: %clang_cc1 -std=c++98 -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX98 %s
 // RUN: %clang_cc1 -std=c++11 -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 // RUN: %clang_cc1 -std=c++14 -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 // RUN: %clang_cc1 -std=c++17 -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 // RUN: %clang_cc1 -std=c++20 -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 
 // Check -ffinite-loops option in combination with various standard versions.
-// RUN: %clang_cc1 -std=c++98 -ffinite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=FINITE %s
 // RUN: %clang_cc1 -std=c++11 -ffinite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 // RUN: %clang_cc1 -std=c++14 -ffinite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 // RUN: %clang_cc1 -std=c++17 -ffinite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 // RUN: %clang_cc1 -std=c++20 -ffinite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX11 %s
 
 // Check -fno-finite-loops option in combination with various standard versions.
-// RUN: %clang_cc1 -std=c++98 -fno-finite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX98 %s
 // RUN: %clang_cc1 -std=c++11 -fno-finite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX98 %s
 // RUN: %clang_cc1 -std=c++14 -fno-finite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX98 %s
 // RUN: %clang_cc1 -std=c++17 -fno-finite-loops -triple=x86_64-unknown-linux-gnu -emit-llvm %s -o - | FileCheck --check-prefix=CHECK --check-prefix=CXX98 %s
@@ -25,21 +22,18 @@ int b = 0;
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2f0v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
 // CHECK:       for.cond:
 // CXX98-NOT:    br {{.*}} llvm.loop
 // CXX11-NOT:    br {{.*}} llvm.loop
-// FINITE-NOT:   br {{.*}} llvm.loop
 void f0() {
   for (; ;) ;
 }
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2f1v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
@@ -48,7 +42,6 @@ void f0() {
 // CHECK:       for.body:
 // CXX98-NOT:    br {{.*}}, !llvm.loop
 // CXX11-NOT:    br {{.*}} llvm.loop
-// FINITE-NOT:   br {{.*}} llvm.loop
 // CHECK:       for.end:
 // CHECK-NEXT:    ret void
 //
@@ -59,7 +52,6 @@ void f1() {
 
 // CXX98-NOT:  mustprogress
 // CXX11:      mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2f2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
@@ -71,7 +63,6 @@ void f1() {
 // CHECK:       for.body:
 // CXX98-NOT:    br {{.*}}, !llvm.loop
 // CXX11:        br label %for.cond, !llvm.loop [[LOOP3:!.*]]
-// FINITE-NEXT:  br label %for.cond, !llvm.loop [[LOOP3:!.*]]
 // CHECK:       for.end:
 // CHECK-NEXT:    ret void
 //
@@ -82,7 +73,6 @@ void f2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z1Fv(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
@@ -91,7 +81,6 @@ void f2() {
 // CHECK:       for.body:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 // CHECK:       for.end:
 // CHECK-NEXT:    br label %for.cond1
 // CHECK:       for.cond1:
@@ -102,7 +91,6 @@ void f2() {
 // CHECK:       for.body2:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NEXT:    br label %for.cond1, !llvm.loop [[LOOP5:!.*]]
-// FINITE-NEXT:   br label %for.cond1, !llvm.loop [[LOOP5:!.*]]
 // CHECK:       for.end3:
 // CHECK-NEXT:    ret void
 //
@@ -115,7 +103,6 @@ void F() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2F2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
@@ -127,7 +114,6 @@ void F() {
 // CHECK:       for.body:
 // CXX98-NOT:     br {{.*}} !llvm.loop
 // CXX11-NEXT:    br label %for.cond, !llvm.loop [[LOOP6:!.*]]
-// FINITE-NEXT:   br label %for.cond, !llvm.loop [[LOOP6:!.*]]
 // CHECK:       for.end:
 // CHECK-NEXT:    br label %for.cond1
 // CHECK:       for.cond1:
@@ -135,7 +121,6 @@ void F() {
 // CHECK:       for.body2:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 // CHECK:       for.end3:
 // CHECK-NEXT:    ret void
 //
@@ -148,14 +133,12 @@ void F2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2w1v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %while.body
 // CHECK:       while.body:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 //
 void w1() {
   while (1)
@@ -164,7 +147,6 @@ void w1() {
 
 // CXX98-NOT:  mustprogress
 // CXX11:      mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2w2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %while.cond
@@ -176,7 +158,6 @@ void w1() {
 // CHECK:       while.body:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NEXT:    br label %while.cond, !llvm.loop [[LOOP9:!.*]]
-// FINITE-NEXT:   br label %while.cond, !llvm.loop [[LOOP9:!.*]]
 // CHECK:       while.end:
 // CHECK-NEXT:    ret void
 //
@@ -187,7 +168,6 @@ void w2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z1Wv(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %while.cond
@@ -199,13 +179,11 @@ void w2() {
 // CHECK:       while.body:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NEXT:    br label %while.cond, !llvm.loop [[LOOP10:!.*]]
-// FINITE-NEXT:   br label %while.cond, !llvm.loop [[LOOP10:!.*]]
 // CHECK:       while.end:
 // CHECK-NEXT:    br label %while.body2
 // CHECK:       while.body2:
 // CXX98-NOT:    br {{.*}}, !llvm.loop
 // CXX11-NOT:    br {{.*}}, !llvm.loop
-// FINITE-NOT:   br {{.*}}, !llvm.loop
 //
 void W() {
   while (a == b)
@@ -216,14 +194,12 @@ void W() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2W2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %while.body
 // CHECK:       while.body:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 //
 void W2() {
   while (1)
@@ -234,7 +210,6 @@ void W2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2d1v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %do.body
@@ -243,7 +218,6 @@ void W2() {
 // CHECK:       do.cond:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 // CHECK:       do.end:
 // CHECK-NEXT:    ret void
 //
@@ -255,7 +229,6 @@ void d1() {
 
 // CXX98-NOT:  mustprogress
 // CXX11:      mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2d2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %do.body
@@ -267,7 +240,6 @@ void d1() {
 // CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[TMP0]], [[TMP1]]
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NEXT:    br i1 [[CMP]], label %do.body, label %do.end, !llvm.loop [[LOOP14:!.*]]
-// FINITE-NEXT:   br i1 [[CMP]], label %do.body, label %do.end, !llvm.loop [[LOOP14:!.*]]
 // CHECK:       do.end:
 // CHECK-NEXT:    ret void
 //
@@ -279,7 +251,6 @@ void d2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z1Dv(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %do.body
@@ -288,7 +259,6 @@ void d2() {
 // CHECK:       do.cond:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 // CHECK:       do.end:
 // CHECK-NEXT:    br label %do.body1
 // CHECK:       do.body1:
@@ -299,7 +269,6 @@ void d2() {
 // CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[TMP0]], [[TMP1]]
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NEXT:    br i1 [[CMP]], label %do.body1, label %do.end3, !llvm.loop [[LOOP16:!.*]]
-// FINITE-NEXT:   br i1 [[CMP]], label %do.body1, label %do.end3, !llvm.loop [[LOOP16:!.*]]
 // CHECK:       do.end3:
 // CHECK-NEXT:    ret void
 //
@@ -314,7 +283,6 @@ void D() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z2D2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %do.body
@@ -326,7 +294,6 @@ void D() {
 // CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[TMP0]], [[TMP1]]
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NEXT:    br i1 [[CMP]], label %do.body, label %do.end, !llvm.loop [[LOOP17:!.*]]
-// FINITE-NEXT:   br i1 [[CMP]], label %do.body, label %do.end, !llvm.loop [[LOOP17:!.*]]
 // CHECK:       do.end:
 // CHECK-NEXT:    br label %do.body1
 // CHECK:       do.body1:
@@ -334,7 +301,6 @@ void D() {
 // CHECK:       do.cond2:
 // CXX98-NOT:     br {{.*}}, !llvm.loop
 // CXX11-NOT:     br {{.*}}, !llvm.loop
-// FINITE-NOT:    br {{.*}}, !llvm.loop
 // CHECK:       do.end3:
 // CHECK-NEXT:    ret void
 //
@@ -349,35 +315,30 @@ void D2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z9compound0v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
 // CHECK:       for.cond:
 // CXX98-NOT:    br {{.*}}, !llvm.loop
 // CXX11-NOT:    br {{.*}}, !llvm.loop
-// FINITE-NOT:   br {{.*}}, !llvm.loop
 void compound0() {
   for (; ;) {}
 }
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z9compound1v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %for.cond
 // CHECK:       for.cond:
 // CXX98-NOT:    br {{.*}}, llvm.loop
 // CXX11-NOT:    br {{.*}}, llvm.loop
-// FINITE-NOT:   br {{.*}}, !llvm.loop
 void compound1() {
   for (; ;) {/*! */}
 }
 
 // CXX98-NOT:  mustprogress
 // CXX11-NOT:  mustprogress
-// FINITE-NOT: mustprogress
 // CHECK-LABEL: @_Z9compound2v(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %do.body
@@ -386,7 +347,6 @@ void compound1() {
 // CHECK:       do.cond:
 // CXX98-NOT:    br {{.*}}, !llvm.loop
 // CXX11-NOT:    br {{.*}}, !llvm.loop
-// FINITE-NOT:   br {{.*}}, !llvm.loop
 // CHECK:       do.end:
 // CHECK-NEXT:    ret void
 //
@@ -396,7 +356,6 @@ void compound2() {
 
 // CXX98-NOT:  mustprogress
 // CXX11    :  mustprogress
-// FINITE   :  mustprogress
 // CHECK-LABEL: @_Z5Falsev(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    br label %do.body

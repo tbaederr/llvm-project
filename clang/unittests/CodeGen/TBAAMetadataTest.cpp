@@ -569,7 +569,6 @@ TEST(TBAAMetadataTest, CXXFields) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -692,7 +691,6 @@ TEST(TBAAMetadataTest, CXXTypedefFields) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -793,7 +791,6 @@ TEST(TBAAMetadataTest, StructureFields) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -875,7 +872,6 @@ TEST(TBAAMetadataTest, ArrayFields) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -954,7 +950,6 @@ TEST(TBAAMetadataTest, BaseClass) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -1030,7 +1025,6 @@ TEST(TBAAMetadataTest, PolymorphicClass) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -1104,7 +1098,6 @@ TEST(TBAAMetadataTest, VirtualBase) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();
@@ -1190,7 +1183,6 @@ TEST(TBAAMetadataTest, TemplSpec) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TBAATestCompiler Compiler(LO, TBAATestCompiler::getCommonCodeGenOpts());
   Compiler.init(TestProgram);
   const BasicBlock *BB = Compiler.compile();

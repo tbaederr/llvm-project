@@ -41,7 +41,6 @@ TEST(BufferSourceTest, EmitCXXGlobalInitFunc) {
 
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TestCompiler Compiler(LO);
   Compiler.init(TestProgram);
 

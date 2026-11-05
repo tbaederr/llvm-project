@@ -535,18 +535,18 @@ TEST(CXXUnresolvedConstructExpr, SourceRange) {
 
 TEST(UsingDecl, SourceRange) {
   RangeVerifier<UsingDecl> Verifier;
-  Verifier.expectRange(2, 22, 2, 25);
+  Verifier.expectRange(2, 22, 2, 31);
   EXPECT_TRUE(Verifier.match("class B { protected: int i; };\n"
-                             "class D : public B { B::i; };",
+                             "class D : public B { using B::i; };",
                              usingDecl()));
 }
 
 TEST(UnresolvedUsingValueDecl, SourceRange) {
   RangeVerifier<UnresolvedUsingValueDecl> Verifier;
-  Verifier.expectRange(3, 3, 3, 6);
+  Verifier.expectRange(3, 3, 3, 12);
   EXPECT_TRUE(Verifier.match("template <typename B>\n"
                              "class D : public B {\n"
-                             "  B::i;\n"
+                             "  using B::i;\n"
                              "};",
                              unresolvedUsingValueDecl()));
 }
@@ -961,7 +961,7 @@ TEST(FunctionDecl, ExceptionSpecifications) {
   std::vector<std::string> Args;
   Args.push_back("-fms-extensions");
   EXPECT_TRUE(Verifier.match("void f() throw(...);\n", loc(functionType()),
-                             Args, Lang_CXX03));
+                             Args, Lang_CXX11));
 
   Verifier.expectRange(1, 10, 1, 10);
   EXPECT_TRUE(

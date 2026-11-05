@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++98
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++11
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++14
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,cxx17,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++17
@@ -6,7 +5,6 @@
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,cxx17,cxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++23
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,since-cxx26,cxx17,cxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++2c
 
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++98 -fexperimental-new-constant-interpreter -DNEW_INTERP
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++11 -fexperimental-new-constant-interpreter -DNEW_INTERP
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++14 -fexperimental-new-constant-interpreter -DNEW_INTERP
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98-23,cxx17,precxx20 %s -triple=i686-pc-linux-gnu -Wno-new-returns-null -std=c++17 -fexperimental-new-constant-interpreter -DNEW_INTERP
@@ -19,9 +17,7 @@
 
 #include <stddef.h>
 
-#if __cplusplus >= 201103L
-// expected-note@+2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@+1 {{candidate constructor (the implicit move constructor) not viable}}
 struct S // expected-note {{candidate}}
 {
   S(int, int, double); // expected-note {{candidate}}
@@ -86,11 +82,9 @@ void good_news()
   typedef foo y[2][2];
   x* f3 = new y;
 
-#if __cplusplus >= 201103L
   (void)new int[]{};
   (void)new int[]{1, 2, 3};
   (void)new char[]{"hello"};
-#endif
 }
 
 struct abstract {
@@ -104,12 +98,10 @@ void bad_news(int *ip)
   (void)new 4; // expected-error {{expected a type}}
   (void)new () int; // expected-error {{expected expression}}
   (void)new int[1.1];
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{array size expression must have integral or enumeration type, not 'double'}}
-#elif __cplusplus <= 201103L
-  // expected-error@-4 {{array size expression must have integral or unscoped enumeration type, not 'double'}}
+#if __cplusplus <= 201103L
+  // expected-error@-2 {{array size expression must have integral or unscoped enumeration type, not 'double'}}
 #else
-  // expected-warning@-6 {{implicit conversion from 'double' to '__size_t' (aka 'unsigned int') changes value from 1.1 to 1}}
+  // expected-warning@-4 {{implicit conversion from 'double' to '__size_t' (aka 'unsigned int') changes value from 1.1 to 1}}
 #endif
 
   (void)new int[1][i];  // expected-note {{read of non-const variable 'i' is not allowed in a constant expression}}
@@ -137,12 +129,10 @@ void bad_news(int *ip)
 #endif
   (void)new int[2000000000]; // expected-error {{array is too large}}
   (void)new int[*(S*)0];
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{array size expression must have integral or enumeration type, not 'S'}}
-#elif __cplusplus <= 201103L
-  // expected-error@-4 {{array size expression must have integral or unscoped enumeration type, not 'S'}}
+#if __cplusplus <= 201103L
+  // expected-error@-2 {{array size expression must have integral or unscoped enumeration type, not 'S'}}
 #else
-  // expected-error@-6 {{converting 'S' to incompatible type}}
+  // expected-error@-4 {{converting 'S' to incompatible type}}
 #endif
 
   (void)::S::new int; // expected-error {{expected unqualified-id}}
@@ -157,9 +147,6 @@ void bad_news(int *ip)
   (void)new int[]; // expected-error {{array size must be specified in new expression with no initializer}}
   (void)new int[](); // expected-error {{cannot determine allocated array size from initializer}}
   // FIXME: This is a terrible diagnostic.
-#if __cplusplus < 201103L
-  (void)new int[]{}; // expected-error {{array size must be specified in new expression with no initializer}}
-#endif
 }
 
 void no_matching_placement_new() {
@@ -326,31 +313,18 @@ void f(X9 *x9) {
 
 struct X10 {
   virtual ~X10();
-#if __cplusplus >= 201103L
-  // expected-note@-2 {{overridden virtual function is here}}
-#endif
+  // expected-note@-1 {{overridden virtual function is here}}
 };
 
 struct X11 : X10 {
-#if __cplusplus <= 199711L
-// expected-error@-2 {{no suitable member 'operator delete' in 'X11'}}
-#else
-// expected-error@-4 {{deleted function '~X11' cannot override a non-deleted function}}
-// expected-note@-5 2 {{virtual destructor requires an unambiguous, accessible 'operator delete'}}
-#endif
+// expected-error@-1 {{deleted function '~X11' cannot override a non-deleted function}}
+// expected-note@-2 2 {{virtual destructor requires an unambiguous, accessible 'operator delete'}}
   void operator delete(void*, int);
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{'operator delete' declared here}}
-#endif
 };
 
 void f() {
   X11 x11;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{implicit destructor for 'X11' first required here}}
-#else
-  // expected-error@-4 {{attempt to use a deleted function}}
-#endif
+  // expected-error@-1 {{attempt to use a deleted function}}
 }
 
 struct X12 {
@@ -540,23 +514,12 @@ namespace PR7702 {
 
 namespace ArrayNewNeedsDtor {
   struct A { A(); private: ~A(); };
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{declared private here}}
-#endif
   struct B { B(); A a; };
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{field of type 'A' has private destructor}}
-#else
-  // expected-note@-4 {{destructor of 'B' is implicitly deleted because field 'a' has an inaccessible destructor}}
-#endif
+  // expected-note@-1 {{destructor of 'B' is implicitly deleted because field 'a' has an inaccessible destructor}}
 
   B *test9() {
     return new B[5];
-#if __cplusplus <= 199711L
-    // expected-note@-2 {{implicit destructor for 'ArrayNewNeedsDtor::B' first required here}}
-#else
-    // expected-error@-4 {{attempt to use a deleted function}}
-#endif
+    // expected-error@-1 {{attempt to use a deleted function}}
   }
 }
 
@@ -581,7 +544,6 @@ namespace PR10504 {
   void f(A *x) { delete x; } // expected-warning {{delete called on 'PR10504::A' that is abstract but has non-virtual destructor}}
 }
 
-#if __cplusplus >= 201103L
 enum GH99278_1 {
     zero = decltype(delete static_cast<GH99278_1*>(nullptr), 0){}
     // expected-warning@-1 {{expression with side effects has no effect in an unevaluated context}}
@@ -595,7 +557,6 @@ struct GH99278_2 {
   } f;
 };
 GH99278_2<void> e;
-#endif
 
 struct PlacementArg {};
 inline void *operator new[](size_t, const PlacementArg &) throw () {
@@ -706,14 +667,12 @@ struct A {
 };
 }
 
-#if __cplusplus >= 201103L
 template<typename ...T> int *dependent_array_size(T ...v) {
   return new int[]{v...}; // expected-error {{cannot initialize}}
 }
 int *p0 = dependent_array_size();
 int *p3 = dependent_array_size(1, 2, 3);
 int *fail = dependent_array_size("hello"); // expected-note {{instantiation of}}
-#endif
 
 // FIXME: Our behavior here is incredibly inconsistent. GCC allows
 // constant-folding in array bounds in new-expressions.
@@ -721,12 +680,8 @@ int (*const_fold)[12] = new int[3][&const_fold + 12 - &const_fold];
 #if __cplusplus >= 201402L
 // expected-error@-2 {{array size is not a constant expression}}
 // expected-note@-3 {{cannot refer to element 12 of non-array}}
-#elif __cplusplus < 201103L
-// expected-error@-5 {{cannot allocate object of variably modified type}}
-// expected-warning@-6 {{variable length arrays in C++ are a Clang extension}}
 #endif
 
-#if __cplusplus >= 201103L
 namespace PR81157 {
   struct C { // #implicit-ctor
     C(int); // #ctor
@@ -740,4 +695,3 @@ namespace PR81157 {
     // expected-note@-4 {{in implicit initialization of trailing array elements in runtime-sized array new}}
   }
 }
-#endif

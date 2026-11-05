@@ -3,8 +3,6 @@
 // RUN: %clang_cc1 -std=c++17 -fsyntax-only -Wno-unused %s -verify=precxx20,cxx11-cxx17
 // RUN: %clang_cc1 -std=c++14 -fsyntax-only -Wno-unused %s -verify=precxx20,cxx11-cxx17
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -Wno-unused %s -verify=precxx20,cxx11-cxx17
-// RUN: %clang_cc1 -std=c++03 -fsyntax-only -Wno-unused %s -verify=precxx20
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -Wno-unused %s -verify=precxx20
 // RUN: %clang_cc1 -x c -std=c23 -fsyntax-only -Wno-unused %s -verify=c
 
 #if __has_builtin(__builtin_is_within_lifetime)
@@ -37,12 +35,10 @@ static_assert(__builtin_is_within_lifetime(&i1), "");
 // precxx20-error@-1 {{use of undeclared identifier '__builtin_is_within_lifetime'}}
 // c-error@-2 {{use of undeclared identifier '__builtin_is_within_lifetime'}}
 
-#if !defined(__cplusplus) || __cplusplus >= 201102L
 constexpr int i2 = 0;
 static_assert(__builtin_is_within_lifetime(&i2), "");
 // cxx11-cxx17-error@-1 {{use of undeclared identifier '__builtin_is_within_lifetime'}}
 // c-error@-2 {{use of undeclared identifier '__builtin_is_within_lifetime'}}
-#endif
 
 #ifdef __cplusplus
 template<typename T>

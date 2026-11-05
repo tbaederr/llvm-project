@@ -107,20 +107,12 @@ static bool diagnoseUnknownDecl(InterpState &S, CodePtr OpPC,
   assert(S.diagnosing());
 
   if (isa<ParmVarDecl>(D)) {
-    if (D->getType()->isReferenceType()) {
-      if (S.inConstantContext() && S.getLangOpts().CPlusPlus &&
-          !S.getLangOpts().CPlusPlus11) {
-        diagnoseNonConstVariable(S, OpPC, D);
-        return false;
-      }
-    }
-
     const SourceInfo &Loc = S.Current->getSource(OpPC);
     if (S.getLangOpts().CPlusPlus23 && D->getType()->isReferenceType()) {
       S.FFDiag(Loc, diag::note_constexpr_access_unknown_variable, 1)
           << AK_Read << D;
       S.Note(D->getLocation(), diag::note_declared_at) << D->getSourceRange();
-    } else if (S.getLangOpts().CPlusPlus11) {
+    } else if (S.getLangOpts().CPlusPlus) {
       S.FFDiag(Loc, diag::note_constexpr_function_param_value_unknown, 1) << D;
       S.Note(D->getLocation(), diag::note_declared_at) << D->getSourceRange();
     } else {
@@ -192,8 +184,8 @@ static void diagnoseNonConstVariable(InterpState &S, CodePtr OpPC,
   }
 
   S.FFDiag(S.Current->getSource(OpPC),
-           S.getLangOpts().CPlusPlus11 ? diag::note_constexpr_ltor_non_constexpr
-                                       : diag::note_constexpr_ltor_non_integral,
+           S.getLangOpts().CPlusPlus ? diag::note_constexpr_ltor_non_constexpr
+                                     : diag::note_constexpr_ltor_non_integral,
            1)
       << VD << VD->getType();
   S.Note(VD->getLocation(), diag::note_declared_at);
@@ -544,10 +536,7 @@ bool CheckConstant(InterpState &S, CodePtr OpPC, const Descriptor *Desc,
   if (IsConstant) {
     if (S.getLangOpts().CPlusPlus) {
       S.CCEDiag(S.Current->getLocation(OpPC),
-                S.getLangOpts().CPlusPlus11
-                    ? diag::note_constexpr_ltor_non_constexpr
-                    : diag::note_constexpr_ltor_non_integral,
-                1)
+                diag::note_constexpr_ltor_non_constexpr, 1)
           << D << T;
       S.Note(D->getLocation(), diag::note_declared_at);
     } else {
@@ -558,7 +547,7 @@ bool CheckConstant(InterpState &S, CodePtr OpPC, const Descriptor *Desc,
 
   if (T->isPointerOrReferenceType()) {
     if (!T->getPointeeType().isConstant(S.getASTContext()) ||
-        !S.getLangOpts().CPlusPlus11) {
+        !S.getLangOpts().CPlusPlus) {
       diagnoseNonConstVariable(S, OpPC, D, AK);
       return false;
     }
@@ -1152,7 +1141,7 @@ static bool diagnoseCallableDecl(InterpState &S, CodePtr OpPC,
     }
   }
 
-  if (!S.getLangOpts().CPlusPlus11) {
+  if (!S.getLangOpts().CPlusPlus) {
     S.FFDiag(S.Current->getLocation(OpPC),
              diag::note_invalid_subexpr_in_const_expr);
     return false;
@@ -1253,7 +1242,7 @@ bool CheckThis(InterpState &S, CodePtr OpPC) {
     return false;
 
   const Expr *E = S.Current->getExpr(OpPC);
-  if (S.getLangOpts().CPlusPlus11) {
+  if (S.getLangOpts().CPlusPlus) {
     bool IsImplicit = false;
     if (const auto *TE = dyn_cast<CXXThisExpr>(E))
       IsImplicit = TE->isImplicit();
@@ -1643,7 +1632,7 @@ bool CheckLiteralType(InterpState &S, CodePtr OpPC, const Type *T) {
   }
 
   const Expr *E = S.Current->getExpr(OpPC);
-  if (S.getLangOpts().CPlusPlus11)
+  if (S.getLangOpts().CPlusPlus)
     S.FFDiag(E, diag::note_constexpr_nonliteral) << E->getType();
   else
     S.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
@@ -2792,17 +2781,12 @@ bool DefaultInit(InterpState &S, CodePtr OpPC, const CXXConstructorDecl *Ctor) {
     return false;
 
   if (!Ctor->isConstexpr()) {
-    if (S.getLangOpts().CPlusPlus11) {
-      // FIXME: If DiagDecl is an implicitly-declared special member function,
-      // we should be much more explicit about why it's not constexpr.
-      S.CCEDiag(S.Current->getSource(OpPC),
-                diag::note_constexpr_invalid_function, 1)
-          << /*IsConstexpr*/ 0 << /*IsConstructor*/ 1 << Ctor;
-      S.Note(Ctor->getLocation(), diag::note_declared_at);
-    } else {
-      S.CCEDiag(S.Current->getSource(OpPC),
-                diag::note_invalid_subexpr_in_const_expr);
-    }
+    // FIXME: If DiagDecl is an implicitly-declared special member function,
+    // we should be much more explicit about why it's not constexpr.
+    S.CCEDiag(S.Current->getSource(OpPC), diag::note_constexpr_invalid_function,
+              1)
+        << /*IsConstexpr*/ 0 << /*IsConstructor*/ 1 << Ctor;
+    S.Note(Ctor->getLocation(), diag::note_declared_at);
   }
 
   Ptr.startLifetime();

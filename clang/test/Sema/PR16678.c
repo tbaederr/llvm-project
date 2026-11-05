@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -DX32TYPE=ULONG -triple powerpc-unknown-linux-gnu -std=c89 -x c %s -verify
 // RUN: %clang_cc1 -DX32TYPE=ULONG -triple powerpc-unknown-linux-gnu -std=iso9899:199409 -x c %s -verify
-// RUN: %clang_cc1 -DX32TYPE=ULONG -triple powerpc-unknown-linux-gnu -std=c++98 -x c++ %s -verify
 // RUN: %clang_cc1 -DX32TYPE=LLONG -triple powerpc-unknown-linux-gnu -std=c99 -x c %s -verify
 // RUN: %clang_cc1 -DX32TYPE=LLONG -triple powerpc-unknown-linux-gnu -std=c11 -x c %s -verify
 // RUN: %clang_cc1 -DX32TYPE=LLONG -triple powerpc-unknown-linux-gnu -std=c++11 -x c++ %s -verify
@@ -8,7 +7,6 @@
 // RUN: %clang_cc1 -DX32TYPE=LLONG -triple powerpc-unknown-linux-gnu -std=c++1z -x c++ %s -verify
 // RUN: %clang_cc1 -DX64TYPE=ULONG -triple powerpc64-unknown-linux-gnu -std=c89 -x c %s -verify
 // RUN: %clang_cc1 -DX64TYPE=ULONG -triple powerpc64-unknown-linux-gnu -std=iso9899:199409 -x c %s -verify
-// RUN: %clang_cc1 -DX64TYPE=ULONG -triple powerpc64-unknown-linux-gnu -std=c++98 -x c++ %s -verify
 // RUN: %clang_cc1 -DX64TYPE=ULLONG -triple powerpc64-unknown-linux-gnu -std=c99 -x c %s -verify
 // RUN: %clang_cc1 -DX64TYPE=ULLONG -triple powerpc64-unknown-linux-gnu -std=c11 -x c %s -verify
 // RUN: %clang_cc1 -DX64TYPE=ULLONG -triple powerpc64-unknown-linux-gnu -std=c++11 -x c++ %s -verify
@@ -41,27 +39,15 @@ extern __typeof__(2147483648l) x32;
 extern __typeof__(2147483648L) x32;
 
 #if IS_ULONG(X32TYPE)
-#if !__cplusplus
 
 /******************************************************************************
  * Under pre-C99 ISO C, unsigned long is attempted for decimal integer literals
  * that do not have a suffix containing "u" or "U" if the literal does not fit
  * within the range of int or long. See 6.1.3.2 paragraph 5.
  ******************************************************************************/
+// expected-warning@37 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will have type 'long long' in C99 onwards}}
+// expected-warning@38 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will have type 'long long' in C99 onwards}}
 // expected-warning@39 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will have type 'long long' in C99 onwards}}
-// expected-warning@40 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will have type 'long long' in C99 onwards}}
-// expected-warning@41 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will have type 'long long' in C99 onwards}}
-#else
-
-/******************************************************************************
- * Under pre-C++11 ISO C++, the same holds if the literal contains an "l" or "L"
- * in its suffix; otherwise, the behavior is undefined. See 2.13.1 [lex.icon]
- * paragraph 2.
- ******************************************************************************/
-// expected-warning@39 {{integer literal is too large to be represented in type 'long' and is subject to undefined behavior under C++98, interpreting as 'unsigned long'; this literal will have type 'long long' in C++11 onwards}}
-// expected-warning@40 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C++98; this literal will have type 'long long' in C++11 onwards}}
-// expected-warning@41 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C++98; this literal will have type 'long long' in C++11 onwards}}
-#endif
 #endif
 
 
@@ -77,36 +63,23 @@ extern __typeof__(9223372036854775808L) x64;
 
 #if IS_ULONG(X64TYPE)
 
-#if !__cplusplus
-
 /******************************************************************************
  * Under pre-C99 ISO C, unsigned long is attempted for decimal integer literals
  * that do not have a suffix containing "u" or "U" if the literal does not fit
  * within the range of int or long. See 6.1.3.2 paragraph 5.
  ******************************************************************************/
-// expected-warning@74 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will be ill-formed in C99 onwards}}
-// expected-warning@75 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will be ill-formed in C99 onwards}}
-// expected-warning@76 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will be ill-formed in C99 onwards}}
-#else
-
-/******************************************************************************
- * Under pre-C++11 ISO C++, the same holds if the literal contains an "l" or "L"
- * in its suffix; otherwise, the behavior is undefined. See 2.13.1 [lex.icon]
- * paragraph 2.
- ******************************************************************************/
-// expected-warning@74 {{integer literal is too large to be represented in type 'long' and is subject to undefined behavior under C++98, interpreting as 'unsigned long'; this literal will be ill-formed in C++11 onwards}}
-// expected-warning@75 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C++98; this literal will be ill-formed in C++11 onwards}}
-// expected-warning@76 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C++98; this literal will be ill-formed in C++11 onwards}}
-#endif
+// expected-warning@60 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will be ill-formed in C99 onwards}}
+// expected-warning@61 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will be ill-formed in C99 onwards}}
+// expected-warning@62 {{integer literal is too large to be represented in type 'long', interpreting as 'unsigned long' per C89; this literal will be ill-formed in C99 onwards}}
 #else
 
 /******************************************************************************
  * The status quo in C99/C++11-and-later modes for the literals in question is
  * to interpret them as unsigned as an extension.
  ******************************************************************************/
-// expected-warning@74 {{integer literal is too large to be represented in a signed integer type, interpreting as unsigned}}
-// expected-warning@75 {{integer literal is too large to be represented in a signed integer type, interpreting as unsigned}}
-// expected-warning@76 {{integer literal is too large to be represented in a signed integer type, interpreting as unsigned}}
+// expected-warning@60 {{integer literal is too large to be represented in a signed integer type, interpreting as unsigned}}
+// expected-warning@61 {{integer literal is too large to be represented in a signed integer type, interpreting as unsigned}}
+// expected-warning@62 {{integer literal is too large to be represented in a signed integer type, interpreting as unsigned}}
 #endif
 #endif
 

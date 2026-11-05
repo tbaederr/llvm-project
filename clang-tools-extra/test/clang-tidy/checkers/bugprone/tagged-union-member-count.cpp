@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s bugprone-tagged-union-member-count %t -- -- \
+// RUN: %check_clang_tidy -std=c++11-or-later %s bugprone-tagged-union-member-count %t -- -- \
 // RUN: -I%S/Inputs/tagged-union-member-count \
 // RUN: -isystem %S/Inputs/tagged-union-member-count/system
 // Test check with C++ features

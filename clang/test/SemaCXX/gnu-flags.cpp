@@ -1,16 +1,10 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s -DNONE -Wno-gnu
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s -DNONE -Wno-gnu
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s -DNONE -Wno-gnu
 
 // RUN: %clang_cc1 -fsyntax-only -verify %s -DALL -Wgnu 
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s -DALL -Wgnu 
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s -DALL -Wgnu 
 
 // RUN: %clang_cc1 -fsyntax-only -verify %s -DALL -Wno-gnu \
-// RUN:   -Wgnu-anonymous-struct -Wredeclared-class-member \
-// RUN:   -Wgnu-flexible-array-union-member -Wgnu-folding-constant \
-// RUN:   -Wgnu-empty-struct
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s -DALL -Wno-gnu \
 // RUN:   -Wgnu-anonymous-struct -Wredeclared-class-member \
 // RUN:   -Wgnu-flexible-array-union-member -Wgnu-folding-constant \
 // RUN:   -Wgnu-empty-struct
@@ -20,10 +14,6 @@
 // RUN:   -Wgnu-empty-struct
 
 // RUN: %clang_cc1 -fsyntax-only -verify %s -DNONE -Wgnu \
-// RUN:   -Wno-gnu-anonymous-struct -Wno-redeclared-class-member \
-// RUN:   -Wno-gnu-flexible-array-union-member -Wno-gnu-folding-constant \
-// RUN:   -Wno-gnu-empty-struct
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s -DNONE -Wgnu \
 // RUN:   -Wno-gnu-anonymous-struct -Wno-redeclared-class-member \
 // RUN:   -Wno-gnu-flexible-array-union-member -Wno-gnu-folding-constant \
 // RUN:   -Wno-gnu-empty-struct
@@ -82,10 +72,6 @@ struct faum {
    };
 };
 
-
-#if (ALL || FOLDINGCONSTANT) && (__cplusplus <= 199711L) // C++03 or earlier modes
-// expected-warning@+4 {{in-class initializer for static data member is not a constant expression; folding it to a constant is a GNU extension}}
-#endif
 
 struct fic {
   static const int B = int(0.75 * 1000 * 1000);

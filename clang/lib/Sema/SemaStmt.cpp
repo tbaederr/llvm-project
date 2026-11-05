@@ -534,7 +534,7 @@ Sema::ActOnCaseExpr(SourceLocation CaseLoc, ExprResult Val) {
   // this. Just clean up after the expression as best we can.
   if (getCurFunction()->SwitchStack.empty())
     return ActOnFinishFullExpr(Val.get(), Val.get()->getExprLoc(), false,
-                               getLangOpts().CPlusPlus11);
+                               getLangOpts().CPlusPlus);
 
   Expr *CondExpr =
       getCurFunction()->SwitchStack.back().getPointer()->getCond();
@@ -546,7 +546,7 @@ Sema::ActOnCaseExpr(SourceLocation CaseLoc, ExprResult Val) {
     if (CondType->isDependentType() || E->isTypeDependent())
       return ExprResult(E);
 
-    if (getLangOpts().CPlusPlus11) {
+    if (getLangOpts().CPlusPlus) {
       // C++11 [stmt.switch]p2: the constant-expression shall be a converted
       // constant expression of the promoted type of the switch condition.
       llvm::APSInt TempVal;
@@ -1284,7 +1284,7 @@ static void AdjustAPSInt(llvm::APSInt &Val, unsigned BitWidth, bool IsSigned) {
 static void checkCaseValue(Sema &S, SourceLocation Loc, const llvm::APSInt &Val,
                            unsigned UnpromotedWidth, bool UnpromotedSign) {
   // In C++11 onwards, this is checked by the language rules.
-  if (S.getLangOpts().CPlusPlus11)
+  if (S.getLangOpts().CPlusPlus)
     return;
 
   // If the case value was signed and negative and the switch expression is
@@ -3648,28 +3648,6 @@ const VarDecl *Sema::getCopyElisionCandidate(NamedReturnInfo &Info,
   return Info.isCopyElidable() ? Info.Candidate : nullptr;
 }
 
-/// Verify that the initialization sequence that was picked for the
-/// first overload resolution is permissible under C++98.
-///
-/// Reject (possibly converting) constructors not taking an rvalue reference,
-/// or user conversion operators which are not ref-qualified.
-static bool
-VerifyInitializationSequenceCXX98(const Sema &S,
-                                  const InitializationSequence &Seq) {
-  const auto *Step = llvm::find_if(Seq.steps(), [](const auto &Step) {
-    return Step.Kind == InitializationSequence::SK_ConstructorInitialization ||
-           Step.Kind == InitializationSequence::SK_UserConversion;
-  });
-  if (Step != Seq.step_end()) {
-    const auto *FD = Step->Function.Function;
-    if (isa<CXXConstructorDecl>(FD)
-            ? !FD->getParamDecl(0)->getType()->isRValueReferenceType()
-            : cast<CXXMethodDecl>(FD)->getRefQualifier() == RQ_None)
-      return false;
-  }
-  return true;
-}
-
 ExprResult Sema::PerformMoveOrCopyInitialization(
     const InitializedEntity &Entity, const NamedReturnInfo &NRInfo, Expr *Value,
     bool SupressSimplerImplicitMoves) {
@@ -3683,9 +3661,7 @@ ExprResult Sema::PerformMoveOrCopyInitialization(
                                                Value->getBeginLoc());
     InitializationSequence Seq(*this, Entity, Kind, InitExpr);
     auto Res = Seq.getFailedOverloadResult();
-    if ((Res == OR_Success || Res == OR_Deleted) &&
-        (getLangOpts().CPlusPlus11 ||
-         VerifyInitializationSequenceCXX98(*this, Seq))) {
+    if (Res == OR_Success || Res == OR_Deleted) {
       // Promote "AsRvalue" to the heap, since we now need this
       // expression node to persist.
       Value =
@@ -4316,7 +4292,7 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
   } else if (!RetValExp && !HasDependentReturnType) {
     if ((FD && FD->isInvalidDecl()) || FnRetType->containsErrors()) {
       // The intended return type might have been "void", so don't warn.
-    } else if (getLangOpts().CPlusPlus11 && FD && FD->isConstexpr()) {
+    } else if (getLangOpts().CPlusPlus && FD && FD->isConstexpr()) {
       // C++11 [stmt.return]p2
       Diag(ReturnLoc, diag::err_constexpr_return_missing_expr)
           << FD << FD->isConsteval();

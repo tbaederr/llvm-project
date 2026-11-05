@@ -2317,7 +2317,7 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
   // manufacture when checking potential constant expressions is conservatively
   // assumed to be global here.
   if (!IsGlobalLValue(Base)) {
-    if (Info.getLangOpts().CPlusPlus11) {
+    if (Info.getLangOpts().CPlusPlus) {
       Info.FFDiag(Loc, diag::note_constexpr_non_global, 1)
           << IsReferenceType << !Designator.Entries.empty() << !!BaseVD
           << BaseVD;
@@ -2497,7 +2497,7 @@ static bool CheckLiteralType(EvalInfo &Info, const Expr *E,
     return true;
 
   // Prvalue constant expressions must be of literal types.
-  if (Info.getLangOpts().CPlusPlus11)
+  if (Info.getLangOpts().CPlusPlus)
     Info.FFDiag(E, diag::note_constexpr_nonliteral)
       << E->getType();
   else
@@ -3549,7 +3549,7 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
     if (!Info.checkingPotentialConstantExpression() ||
         !Info.CurrentCall->Callee ||
         !Info.CurrentCall->Callee->Equals(VD->getDeclContext())) {
-      if (Info.getLangOpts().CPlusPlus11) {
+      if (Info.getLangOpts().CPlusPlus) {
         Info.FFDiag(E, diag::note_constexpr_function_param_value_unknown)
             << VD;
         NoteLValueLocation(Info, Base);
@@ -3589,7 +3589,7 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   if (Init && Init->isValueDependent()) {
     if (!Info.checkingPotentialConstantExpression()) {
       Info.FFDiag(E,
-                  Info.getLangOpts().CPlusPlus11
+                  Info.getLangOpts().CPlusPlus
                       ? diag::note_constexpr_ltor_non_constexpr
                       : diag::note_constexpr_ltor_non_integral,
                   1)
@@ -3626,7 +3626,7 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   // Check that the variable is actually usable in constant expressions. For a
   // const integral variable or a reference, we might have a non-constant
   // initializer that we can nonetheless evaluate the initializer for. Such
-  // variables are not usable in constant expressions. In C++98, the
+  // variables are not usable in constant expressions. In OpenCL C, the
   // initializer also syntactically needs to be an ICE.
   //
   // FIXME: We don't diagnose cases that aren't potentially usable in constant
@@ -3635,8 +3635,8 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   if ((Info.getLangOpts().CPlusPlus && !VD->hasConstantInitialization() &&
        VD->mightBeUsableInConstantExpressions(Info.Ctx) &&
        !AllowConstexprUnknown) ||
-      ((Info.getLangOpts().CPlusPlus || Info.getLangOpts().OpenCL) &&
-       !Info.getLangOpts().CPlusPlus11 && !VD->hasICEInitializer(Info.Ctx))) {
+      (Info.getLangOpts().OpenCL && !Info.getLangOpts().CPlusPlus &&
+       !VD->hasICEInitializer(Info.Ctx))) {
     if (Init) {
       Info.CCEDiag(E, diag::note_constexpr_var_init_non_constant, 1) << VD;
       NoteLValueLocation(Info, Base);
@@ -4310,7 +4310,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
     // A diagnostic will have already been produced.
     return handler.failed();
   if (Sub.isOnePastTheEnd() || Sub.isMostDerivedAnUnsizedArray()) {
-    if (Info.getLangOpts().CPlusPlus11)
+    if (Info.getLangOpts().CPlusPlus)
       Info.FFDiag(E, Sub.isOnePastTheEnd()
                          ? diag::note_constexpr_access_past_end
                          : diag::note_constexpr_access_unsized_array)
@@ -4430,7 +4430,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
           CAT && CAT->getSize().ule(Index)) {
         // Note, it should not be possible to form a pointer with a valid
         // designator which points more than one past the end of the array.
-        if (Info.getLangOpts().CPlusPlus11)
+        if (Info.getLangOpts().CPlusPlus)
           Info.FFDiag(E, diag::note_constexpr_access_past_end)
             << handler.AccessKind;
         else
@@ -4455,7 +4455,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       // Next subobject is a complex number.
       uint64_t Index = Sub.Entries[I].getAsArrayIndex();
       if (Index > 1) {
-        if (Info.getLangOpts().CPlusPlus11)
+        if (Info.getLangOpts().CPlusPlus)
           Info.FFDiag(E, diag::note_constexpr_access_past_end)
             << handler.AccessKind;
         else
@@ -4479,7 +4479,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       uint64_t Index = Sub.Entries[I].getAsArrayIndex();
       unsigned NumElements = VT->getNumElements();
       if (Index == NumElements) {
-        if (Info.getLangOpts().CPlusPlus11)
+        if (Info.getLangOpts().CPlusPlus)
           Info.FFDiag(E, diag::note_constexpr_access_past_end)
               << handler.AccessKind;
         else
@@ -4745,9 +4745,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
   bool IsAccess = isAnyAccess(AK);
 
   // C++11 DR1311: An lvalue-to-rvalue conversion on a volatile-qualified type
-  // is not a constant expression (even if the object is non-volatile). We also
-  // apply this rule to C++98, in order to conform to the expected 'volatile'
-  // semantics.
+  // is not a constant expression (even if the object is non-volatile).
   if (isFormalAccess(AK) && LValType.isVolatileQualified()) {
     if (Info.getLangOpts().CPlusPlus)
       Info.FFDiag(E, diag::note_constexpr_access_volatile_type)
@@ -4803,7 +4801,6 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
                             TPO->getType());
     }
 
-    // In C++98, const, non-volatile integers initialized with ICEs are ICEs.
     // In C++11, constexpr, non-volatile variables initialized with constant
     // expressions are constant expressions too. Inside constexpr functions,
     // parameters are constant expressions even if they're non-const.
@@ -4876,9 +4873,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
         // folding of const floating-point types, in order to make static const
         // data members of such types (supported as an extension) more useful.
         if (Info.getLangOpts().CPlusPlus) {
-          Info.CCEDiag(E, Info.getLangOpts().CPlusPlus11
-                              ? diag::note_constexpr_ltor_non_constexpr
-                              : diag::note_constexpr_ltor_non_integral, 1)
+          Info.CCEDiag(E, diag::note_constexpr_ltor_non_constexpr, 1)
               << VD << BaseType;
           Info.Note(VD->getLocation(), diag::note_declared_at);
         } else {
@@ -4887,9 +4882,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
       } else {
         // Never allow reading a non-const value.
         if (Info.getLangOpts().CPlusPlus) {
-          Info.FFDiag(E, Info.getLangOpts().CPlusPlus11
-                             ? diag::note_constexpr_ltor_non_constexpr
-                             : diag::note_constexpr_ltor_non_integral, 1)
+          Info.FFDiag(E, diag::note_constexpr_ltor_non_constexpr, 1)
               << VD << BaseType;
           Info.Note(VD->getLocation(), diag::note_declared_at);
         } else {
@@ -5074,7 +5067,7 @@ handleLValueToRValueConversion(EvalInfo &Info, const Expr *Conv, QualType Type,
         return false;
       }
       if (LVal.Designator.isOnePastTheEnd()) {
-        if (Info.getLangOpts().CPlusPlus11)
+        if (Info.getLangOpts().CPlusPlus)
           Info.FFDiag(Conv, diag::note_constexpr_access_past_end) << AK;
         else
           Info.FFDiag(Conv);
@@ -6563,15 +6556,11 @@ static bool CheckTrivialDefaultConstructor(EvalInfo &Info, SourceLocation Loc,
   // call is a core constant expression whether or not the constructor is
   // constexpr.
   if (!CD->isConstexpr() && !IsValueInitialization) {
-    if (Info.getLangOpts().CPlusPlus11) {
-      // FIXME: If DiagDecl is an implicitly-declared special member function,
-      // we should be much more explicit about why it's not constexpr.
-      Info.CCEDiag(Loc, diag::note_constexpr_invalid_function, 1)
-        << /*IsConstexpr*/0 << /*IsConstructor*/1 << CD;
-      Info.Note(CD->getLocation(), diag::note_declared_at);
-    } else {
-      Info.CCEDiag(Loc, diag::note_invalid_subexpr_in_const_expr);
-    }
+    // FIXME: If DiagDecl is an implicitly-declared special member function,
+    // we should be much more explicit about why it's not constexpr.
+    Info.CCEDiag(Loc, diag::note_constexpr_invalid_function, 1)
+        << /*IsConstexpr*/ 0 << /*IsConstructor*/ 1 << CD;
+    Info.Note(CD->getLocation(), diag::note_declared_at);
   }
   return true;
 }
@@ -6629,7 +6618,7 @@ static bool CheckConstexprFunction(EvalInfo &Info, SourceLocation CallLoc,
     }
   }
 
-  if (Info.getLangOpts().CPlusPlus11) {
+  if (Info.getLangOpts().CPlusPlus) {
     // If this function is not constexpr because it is an inherited
     // non-constexpr constructor, diagnose that directly.
     auto *CD = dyn_cast<CXXConstructorDecl>(DiagDecl);
@@ -9247,7 +9236,7 @@ public:
 
   /// A member expression where the object is a prvalue is itself a prvalue.
   bool VisitMemberExpr(const MemberExpr *E) {
-    assert(!Info.Ctx.getLangOpts().CPlusPlus11 &&
+    assert(!Info.Ctx.getLangOpts().CPlusPlus &&
            "missing temporary materialization conversion");
     assert(!E->isArrow() && "missing call to bound member function?");
 
@@ -9265,7 +9254,7 @@ public:
            "record / field mismatch");
 
     // Note: there is no lvalue base here. But this case should only ever
-    // happen in C or in C++98, where we cannot be evaluating a constexpr
+    // happen in C, where we cannot be evaluating a constexpr
     // constructor, which is the only case the base matters.
     CompleteObject Obj(APValue::LValueBase(), &Val, BaseTy);
     SubobjectDesignator Designator(BaseTy);
@@ -9789,7 +9778,7 @@ bool LValueExprEvaluator::VisitVarDecl(const Expr *E, const VarDecl *VD) {
     return Success(VD);
   }
 
-  if (!Info.getLangOpts().CPlusPlus11) {
+  if (!Info.getLangOpts().CPlusPlus) {
     Info.CCEDiag(E, diag::note_constexpr_ltor_non_integral, 1)
         << VD << VD->getType();
     Info.Note(VD->getLocation(), diag::note_declared_at);
@@ -10270,10 +10259,7 @@ public:
   }
   bool VisitCXXThisExpr(const CXXThisExpr *E) {
     auto DiagnoseInvalidUseOfThis = [&] {
-      if (Info.getLangOpts().CPlusPlus11)
-        Info.FFDiag(E, diag::note_constexpr_this) << E->isImplicit();
-      else
-        Info.FFDiag(E);
+      Info.FFDiag(E, diag::note_constexpr_this) << E->isImplicit();
     };
 
     // Can't look at 'this' when checking a potential constant expression.
@@ -10871,7 +10857,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BIwcschr:
   case Builtin::BImemchr:
   case Builtin::BIwmemchr:
-    if (Info.getLangOpts().CPlusPlus11)
+    if (Info.getLangOpts().CPlusPlus)
       Info.CCEDiag(E, diag::note_constexpr_invalid_function)
           << /*isConstexpr*/ 0 << /*isConstructor*/ 0
           << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
@@ -10971,7 +10957,7 @@ bool PointerExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BImemmove:
   case Builtin::BIwmemcpy:
   case Builtin::BIwmemmove:
-    if (Info.getLangOpts().CPlusPlus11)
+    if (Info.getLangOpts().CPlusPlus)
       Info.CCEDiag(E, diag::note_constexpr_invalid_function)
           << /*isConstexpr*/ 0 << /*isConstructor*/ 0
           << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
@@ -18230,7 +18216,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BIstrlen:
   case Builtin::BIwcslen:
     // A call to strlen is not a constant expression.
-    if (Info.getLangOpts().CPlusPlus11)
+    if (Info.getLangOpts().CPlusPlus)
       Info.CCEDiag(E, diag::note_constexpr_invalid_function)
           << /*isConstexpr*/ 0 << /*isConstructor*/ 0
           << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
@@ -18255,7 +18241,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
   case Builtin::BIbcmp:
   case Builtin::BIwmemcmp:
     // A call to strlen is not a constant expression.
-    if (Info.getLangOpts().CPlusPlus11)
+    if (Info.getLangOpts().CPlusPlus)
       Info.CCEDiag(E, diag::note_constexpr_invalid_function)
           << /*isConstexpr*/ 0 << /*isConstructor*/ 0
           << Info.Ctx.BuiltinInfo.getQuotedName(BuiltinOp);
@@ -22189,7 +22175,7 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
       return false;
     Result = Value;
   } else if (T->isVoidType()) {
-    if (!Info.getLangOpts().CPlusPlus11)
+    if (!Info.getLangOpts().CPlusPlus)
       Info.CCEDiag(E, diag::note_constexpr_nonliteral)
         << E->getType();
     if (!EvaluateVoid(E, Info))
@@ -22207,7 +22193,7 @@ static bool Evaluate(APValue &Result, EvalInfo &Info, const Expr *E) {
       if (!EvaluateAtomic(E, nullptr, Result, Info))
         return false;
     }
-  } else if (Info.getLangOpts().CPlusPlus11) {
+  } else if (Info.getLangOpts().CPlusPlus) {
     Info.FFDiag(E, diag::note_constexpr_nonliteral) << E->getType();
     return false;
   } else {
@@ -23473,7 +23459,7 @@ bool Expr::isIntegerConstantExpr(const ASTContext &Ctx) const {
 
   ExprTimeTraceScope TimeScope(this, Ctx, "isIntegerConstantExpr");
 
-  if (Ctx.getLangOpts().CPlusPlus11)
+  if (Ctx.getLangOpts().CPlusPlus)
     return EvaluateCPlusPlus11IntegralConstantExpr(Ctx, this, nullptr);
 
   ICEDiag D = CheckICE(this, Ctx);
@@ -23490,7 +23476,7 @@ Expr::getIntegerConstantExpr(const ASTContext &Ctx,
     return std::nullopt;
   }
 
-  if (Ctx.getLangOpts().CPlusPlus11) {
+  if (Ctx.getLangOpts().CPlusPlus) {
     APSInt Value;
     if (EvaluateCPlusPlus11IntegralConstantExpr(Ctx, this, &Value,
                                                 AllowRelaxedEval))
@@ -23540,8 +23526,6 @@ bool Expr::isCXX11ConstantExpr(const ASTContext &Ctx, APValue &Result,
   assert(!isValueDependent() &&
          "Expression evaluator can't be called on a dependent expression.");
 
-  // We support this checking in C++98 mode in order to diagnose compatibility
-  // issues.
   assert(Ctx.getLangOpts().CPlusPlus);
 
   bool IsConst;

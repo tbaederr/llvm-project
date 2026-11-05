@@ -63,7 +63,7 @@ bool UseToUnderlyingCheck::isLanguageVersionSupported(
   // which are available since C++11.
   if (ReplacementFunction == "std::to_underlying")
     return LangOpts.CPlusPlus23;
-  return LangOpts.CPlusPlus11;
+  return LangOpts.CPlusPlus;
 }
 
 void UseToUnderlyingCheck::registerPPCallbacks(const SourceManager &SM,

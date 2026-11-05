@@ -371,10 +371,9 @@ static void EmitDiagForCXXThrowInNonThrowingFunc(Sema &S, SourceLocation OpLoc,
   if (!S.getSourceManager().isInSystemHeader(OpLoc) &&
       FD->getTypeSourceInfo()) {
     S.Diag(OpLoc, diag::warn_throw_in_noexcept_func) << FD;
-    if (S.getLangOpts().CPlusPlus11 &&
-        (isa<CXXDestructorDecl>(FD) ||
-         FD->getDeclName().getCXXOverloadedOperator() == OO_Delete ||
-         FD->getDeclName().getCXXOverloadedOperator() == OO_Array_Delete)) {
+    if (isa<CXXDestructorDecl>(FD) ||
+        FD->getDeclName().getCXXOverloadedOperator() == OO_Delete ||
+        FD->getDeclName().getCXXOverloadedOperator() == OO_Array_Delete) {
       if (const auto *Ty = FD->getTypeSourceInfo()->getType()->
                                          getAs<FunctionProtoType>())
         S.Diag(FD->getLocation(), diag::note_throw_in_dtor)

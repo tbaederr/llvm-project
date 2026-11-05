@@ -1,34 +1,18 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 class Base { // expected-warning{{class 'Base' does not declare any constructor to initialize its non-modifiable members}}
-#if __cplusplus <= 199711L
-// expected-error@-2 {{cannot define the implicit copy assignment operator for 'Base', because non-static reference member 'ref' cannot use copy assignment operator}}
-#endif
 
   int &ref; // expected-note{{reference member 'ref' will never be initialized}}
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{declared here}}
-#else
-  // expected-note@-4 2 {{copy assignment operator of 'Base' is implicitly deleted because field 'ref' is of reference type 'int &'}}
-#endif
+  // expected-note@-1 2 {{copy assignment operator of 'Base' is implicitly deleted because field 'ref' is of reference type 'int &'}}
 };
 
 class X  : Base {
-#if __cplusplus <= 199711L
-// expected-note@-2 {{assignment operator for 'Base' first required here}}
-// expected-error@-3 {{cannot define the implicit copy assignment operator for 'X', because non-static const member 'cint' cannot use copy assignment operator}}
-#else
-// expected-note@-5 2 {{copy assignment operator of 'X' is implicitly deleted because base class 'Base' has a deleted copy assignment operator}}
-#endif
+// expected-note@-1 2 {{copy assignment operator of 'X' is implicitly deleted because base class 'Base' has a deleted copy assignment operator}}
 
 public: 
   X();
   const int cint;
-#if __cplusplus <= 199711L
-// expected-note@-2 {{declared here}}
-#endif
 }; 
 
 struct Y  : X { 
@@ -47,16 +31,10 @@ Z z2;
 // Test1
 void f(X x, const X cx) {
   x = cx;
-#if __cplusplus <= 199711L
-  // expected-note@-2 2{{assignment operator for 'X' first required here}}
-#else
-  // expected-error@-4 {{object of type 'X' cannot be assigned because its copy assignment operator is implicitly deleted}}
-#endif
+  // expected-error@-1 {{object of type 'X' cannot be assigned because its copy assignment operator is implicitly deleted}}
 
   x = cx;
-#if __cplusplus >= 201103L
-  // expected-error@-2 {{object of type 'X' cannot be assigned because its copy assignment operator is implicitly deleted}}
-#endif
+  // expected-error@-1 {{object of type 'X' cannot be assigned because its copy assignment operator is implicitly deleted}}
   z1 = z2;
 }
 
@@ -101,17 +79,10 @@ void i() {
 // Test5
 
 class E1 {
-#if __cplusplus <= 199711L
-// expected-error@-2 {{cannot define the implicit copy assignment operator for 'E1', because non-static const member 'a' cannot use copy assignment operator}}
-#endif
 
 public:
   const int a;
-#if __cplusplus <= 199711L
-// expected-note@-2 {{declared here}}
-#else
-// expected-note@-4 {{copy assignment operator of 'E1' is implicitly deleted because field 'a' is of const-qualified type 'const int'}}
-#endif
+// expected-note@-1 {{copy assignment operator of 'E1' is implicitly deleted because field 'a' is of const-qualified type 'const int'}}
   E1() : a(0) {}
 
 };
@@ -120,20 +91,13 @@ E1 e1, e2;
 
 void j() {
   e1 = e2;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{assignment operator for 'E1' first required here}}
-#else
-  // expected-error@-4 {{object of type 'E1' cannot be assigned because its copy assignment operator is implicitly deleted}}
-#endif
+  // expected-error@-1 {{object of type 'E1' cannot be assigned because its copy assignment operator is implicitly deleted}}
 }
 
 namespace ProtectedCheck {
   struct X {
   protected:
     X &operator=(const X&);
-#if __cplusplus <= 199711L
-    // expected-note@-2 {{declared protected here}}
-#endif
   };
 
   struct Y : public X { };
@@ -141,21 +105,12 @@ namespace ProtectedCheck {
   void f(Y y) { y = y; }
 
   struct Z {
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{'operator=' is a protected member of 'ProtectedCheck::X'}}
-#endif
     X x;
-#if __cplusplus >= 201103L
-    // expected-note@-2 {{copy assignment operator of 'Z' is implicitly deleted because field 'x' has an inaccessible copy assignment operator}}
-#endif
+    // expected-note@-1 {{copy assignment operator of 'Z' is implicitly deleted because field 'x' has an inaccessible copy assignment operator}}
   };
 
   void f(Z z) { z = z; }
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{implicit copy assignment operator}}
-#else
-  // expected-error@-4 {{object of type 'Z' cannot be assigned because its copy assignment operator is implicitly deleted}}
-#endif
+  // expected-error@-1 {{object of type 'Z' cannot be assigned because its copy assignment operator is implicitly deleted}}
 }
 
 namespace MultiplePaths {

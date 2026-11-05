@@ -145,7 +145,7 @@ static std::string compareExpressionToConstant(const ASTContext &Context,
 
 static std::string compareExpressionToNullPtr(const ASTContext &Context,
                                               const Expr *E, bool Negated) {
-  const char *NullPtr = Context.getLangOpts().CPlusPlus11 ? "nullptr" : "NULL";
+  const char *NullPtr = Context.getLangOpts().CPlusPlus ? "nullptr" : "NULL";
   return compareExpressionToConstant(Context, E, Negated, NullPtr);
 }
 

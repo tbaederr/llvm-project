@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98 %s
 // RUN: %clang_cc1 -std=c++11 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11 %s
 // RUN: %clang_cc1 -std=c++14 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11 %s
 // RUN: %clang_cc1 -std=c++17 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx17 %s
@@ -6,7 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx17,since-cxx20,since-cxx23 %s
 // RUN: %clang_cc1 -std=c++2c -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx17,since-cxx20,since-cxx23,since-cxx26 %s
 
-// cxx98-no-diagnostics
 
 namespace cwg2900 { // cwg2900: 24
 #if __cplusplus >= 201703L
@@ -71,7 +69,6 @@ struct A {
 } // namespace cwg2915
 
 namespace cwg2917 { // cwg2917: 20
-#if __cplusplus >= 201103L
 template <typename>
 class Foo;
 
@@ -89,7 +86,6 @@ struct S {
   friend class C<Ts>::Nested...;
   // since-cxx11-error@-1 {{friend declaration expands pack 'Ts' that is declared it its own template parameter list}}
 };
-#endif
 } // namespace cwg2917
 
 namespace cwg2918 { // cwg2918: 21
@@ -154,7 +150,6 @@ void test() {
 } // namespace Example2
 #endif
 
-#if __cplusplus >= 201103L
 namespace Example3 {
 
 template <typename T> void f(T &&, void (*)(T &&)); // #cwg2918_f
@@ -176,7 +171,6 @@ void q() {
 
 } // namespace Example3
 
-#endif
 
 } // namespace cwg2918
 
@@ -209,10 +203,8 @@ constexpr U _ = nondeterministic(true);
 // cwg2947 is in cwg2947.cpp
 
 namespace cwg2966 { // cwg2966: 2.7
-#if __cplusplus >= 201103L
 static_assert(sizeof(decltype(nullptr)) == sizeof(void*), "");
 static_assert(alignof(decltype(nullptr)) == alignof(void*), "");
-#endif
 } // namespace cwg2966
 
 // cwg2983: na

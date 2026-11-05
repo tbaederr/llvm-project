@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -emit-llvm -triple %itanium_abi_triple %s -o - -debug-info-kind=standalone %std_cxx98-14 | FileCheck %s --check-prefixes=CHECK,PRE17
+// RUN: %clang_cc1 -emit-llvm -triple %itanium_abi_triple %s -o - -debug-info-kind=standalone %std_cxx11-14 | FileCheck %s --check-prefixes=CHECK,PRE17
 // RUN: %clang_cc1 -emit-llvm -triple %itanium_abi_triple %s -o - -debug-info-kind=standalone %std_cxx17- | FileCheck %s --check-prefixes=CHECK,CXX17
 namespace __pointer_type_imp
 {

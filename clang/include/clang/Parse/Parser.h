@@ -3483,9 +3483,6 @@ private:
   ///     '=' 'default'
   ///     '=' 'delete'
   /// \endverbatim
-  ///
-  /// Prior to C++0x, the assignment-expression in an initializer-clause must
-  /// be a constant-expression.
   ExprResult ParseCXXMemberInitializer(Decl *D, bool IsFunction,
                                        SourceLocation &EqualLoc);
 
@@ -3629,12 +3626,6 @@ private:
   ///       class-name: [C++ class.name]
   ///         identifier
   ///         simple-template-id
-  /// \endverbatim
-  ///
-  /// In C++98, instead of base-type-specifier, we have:
-  ///
-  /// \verbatim
-  ///         ::[opt] nested-name-specifier[opt] class-name
   /// \endverbatim
   TypeResult ParseBaseTypeSpecifier(SourceLocation &BaseLoc,
                                     SourceLocation &EndLocation);

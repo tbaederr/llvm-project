@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98,cxx98-11,cxx98-14,cxx98-17
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx98-11,cxx98-14,cxx98-17,cxx11-14
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx98-14,cxx98-17,cxx11-14
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx17,cxx98-17
@@ -6,16 +5,8 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx17
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx17
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
-#if __cplusplus == 199711L
-#define __enable_constant_folding(x) (__builtin_constant_p(x) ? (x) : (x))
-#else
 #define __enable_constant_folding
-#endif
 
 namespace cwg100 { // cwg100: 2.7
   template<const char (*)[4]> struct A {}; // #cwg100-A
@@ -155,12 +146,8 @@ namespace cwg112 { // cwg112: 3.1
   template<const volatile T*> struct X {};
   // FIXME: Test this somehow in C++11 and on.
   X<a1> x1;
-  // cxx98-error@-1 {{non-type template argument referring to object 'a1' with internal linkage is a C++11 extension}}
-  //   cxx98-note@#cwg112-a1 {{non-type template argument refers to object here}}
   X<a2> x2;
   X<a3> x3;
-  // cxx98-error@-1 {{non-type template argument referring to object 'a3' with internal linkage is a C++11 extension}}
-  //   cxx98-note@#cwg112-a3 {{non-type template argument refers to object here}}
   X<a4> x4;
 } // namespace cwg112
 
@@ -272,7 +259,6 @@ namespace cwg115 { // cwg115: 3.0
     // expected-error@-1 {{cannot create a non-constant pointer to member function}}
   }
 
-#if __cplusplus >= 201103L
   // Special case kicks in only if a template argument list is specified.
   template<typename T=int> void with_default(); // #cwg115-with-default
   int k10 = f(&with_default);
@@ -289,7 +275,6 @@ namespace cwg115 { // cwg115: 3.0
     //   since-cxx11-note@#cwg115-with-default {{possible target for call}}
     (void)&with_default<>;
   }
-#endif
 } // namespace cwg115
 
 namespace cwg116 { // cwg116: 2.7
@@ -340,8 +325,6 @@ namespace cwg125 {
     friend cwg125_A (::cwg125_B::cwg125_C)(); // ok
     friend cwg125_A::cwg125_B::cwg125_C(); // #cwg125_C
     // expected-error@#cwg125_C {{missing return type for function 'cwg125_C'; did you mean the constructor name 'cwg125_B'?}}
-    // cxx98-error@#cwg125_C {{'cwg125_B' is missing exception specification 'throw()'}}
-    //   cxx98-note@#cwg125_B {{previous declaration is here}}
     // since-cxx11-error@#cwg125_C {{'cwg125_B' is missing exception specification 'noexcept'}}
     //   since-cxx11-note@#cwg125_B {{previous declaration is here}}
   };
@@ -429,7 +412,6 @@ namespace cwg126 { // cwg126: partial
 
     virtual void pv() throw(C*);
 
-#if __cplusplus >= 201103L
     using nullptr_t = decltype(nullptr);
     virtual void np() throw(nullptr_t);
     virtual void npm() throw(nullptr_t&);
@@ -437,7 +419,6 @@ namespace cwg126 { // cwg126: partial
     // cxx11-14-error@-1 {{exception specification of overriding function is more lax than base version}}
     //   cxx11-14-note@#cwg126-nr {{overridden virtual function is here}}
     virtual void ncr() throw(nullptr_t);
-#endif // __cplusplus >= 201103L
 
     virtual void ref1() throw(D *const &);
     virtual void ref2() throw(D *);
@@ -464,9 +445,7 @@ namespace cwg127 { // cwg127: 2.9
     A() { throw 0; }
     void *operator new(size_t, const char * = 0);
     void operator delete(void *, const char *) = delete; // #cwg127-delete-char
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
     void operator delete(void *) = delete;
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
   };
   A<void> *p = new A<void>;
   // expected-error@-1 {{attempt to use a deleted function}}
@@ -697,9 +676,6 @@ namespace cwg141 { // cwg141: 3.1
   void g() {
     a.f<int>();
     (void)a.S<int>::n; // #cwg141-a
-    // cxx98-error@#cwg141-a {{lookup of 'S' in member access expression is ambiguous; using member of 'struct A'}}
-    //   cxx98-note@#cwg141-A-S {{lookup in the object type 'struct A' refers here}}
-    //   cxx98-note@#cwg141-S {{lookup from the current scope refers here}}
     // expected-error@#cwg141-a {{no member named 'n' in 'cwg141::A::S<int>'}}
     // FIXME: we issue a useful diagnostic first, then some bogus ones.
     b.f<int>();
@@ -1007,7 +983,6 @@ namespace cwg165 { // cwg165: no
   }
   struct N::B {};
   void N::g() {}
-  // FIXME-error@-1 {{'g' is not nominable in 'N'}}
 } // namespace cwg165
 
 namespace cwg166 { // cwg166: 2.9
@@ -1074,7 +1049,6 @@ namespace cwg169 { // cwg169: 3.4
 } // namespace cwg169
 
 namespace cwg170 { // cwg170: 3.1
-#if __cplusplus >= 201103L
 struct A {};
 struct B : A { int i; };
 struct C : A {};
@@ -1090,7 +1064,6 @@ constexpr auto r = g(p);
 // since-cxx11-error@-1 {{constexpr variable 'r' must be initialized by a constant expression}}
 constexpr auto s = h(p);
 // since-cxx11-error@-1 {{constexpr variable 's' must be initialized by a constant expression}}
-#endif
 } // namespace cwg170
 
 namespace { // cwg171: 3.4
@@ -1128,12 +1101,10 @@ namespace cwg172 { // cwg172: 2.7
   static_assert(-d > 0, "");
 
   enum { e = (unsigned long long)-1 / 2 };
-  // cxx98-error@-1 {{'long long' is a C++11 extension}}
   static_assert(sizeof(e) == sizeof(long), "");
   static_assert(-e < 0, "");
 
   enum { f = (unsigned long long)-1 / 2 + 1 };
-  // cxx98-error@-1 {{'long long' is a C++11 extension}}
   static_assert(sizeof(f) == sizeof(unsigned long), "");
   static_assert(-f > 0, "");
 } // namespace cwg172
@@ -1221,7 +1192,6 @@ namespace cwg177 { // cwg177: 2.7
 
 namespace cwg178 { // cwg178: 3.1
   static_assert(int() == 0, "");
-#if __cplusplus >= 201103L
   static_assert(int{} == 0, "");
   struct S { int a, b; };
   static_assert(S{1}.b == 0, "");
@@ -1229,7 +1199,6 @@ namespace cwg178 { // cwg178: 3.1
   static_assert(T().n == 0, "");
   struct U : S { constexpr U() : S() {} };
   static_assert(U().b == 0, "");
-#endif
 } // namespace cwg178
 
 namespace cwg179 { // cwg179: 2.7
@@ -1294,7 +1263,6 @@ namespace cwg183 { // cwg183: sup 382
   };
   template<> struct A<int> {
     typename B<int>::X x;
-    // cxx98-error@-1 {{'typename' outside of a template is a C++11 extension}}
   };
 } // namespace cwg183
 
@@ -1414,9 +1382,7 @@ namespace cwg194 { // cwg194: 2.7
 namespace cwg195 { // cwg195: 2.7
   void f();
   int *p = (int*)&f;
-  // cxx98-error@-1 {{cast between pointer-to-function and pointer-to-object is a C++11 extension}}
   void (*q)() = (void(*)())&p;
-  // cxx98-error@-1 {{cast between pointer-to-function and pointer-to-object is a C++11 extension}}
 } // namespace cwg195
 
 namespace cwg197 { // cwg197: 2.7
@@ -1446,7 +1412,6 @@ namespace cwg198 { // cwg198: 2.9
     int n;
     struct B {
       int m[sizeof(n)];
-      // cxx98-error@-1 {{invalid use of non-static data member 'n'}}
       int f() { return n; }
       // expected-error@-1 {{use of non-static data member 'n' of 'A' from nested type 'B'}}
     };
@@ -1455,13 +1420,11 @@ namespace cwg198 { // cwg198: 2.9
   };
   struct A::C {
     int m[sizeof(n)];
-    // cxx98-error@-1 {{invalid use of non-static data member 'n'}}
     int f() { return n; }
     // expected-error@-1 {{use of non-static data member 'n' of 'A' from nested type 'C'}}
   };
   struct A::D : A {
     int m[sizeof(n)];
-    // cxx98-error@-1 {{invalid use of non-static data member 'n'}}
     int f() { return n; }
   };
 } // namespace cwg198

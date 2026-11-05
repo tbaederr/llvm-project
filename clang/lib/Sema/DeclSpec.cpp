@@ -1420,7 +1420,7 @@ void DeclSpec::CheckTypeSpec(Sema &S, const PrintingPolicy &Policy) {
 
   // If no type specifier was provided and we're parsing a language where
   // the type specifier is not optional, but we got 'auto' as a storage
-  // class specifier, then assume this is an attempt to use C++0x's 'auto'
+  // class specifier, then assume this is an attempt to use C++11's 'auto'
   // type specifier.
   if (S.getLangOpts().CPlusPlus &&
       TypeSpecType == TST_unspecified && StorageClassSpec == SCS_auto) {
@@ -1430,26 +1430,17 @@ void DeclSpec::CheckTypeSpec(Sema &S, const PrintingPolicy &Policy) {
     StorageClassSpecLoc = SourceLocation();
   }
   // Diagnose if we've recovered from an ill-formed 'auto' storage class
-  // specifier in a pre-C++11 dialect of C++ or in a pre-C23 dialect of C.
-  if (!S.getLangOpts().CPlusPlus11 && !S.getLangOpts().C23 &&
+  // specifier in a pre-C23 dialect of C.
+  if (!S.getLangOpts().CPlusPlus && !S.getLangOpts().C23 &&
       TypeSpecType == TST_auto)
     S.Diag(TSTLoc, diag::ext_auto_type_specifier) << /*C++*/ 0;
   if (S.getLangOpts().HLSL &&
       S.getLangOpts().getHLSLVersion() < LangOptions::HLSL_202y &&
       TypeSpecType == TST_auto)
     S.Diag(TSTLoc, diag::ext_hlsl_auto_type_specifier) << /*HLSL*/ 1;
-  if (S.getLangOpts().CPlusPlus && !S.getLangOpts().CPlusPlus11 &&
-      StorageClassSpec == SCS_auto)
-    S.Diag(StorageClassSpecLoc, diag::warn_auto_storage_class)
-      << FixItHint::CreateRemoval(StorageClassSpecLoc);
   if (TypeSpecType == TST_char8)
     S.Diag(TSTLoc, diag::warn_cxx17_compat_unicode_type);
-  else if (TypeSpecType == TST_char16 || TypeSpecType == TST_char32)
-    S.Diag(TSTLoc, diag::warn_cxx98_compat_unicode_type)
-      << (TypeSpecType == TST_char16 ? "char16_t" : "char32_t");
-  if (getConstexprSpecifier() == ConstexprSpecKind::Constexpr)
-    S.Diag(ConstexprLoc, diag::warn_cxx98_compat_constexpr);
-  else if (getConstexprSpecifier() == ConstexprSpecKind::Consteval)
+  if (getConstexprSpecifier() == ConstexprSpecKind::Consteval)
     S.Diag(ConstexprLoc, diag::warn_cxx20_compat_consteval);
   else if (getConstexprSpecifier() == ConstexprSpecKind::Constinit)
     S.Diag(ConstexprLoc, diag::warn_cxx20_compat_constinit);

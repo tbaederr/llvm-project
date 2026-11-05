@@ -1,11 +1,9 @@
 // RUN: %clang_cc1 -verify -fopenmp -ferror-limit 100 -o - %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp -ferror-limit 100 -std=c++98 -o - %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp -ferror-limit 100 -std=c++11 -o - %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp52 -fopenmp -fopenmp-version=52 -ferror-limit 100 -o - %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp52 -fopenmp -fopenmp-version=60 -ferror-limit 100 -o - %s -Wuninitialized
 
 // RUN: %clang_cc1 -verify -fopenmp-simd -ferror-limit 100 -o - %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp-simd -ferror-limit 100 -std=c++98 -o - %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp-simd -ferror-limit 100 -std=c++11 -o - %s -Wuninitialized
 
 void xxx(int argc) {
@@ -18,9 +16,7 @@ void xxx(int argc) {
 }
 
 int foo();
-#if __cplusplus >= 201103L
-// expected-note@-2 {{declared here}}
-#endif
+// expected-note@-1 {{declared here}}
 
 template <class T>
 T foo() {
@@ -179,9 +175,7 @@ T foo() {
 #pragma omp ordered doacross(sink : j, i) // omp52-error {{expected 'i' loop iteration variable}} omp52-error {{expected 'j' loop iteration variable}}
 #pragma omp ordered doacross(sink : i, j, k) // omp52-error {{unexpected expression: number of expressions is larger than the number of associated loops}}
 #pragma omp ordered doacross(sink : i+foo(), j/4) // omp52-error {{integral constant expression}} omp52-error {{expected '+' or '-' operation}}
-#if __cplusplus >= 201103L
-// omp52-note@-2 {{non-constexpr function 'foo' cannot be used in a constant expression}}
-#endif
+// omp52-note@-1 {{non-constexpr function 'foo' cannot be used in a constant expression}}
 #pragma omp ordered doacross(sink : i*0, j-4)// omp52-error {{expected '+' or '-' operation}}
 #pragma omp ordered doacross(sink : i-0, j+sizeof(T)) doacross(sink : i-0, j+sizeof(T))
 #pragma omp ordered doacross(sink : i-0, j+sizeof(T)) doacross(source:) // omp52-error {{'doacross(source)' clause cannot be mixed with 'doacross(sink:vec)' clauses}}
@@ -209,9 +203,7 @@ T foo() {
 #pragma omp ordered depend(sink : j, i) // expected-error {{expected 'i' loop iteration variable}} expected-error {{expected 'j' loop iteration variable}}
 #pragma omp ordered depend(sink : i, j, k) // expected-error {{unexpected expression: number of expressions is larger than the number of associated loops}}
 #pragma omp ordered depend(sink : i+foo(), j/4) // expected-error {{integral constant expression}} expected-error {{expected '+' or '-' operation}}
-#if __cplusplus >= 201103L
-// expected-note@-2 {{non-constexpr function 'foo' cannot be used in a constant expression}}
-#endif
+// expected-note@-1 {{non-constexpr function 'foo' cannot be used in a constant expression}}
 #pragma omp ordered depend(sink : i*0, j-4)// expected-error {{expected '+' or '-' operation}}
 #pragma omp ordered depend(sink : i-0, j+sizeof(T)) depend(sink : i-0, j+sizeof(T))
 #pragma omp ordered depend(sink : i-0, j+sizeof(T)) depend(source) // expected-error {{'depend(source)' clause cannot be mixed with 'depend(sink:vec)' clauses}}
@@ -228,9 +220,7 @@ T foo() {
 }
 
 int foo() {
-#if __cplusplus >= 201103L
-// expected-note@-2 {{declared here}}
-#endif
+// expected-note@-1 {{declared here}}
 int k;
   #pragma omp for ordered
   for (int i = 0; i < 10; ++i) {
@@ -358,9 +348,7 @@ int k;
 #pragma omp ordered doacross(sink : j, i) // omp52-error {{expected 'i' loop iteration variable}} omp52-error {{expected 'j' loop iteration variable}}
 #pragma omp ordered doacross(sink : i, j, k) // omp52-error {{unexpected expression: number of expressions is larger than the number of associated loops}}
 #pragma omp ordered doacross(sink : i+foo(), j/4) // omp52-error {{integral constant expression}} omp52-error {{expected '+' or '-' operation}}
-#if __cplusplus >= 201103L
-// omp52-note@-2 {{non-constexpr function 'foo' cannot be used in a constant expression}}
-#endif
+// omp52-note@-1 {{non-constexpr function 'foo' cannot be used in a constant expression}}
 #pragma omp ordered doacross(sink : i*0, j-4)// omp52-error {{expected '+' or '-' operation}}
 #pragma omp ordered doacross(sink : i-0, j+sizeof(int)) doacross(sink : i-0, j+sizeof(int))
 #pragma omp ordered doacross(sink : i-0, j+sizeof(int)) doacross(source:) // omp52-error {{'doacross(source)' clause cannot be mixed with 'doacross(sink:vec)' clauses}}
@@ -388,9 +376,7 @@ int k;
 #pragma omp ordered depend(sink : j, i) // expected-error {{expected 'i' loop iteration variable}} expected-error {{expected 'j' loop iteration variable}}
 #pragma omp ordered depend(sink : i, j, k) // expected-error {{unexpected expression: number of expressions is larger than the number of associated loops}}
 #pragma omp ordered depend(sink : i+foo(), j/4) // expected-error {{integral constant expression}} expected-error {{expected '+' or '-' operation}}
-#if __cplusplus >= 201103L
-// expected-note@-2 {{non-constexpr function 'foo' cannot be used in a constant expression}}
-#endif
+// expected-note@-1 {{non-constexpr function 'foo' cannot be used in a constant expression}}
 #pragma omp ordered depend(sink : i*0, j-4)// expected-error {{expected '+' or '-' operation}}
 #pragma omp ordered depend(sink : i-0, j+sizeof(int)) depend(sink : i-0, j+sizeof(int))
 #pragma omp ordered depend(sink : i-0, j+sizeof(int)) depend(source) // expected-error {{'depend(source)' clause cannot be mixed with 'depend(sink:vec)' clauses}}

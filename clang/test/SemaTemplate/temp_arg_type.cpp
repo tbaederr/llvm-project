@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++1z %s
 
@@ -29,20 +28,11 @@ A<ns::B> a8; // expected-error{{use of class template 'ns::B' requires template 
 void f() {
   class X { };
   A<X> * a = 0;
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{template argument uses local type 'X'}}
-#endif
 }
 
 struct { int x; } Unnamed;
-#if __cplusplus <= 199711L
-// expected-note@-2 {{unnamed type used in template argument was declared here}}
-#endif
 
 A<__typeof__(Unnamed)> *a9;
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{template argument uses unnamed type}}
-#endif
 
 template<typename T, unsigned N>
 struct Array {

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++03 -verify -Dstatic_assert=_Static_assert -Wno-c++11-extensions -Wno-c++14-extensions -Wno-c++17-extensions -Wno-c++20-extensions %s
 // RUN: %clang_cc1 -std=c++11 -verify=expected,cxx11,cxx11-cxx14 -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c++14-extensions  %s
 // RUN: %clang_cc1 -std=c++14 -verify=expected,cxx11-cxx14,cxx14 -Wno-c++20-extensions -Wno-c++17-extensions %s
 // RUN: %clang_cc1 -std=c++17 -verify=expected,cxx17,cxx17-cxx20 -Wno-c++20-extensions %s
@@ -40,7 +39,6 @@ struct ShadowMe {
   }
 };
 
-#if __cplusplus >= 201102L
 template<typename T>
 constexpr T outer() {
   // FIXME: The C++11 error seems wrong
@@ -52,7 +50,6 @@ constexpr T outer() {
 }
 static_assert(outer<int>() == 123); // cxx11-cxx14-error {{not an integral constant expression}} cxx11-cxx14-note {{in call}}
 template int *outer<int *>(); // expected-note {{in instantiation}}
-#endif
 
 #if __cplusplus >= 202002L
 namespace GH62611 {

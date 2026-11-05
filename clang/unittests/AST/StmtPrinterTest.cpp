@@ -31,7 +31,7 @@ using namespace tooling;
 
 namespace {
 
-enum class StdVer { CXX98, CXX11, CXX14, CXX17, CXX20 };
+enum class StdVer { CXX11, CXX14, CXX17, CXX20 };
 
 DeclarationMatcher FunctionBodyMatcher(StringRef ContainingFunction) {
   return functionDecl(hasName(ContainingFunction),
@@ -63,7 +63,6 @@ PrintedStmtCXXMatches(StdVer Standard, StringRef Code, const T &NodeMatch,
                       PrintingPolicyAdjuster PolicyAdjuster = nullptr) {
   const char *StdOpt;
   switch (Standard) {
-  case StdVer::CXX98: StdOpt = "-std=c++98"; break;
   case StdVer::CXX11: StdOpt = "-std=c++11"; break;
   case StdVer::CXX14: StdOpt = "-std=c++14"; break;
   case StdVer::CXX17: StdOpt = "-std=c++17"; break;
@@ -86,7 +85,7 @@ PrintedStmtMSMatches(StringRef Code, const T &NodeMatch,
                      StringRef ExpectedPrinted,
                      PrintingPolicyAdjuster PolicyAdjuster = nullptr) {
   std::vector<std::string> Args = {
-    "-std=c++98",
+    "-std=c++11",
     "-target", "i686-pc-win32",
     "-fms-extensions",
     "-Wno-unused-value",
@@ -111,7 +110,7 @@ PrintedStmtObjCMatches(StringRef Code, const T &NodeMatch,
 } // unnamed namespace
 
 TEST(StmtPrinter, TestIntegerLiteral) {
-  ASSERT_TRUE(PrintedStmtCXXMatches(StdVer::CXX98,
+  ASSERT_TRUE(PrintedStmtCXXMatches(StdVer::CXX11,
                                     "void A() {"
                                     "  1, -1, 1U, 1u,"
                                     "  1L, 1l, -1L, 1UL, 1ul,"
@@ -141,7 +140,7 @@ TEST(StmtPrinter, TestMSIntegerLiteral) {
 
 TEST(StmtPrinter, TestFloatingPointLiteral) {
   ASSERT_TRUE(PrintedStmtCXXMatches(
-      StdVer::CXX98, "void A() { 1.0f, -1.0f, 1.0, -1.0, 1.0l, -1.0l; }",
+      StdVer::CXX11, "void A() { 1.0f, -1.0f, 1.0, -1.0, 1.0l, -1.0l; }",
       FunctionBodyMatcher("A"), "1.F, -1.F, 1., -1., 1.L, -1.L"));
   // Should be: with semicolon
 }
@@ -177,7 +176,7 @@ TEST(StmtPrinter, TestStringLiteralOperatorTemplate_Class) {
 
 TEST(StmtPrinter, TestCXXConversionDeclImplicit) {
   ASSERT_TRUE(PrintedStmtCXXMatches(
-      StdVer::CXX98,
+      StdVer::CXX11,
       "struct A {"
       "operator void *();"
       "A operator&(A);"

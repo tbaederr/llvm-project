@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++11 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++14 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11
@@ -55,10 +54,8 @@ namespace cwg3088 { // cwg3088: partial
 #define class()
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #define const
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef const
 #define const()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #define const_cast
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #undef const_cast
@@ -115,10 +112,8 @@ namespace cwg3088 { // cwg3088: partial
 #define export()
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #define extern
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef extern
 #define extern()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #define false
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #undef false
@@ -150,10 +145,8 @@ namespace cwg3088 { // cwg3088: partial
 #define if()
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #define inline
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef inline
 #define inline()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #define int
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #undef int
@@ -230,10 +223,8 @@ namespace cwg3088 { // cwg3088: partial
 #define sizeof()
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #define static
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef static
 #define static()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #define static_cast
 // expected-error@-1 {{keyword is hidden by macro definition}}
 #undef static_cast
@@ -399,7 +390,6 @@ namespace cwg3088 { // cwg3088: partial
 #define xor_eq
 // expected-error@-1 {{C++ operator 'xor_eq' (aka '^=') used as a macro name}}
 
-#if __cplusplus >= 201103L
 // Keywords introduced in C++11
 
 #define alignas
@@ -470,40 +460,29 @@ namespace cwg3088 { // cwg3088: partial
 
 // carries_dependency was retroactively removed by P3475R2
 #define noreturn
-// FIXME-since-cxx11-error@-1 {{attribute is hidden by macro definition}}
 #undef noreturn
 #define noreturn()
-// FIXME-since-cxx11-error@-1 {{attribute is hidden by macro definition}}
-#endif
 
 #if __cplusplus >= 201402L
 // Attributes introduced in C++14
 
 #define deprecated
-// FIXME-since-cxx14-error@-1 {{attribute is hidden by macro definition}}
 #undef deprecated
 #define deprecated()
-// FIXME-since-cxx14-error@-1 {{attribute is hidden by macro definition}}
 #endif
 
 #if __cplusplus >= 201703L
 // Attributes introduced in C++17
 
 #define fallthrough
-// FIXME-since-cxx17-error@-1 {{attribute is hidden by macro definition}}
 #undef fallthrough
 #define fallthrough()
-// FIXME-since-cxx17-error@-1 {{attribute is hidden by macro definition}}
 #define maybe_unused
-// FIXME-since-cxx17-error@-1 {{attribute is hidden by macro definition}}
 #undef maybe_unused
 #define maybe_unused()
-// FIXME-since-cxx17-error@-1 {{attribute is hidden by macro definition}}
 #define nodiscard
-// FIXME-since-cxx17-error@-1 {{attribute is hidden by macro definition}}
 #undef nodiscard
 #define nodiscard()
-// FIXME-since-cxx17-error@-1 {{attribute is hidden by macro definition}}
 #endif
 
 #if __cplusplus >= 202002L
@@ -553,30 +532,22 @@ namespace cwg3088 { // cwg3088: partial
 // Identifiers with special meaning introduced in C++20
 
 #define import
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef import
 #define import()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #define module
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef module
 #define module()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 
 // Attributes introduced in C++20
 
 #define likely
-// FIXME-since-cxx20-error@-1 {{attribute is hidden by macro definition}}
 #undef likely
 #define likely()
 #define no_unique_address
-// FIXME-since-cxx20-error@-1 {{attribute is hidden by macro definition}}
 #undef no_unique_address
 #define no_unique_address()
-// FIXME-since-cxx20-error@-1 {{attribute is hidden by macro definition}}
 #define unlikely
 #undef unlikely
-// FIXME-since-cxx20-error@-1 {{attribute is hidden by macro definition}}
 #define unlikely()
 #endif
 
@@ -584,40 +555,30 @@ namespace cwg3088 { // cwg3088: partial
 // Attributes introduced in C++23
 
 #define assume
-// FIXME-since-cxx23-error@-1 {{attribute is hidden by macro definition}}
 #undef assume
 #define assume()
-// FIXME-since-cxx23-error@-1 {{attribute is hidden by macro definition}}
 #endif
 
 #if __cplusplus >= 202600L
 // Keywords introduced in C++26
 
 #define contract_assert
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef contract_assert
 #define contract_assert()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 
 // Identifiers with special meaning introduced in C++26
 
 #define post
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef post
 #define post()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #define pre
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 #undef pre
 #define pre()
-// FIXME-error@-1 {{keyword is hidden by macro definition}}
 
 // Attributes introduced in C++26
 
 #define indeterminate
-// FIXME-since-cxx26-error@-1 {{attribute is hidden by macro definition}}
 #undef indeterminate
 #define indeterminate()
-// FIXME-since-cxx26-error@-1 {{attribute is hidden by macro definition}}
 #endif
 } // namespace cwg3088

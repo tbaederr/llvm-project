@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=gnu++98 -fsyntax-only -verify %s
+// RUN: %clang_cc1 -std=gnu++11 -fsyntax-only -verify %s
 // expected-no-diagnostics
 
 _Atomic unsigned an_atomic_uint;

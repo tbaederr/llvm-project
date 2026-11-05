@@ -141,7 +141,7 @@ bool Sema::CheckConstraintExpression(const Expr *ConstraintExpression,
         // first operand, and complain that it is of non-bool type.
         getBinOpPrecedence(NextToken.getKind(),
                            /*GreaterThanIsOperator=*/true,
-                           getLangOpts().CPlusPlus11) > prec::LogicalAnd;
+                           getLangOpts().CPlusPlus) > prec::LogicalAnd;
   };
 
   // An atomic constraint!

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx11-17,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx14-17,cxx11-17,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx14-17,cxx11-17,since-cxx11,since-cxx14,since-cxx17
@@ -6,7 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx17,since-cxx20
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx17,since-cxx20
 
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx98-14
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx98-14,cxx11-17,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx98-14,cxx14-17,cxx11-17,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx14-17,cxx11-17,since-cxx11,since-cxx14,since-cxx17
@@ -15,16 +13,12 @@
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx17,since-cxx20
 
 namespace cwg3106 { // cwg3106: 2.7
-#if __cplusplus >= 201103L
 const char str[9] = R"(\u{1234})";
-#endif
 } // namespace cwg3106
 
 namespace cwg3128 { // cwg3128: 2.7
-#if __cplusplus >= 201103L
 void f();
 static_assert(noexcept(noexcept(f())), "");
-#endif
 } // namespace cwg3128
 
 namespace cwg3129 { // cwg3129: 3.0

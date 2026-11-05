@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -verify -fexceptions -fcxx-exceptions -pedantic-errors
 // RUN: %clang_cc1 -std=c++11 %s -verify -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
 // RUN: %clang_cc1 -std=c++14 %s -verify -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
 // RUN: %clang_cc1 -std=c++17 %s -verify -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
@@ -9,7 +8,6 @@
 // expected-no-diagnostics
 // cwg722: 20
 
-#if __cplusplus >= 201103L
 namespace std {
   using nullptr_t = decltype(nullptr);
 } // namespace std
@@ -53,4 +51,3 @@ void h() {
 // CHECK-NEXT:            `-UnaryOperator {{.+}} 'int *' prefix '&' cannot overflow
 // CHECK-NEXT:              `-DeclRefExpr {{.+}} 'int' lvalue Var {{.+}} 'i' 'int'
 }
-#endif

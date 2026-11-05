@@ -58,9 +58,7 @@ LangStandard::Kind standardFromOpts(const LangOptions &LO) {
       return LangStandard::lang_cxx17;
     if (LO.CPlusPlus14)
       return LangStandard::lang_cxx14;
-    if (LO.CPlusPlus11)
-      return LangStandard::lang_cxx11;
-    return LangStandard::lang_cxx98;
+    return LangStandard::lang_cxx11;
   }
   if (LO.C23)
     return LangStandard::lang_c23;

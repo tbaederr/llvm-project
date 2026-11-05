@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -triple %itanium_abi_triple -verify -std=c++98 %s
-// RUN: %clang_cc1 -fsyntax-only -triple %ms_abi_triple -DMSABI -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -triple %itanium_abi_triple -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -triple %ms_abi_triple -DMSABI -verify -std=c++11 %s
 
@@ -78,15 +76,6 @@ namespace test2 {
   };
   B::~B() {} // expected-error {{no suitable member 'operator delete' in 'B'}}
 
-#if __cplusplus < 201103L
-  struct CBase { virtual ~CBase(); };
-  struct C : CBase { // expected-error {{no suitable member 'operator delete' in 'C'}}
-    static void operator delete(void*, const int &); // expected-note {{declared here}}
-  };
-  void test() {
-    C c; // expected-note {{first required here}}
-  }
-#else
   struct CBase { virtual ~CBase(); }; // expected-note {{overridden virtual function is here}}
   struct C : CBase { // expected-error {{deleted function '~C' cannot override a non-deleted function}} expected-note 2{{requires an unambiguous, accessible 'operator delete'}}
     static void operator delete(void*, const int &);
@@ -94,7 +83,6 @@ namespace test2 {
   void test() {
     C c; // expected-error {{attempt to use a deleted function}}
   }
-#endif
 }
 
 // PR7346

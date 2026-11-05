@@ -2917,7 +2917,7 @@ bool QualType::isPODType(const ASTContext &Context) const {
     return true;
 
   // C++11 has a more relaxed definition of POD.
-  if (Context.getLangOpts().CPlusPlus11)
+  if (Context.getLangOpts().CPlusPlus)
     return isCXX11PODType(Context);
 
   return isCXX98PODType(Context);

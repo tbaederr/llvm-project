@@ -8,12 +8,8 @@
 // hasSameUnqualifiedType detects this mismatch and correctly falls back to
 // Init->getType(), preventing the backing store from being marked constant.
 //
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-linux-gnu -emit-llvm -o - %s | FileCheck %s
-// RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++98 -triple x86_64-linux-gnu -emit-llvm -o - %s | FileCheck %s %}
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-linux-gnu -emit-llvm -o - %s | FileCheck %s
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++11 -triple x86_64-linux-gnu -emit-llvm -o - %s | FileCheck %s %}
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-linux-gnu -emit-llvm -o - %s -fexperimental-new-constant-interpreter | FileCheck %s
-// RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++98 -triple x86_64-linux-gnu -emit-llvm -o - %s -fexperimental-new-constant-interpreter | FileCheck %s %}
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-linux-gnu -emit-llvm -o - %s -fexperimental-new-constant-interpreter | FileCheck %s
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++11 -triple x86_64-linux-gnu -emit-llvm -o - %s -fexperimental-new-constant-interpreter | FileCheck %s %}
 

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -Wno-unused-value -triple %itanium_abi_triple -emit-llvm %s -std=c++98 -o - | FileCheck %s
 // RUN: %clang_cc1 -Wno-unused-value -triple %itanium_abi_triple -emit-llvm %s -std=c++11 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK11 %s
 
 // CHECK: @i = {{(dso_local )?}}global [[INT:i[0-9]+]] 0

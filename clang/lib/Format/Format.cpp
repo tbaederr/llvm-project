@@ -4620,7 +4620,6 @@ LangOptions getFormattingLangOpts(const FormatStyle &Style) {
   case FormatStyle::LK_Cpp:
   case FormatStyle::LK_ObjC:
     LangOpts.CXXOperatorNames = 1;
-    LangOpts.CPlusPlus11 = SinceCpp11;
     LangOpts.CPlusPlus14 = LexingStd >= FormatStyle::LS_Cpp14;
     LangOpts.CPlusPlus17 = LexingStd >= FormatStyle::LS_Cpp17;
     LangOpts.CPlusPlus20 = SinceCpp20;

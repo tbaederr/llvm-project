@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -Wno-parentheses -Wdeprecated -verify=expected,not-cxx20 -triple x86_64-linux-gnu
-// RUN: %clang_cc1 -std=c++98 %s -Wno-parentheses -Wdeprecated -verify=expected,not-cxx20 -triple x86_64-linux-gnu -fms-compatibility
 // RUN: %clang_cc1 -std=c++11 %s -Wno-parentheses -Wdeprecated -verify=expected,not-cxx20 -triple x86_64-linux-gnu
 // RUN: %clang_cc1 -std=c++11 %s -Wno-parentheses -Wdeprecated -verify=expected,not-cxx20 -triple x86_64-linux-gnu -fms-compatibility
 // RUN: %clang_cc1 -std=c++14 %s -Wno-parentheses -Wdeprecated -verify=expected,not-cxx20 -triple x86_64-linux-gnu
@@ -63,30 +61,17 @@ void stuff(register int q) {
 #endif
 
   char *p = "foo";
-#if __cplusplus < 201103L
-  // expected-warning@-2 {{conversion from string literal to 'char *' is deprecated}}
-#else
-  // expected-warning@-4 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
-#endif
+  // expected-warning@-1 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
 }
 
 struct S { int n; void operator+(int); };
 struct T : private S {
   S::n;
-#if __cplusplus < 201103L
-  // expected-warning@-2 {{access declarations are deprecated; use using declarations instead}}
-#else
-  // expected-error@-4 {{ISO C++11 does not allow access declarations; use using declarations instead}}
-#endif
+  // expected-error@-1 {{ISO C++11 does not allow access declarations; use using declarations instead}}
   S::operator+;
-#if __cplusplus < 201103L
-  // expected-warning@-2 {{access declarations are deprecated; use using declarations instead}}
-#else
-  // expected-error@-4 {{ISO C++11 does not allow access declarations; use using declarations instead}}
-#endif
+  // expected-error@-1 {{ISO C++11 does not allow access declarations; use using declarations instead}}
 };
 
-#if __cplusplus >= 201103L
 namespace DeprecatedCopy {
   struct Assign {
     Assign &operator=(const Assign&); // expected-warning {{definition of implicit copy constructor for 'Assign' is deprecated because it has a user-provided copy assignment operator}}
@@ -115,7 +100,6 @@ namespace DeprecatedCopy {
   DefaultedDtor d2(d1);         // expected-note {{in implicit copy constructor for 'DeprecatedCopy::DefaultedDtor' first required here}}
   void h() { d1 = d2; }         // expected-note {{in implicit copy assignment operator for 'DeprecatedCopy::DefaultedDtor' first required here}}
 }
-#endif
 
 struct X {
   friend int operator,(X, X);
@@ -148,19 +132,15 @@ namespace DeprecatedVolatile {
   void f() {
     // simple assignments are deprecated only if their value is used
     n = 5; // ok
-#if __cplusplus >= 201103L
     decltype(n = 5) m = n; // ok expected-warning {{side effects}}
     (void)noexcept(n = 5); // ok expected-warning {{side effects}}
-#endif
     (void)typeid(n = 5); // ok expected-warning {{side effects}}
     (n = 5, 0); // ok
     use(n = 5); // cxx20-warning {{use of result of assignment to object of volatile-qualified type 'volatile int' is deprecated}}
     int q = n = 5; // cxx20-warning {{deprecated}}
     q = n = 5; // cxx20-warning {{deprecated}}
-#if __cplusplus >= 201103L
     decltype(q = n = 5) m2 = q; // cxx20-warning {{deprecated}} expected-warning {{side effects}}
     (void)noexcept(q = n = 5); // cxx20-warning {{deprecated}} expected-warning {{side effects}}
-#endif
     (void)sizeof(q = n = 5); // cxx20-warning {{deprecated}} expected-warning {{side effects}}
     (void)typeid(use(n = 5)); // cxx20-warning {{deprecated}} expected-warning {{side effects}}
     (void)__alignof(+(n = 5)); // cxx20-warning {{deprecated}} expected-warning {{side effects}}
@@ -209,11 +189,9 @@ namespace DeprecatedVolatile {
       volatile int (*p)( // cxx20-warning {{volatile-qualified return type 'volatile int' is deprecated}}
         volatile int m) // cxx20-warning {{volatile-qualified parameter type 'volatile int' is deprecated}}
       );
-#if __cplusplus >= 201103L
   auto lambda = []( // cxx20-warning{{volatile-qualified return type 'volatile int' is deprecated}}
       volatile int n) // cxx20-warning{{volatile-qualified parameter type 'volatile int' is deprecated}}
     -> volatile int { return n; };
-#endif
 
   template<typename T> T f(T v); // cxx20-warning 2{{deprecated}}
   int use_f = f<volatile int>(0); // cxx20-note {{while substituting deduced template arguments}}

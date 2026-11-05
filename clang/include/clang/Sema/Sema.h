@@ -668,7 +668,6 @@ enum class ArithConvKind {
 // vararg function.
 enum class VarArgKind {
   Valid,
-  ValidInCXX11,
   Undefined,
   MSVCUndefined,
   Invalid
@@ -1742,8 +1741,7 @@ public:
   /// Checks access to a constructor.
   AccessResult CheckConstructorAccess(SourceLocation Loc, CXXConstructorDecl *D,
                                       DeclAccessPair FoundDecl,
-                                      const InitializedEntity &Entity,
-                                      bool IsCopyBindingRefToTemp = false);
+                                      const InitializedEntity &Entity);
 
   /// Checks access to a constructor.
   AccessResult CheckConstructorAccess(SourceLocation Loc, CXXConstructorDecl *D,
@@ -3418,10 +3416,7 @@ public:
   /// Determines whether the given declaration is an valid acceptable
   /// result for name lookup of a nested-name-specifier.
   /// \param SD Declaration checked for nested-name-specifier.
-  /// \param IsExtension If not null and the declaration is accepted as an
-  /// extension, the pointed variable is assigned true.
-  bool isAcceptableNestedNameSpecifier(const NamedDecl *SD,
-                                       bool *CanCorrect = nullptr);
+  bool isAcceptableNestedNameSpecifier(const NamedDecl *SD);
 
   /// If the given nested-name-specifier begins with a bare identifier
   /// (e.g., Base::), perform name lookup for that identifier as a
@@ -4512,8 +4507,6 @@ public:
                             Expr *BitfieldWidth, InClassInitStyle InitStyle,
                             SourceLocation TSSL, AccessSpecifier AS,
                             NamedDecl *PrevDecl, Declarator *D = nullptr);
-
-  bool CheckNontrivialField(FieldDecl *FD);
 
   /// ActOnLastBitfield - This routine handles synthesized bitfields rules for
   /// class and class extensions. For every class \@interface and class
@@ -5688,10 +5681,7 @@ public:
 
   public:
     explicit ImplicitExceptionSpecification(Sema &Self)
-        : Self(&Self), ComputedEST(EST_BasicNoexcept) {
-      if (!Self.getLangOpts().CPlusPlus11)
-        ComputedEST = EST_DynamicNone;
-    }
+        : Self(&Self), ComputedEST(EST_BasicNoexcept) {}
 
     /// Get the computed exception specification type.
     ExceptionSpecificationType getExceptionSpecType() const {
@@ -6541,11 +6531,6 @@ public:
                                    InClassInitStyle InitStyle,
                                    AccessSpecifier AS,
                                    const ParsedAttr &MSPropertyAttr);
-
-  /// Diagnose why the specified class does not have a trivial special member of
-  /// the given kind.
-  void DiagnoseNontrivial(const CXXRecordDecl *Record,
-                          CXXSpecialMemberKind CSM);
 
   /// Determine whether a defaulted or deleted special member function is
   /// trivial, as specified in C++11 [class.ctor]p5, C++11 [class.copy]p12,
@@ -9209,8 +9194,7 @@ public:
                                  bool BoundToLvalueReference);
 
   /// If \p E is a prvalue denoting an unmaterialized temporary, materialize
-  /// it as an xvalue. In C++98, the result will still be a prvalue, because
-  /// we don't have xvalues there.
+  /// it as an xvalue.
   ExprResult TemporaryMaterializationConversion(Expr *E);
 
   ExprResult PerformQualificationConversion(

@@ -366,7 +366,6 @@ static void RemoveCppKeyword(IdentifierTable &idents, llvm::StringRef token) {
 
   LangOptions cpp_lang_opts;
   cpp_lang_opts.CPlusPlus = true;
-  cpp_lang_opts.CPlusPlus11 = true;
   cpp_lang_opts.CPlusPlus20 = true;
 
   clang::IdentifierInfo &ii = idents.get(token);
@@ -589,14 +588,6 @@ static void SetupLangOpts(CompilerInstance &compiler,
     language_for_note = lldb::eLanguageTypeObjC_plus_plus;
     language_fallback_reason =
         "Expression evaluation in pure Objective-C not supported. ";
-
-    // Clang now sets as default C++14 as the default standard (with
-    // GNU extensions), so we do the same here to avoid mismatches that
-    // cause compiler error when evaluating expressions (e.g. nullptr not found
-    // as it's a C++11 feature). Currently lldb evaluates C++14 as C++11 (see
-    // two lines below) so we decide to be consistent with that, but this could
-    // be re-evaluated in the future.
-    lang_opts.CPlusPlus11 = true;
     break;
   case lldb::eLanguageTypeC_plus_plus_20:
     lang_opts.CPlusPlus20 = true;
@@ -611,7 +602,6 @@ static void SetupLangOpts(CompilerInstance &compiler,
   case lldb::eLanguageTypeC_plus_plus:
   case lldb::eLanguageTypeC_plus_plus_11:
   case lldb::eLanguageTypeC_plus_plus_14:
-    lang_opts.CPlusPlus11 = true;
     compiler.getHeaderSearchOpts().UseLibcxx = true;
     [[fallthrough]];
   case lldb::eLanguageTypeC_plus_plus_03: {
@@ -634,7 +624,6 @@ static void SetupLangOpts(CompilerInstance &compiler,
   default:
     lang_opts.ObjC = true;
     lang_opts.CPlusPlus = true;
-    lang_opts.CPlusPlus11 = true;
     compiler.getHeaderSearchOpts().UseLibcxx = true;
 
     language_for_note = lldb::eLanguageTypeObjC_plus_plus;
@@ -726,7 +715,7 @@ static void SetupImportStdModuleLangOpts(CompilerInstance &compiler,
   // FIXME: We should ask the driver for the appropriate default flags.
   lang_opts.GNUMode = true;
   lang_opts.GNUKeywords = true;
-  lang_opts.CPlusPlus11 = true;
+  lang_opts.CPlusPlus = true;
 
   lang_opts.BuiltinHeadersInSystemModules = false;
 

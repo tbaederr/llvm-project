@@ -20,7 +20,7 @@ class NoAutomaticMoveCheck : public ClangTidyCheck {
 public:
   NoAutomaticMoveCheck(StringRef Name, ClangTidyContext *Context);
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;

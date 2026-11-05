@@ -1187,7 +1187,7 @@ void Sema::PrintInstantiationStack(InstantiationContextDiagFuncRef DiagFunc) {
       DiagFunc(Active->PointOfInstantiation,
                PDiag(diag::note_due_to_dllexported_class)
                    << cast<CXXRecordDecl>(Active->Entity)
-                   << !getLangOpts().CPlusPlus11);
+                   << /*SuggestCXX11=*/0);
       break;
 
     case CodeSynthesisContext::BuildingBuiltinDumpStructCall:

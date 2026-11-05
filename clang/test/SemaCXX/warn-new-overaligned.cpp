@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -triple=x86_64-pc-linux-gnu -Wover-aligned -verify=precxx17 %std_cxx98-14 %s
+// RUN: %clang_cc1 -triple=x86_64-pc-linux-gnu -Wover-aligned -verify=precxx17 %std_cxx11-14 %s
 // RUN: %clang_cc1 -triple=x86_64-pc-linux-gnu -Wover-aligned -verify=cxx17 %std_cxx17- %s
 
 namespace test1 {

@@ -624,9 +624,7 @@ NamedDecl *Parser::ParseTypeParameter(unsigned Depth, unsigned Position) {
 
   // Grab the ellipsis (if given).
   SourceLocation EllipsisLoc;
-  if (TryConsumeToken(tok::ellipsis, EllipsisLoc)) {
-    DiagCompat(EllipsisLoc, diag_compat::variadic_templates);
-  }
+  TryConsumeToken(tok::ellipsis, EllipsisLoc);
 
   // Grab the template parameter name (if given)
   SourceLocation NameLoc = Tok.getLocation();
@@ -766,8 +764,7 @@ NamedDecl *Parser::ParseTemplateTemplateParameter(unsigned Depth,
   }
 
   // Parse the ellipsis, if given.
-  if (TryConsumeToken(tok::ellipsis, EllipsisLoc))
-    DiagCompat(EllipsisLoc, diag_compat::variadic_templates);
+  TryConsumeToken(tok::ellipsis, EllipsisLoc);
 
   // Get the identifier, if given.
   NameLoc = Tok.getLocation();
@@ -952,7 +949,7 @@ bool Parser::ParseGreaterThanInTemplateList(SourceLocation LAngleLoc,
   }
 
   // This template-id is terminated by a token that starts with a '>'.
-  // Outside C++11 and Objective-C, this is now error recovery.
+  // Outside C++ and Objective-C, this is now error recovery.
   //
   // C++11 allows this when the token is '>>', and in CUDA + C++11 mode, we
   // extend that treatment to also apply to the '>>>' token.
@@ -975,7 +972,10 @@ bool Parser::ParseGreaterThanInTemplateList(SourceLocation LAngleLoc,
       areTokensAdjacent(Tok, Next);
 
   // Diagnose this situation as appropriate.
-  if (!ObjCGenericList) {
+  bool IsCXXRightShift =
+      getLangOpts().CPlusPlus &&
+      Tok.isOneOf(tok::greatergreater, tok::greatergreatergreater);
+  if (!ObjCGenericList && !IsCXXRightShift) {
     // The source range of the replaced token(s).
     CharSourceRange ReplacementRange = CharSourceRange::getCharRange(
         TokLoc, Lexer::AdvanceToTokenCharacter(TokLoc, 2, PP.getSourceManager(),
@@ -994,10 +994,7 @@ bool Parser::ParseGreaterThanInTemplateList(SourceLocation LAngleLoc,
       Hint2 = FixItHint::CreateInsertion(Next.getLocation(), " ");
 
     unsigned DiagId = diag::err_two_right_angle_brackets_need_space;
-    if (getLangOpts().CPlusPlus11 &&
-        (Tok.is(tok::greatergreater) || Tok.is(tok::greatergreatergreater)))
-      DiagId = diag::warn_cxx98_compat_two_right_angle_brackets;
-    else if (Tok.is(tok::greaterequal))
+    if (Tok.is(tok::greaterequal))
       DiagId = diag::err_right_angle_bracket_equal_needs_space;
     Diag(TokLoc, DiagId) << Hint1 << Hint2;
   }
@@ -1080,11 +1077,8 @@ bool Parser::ParseTemplateIdAfterTemplateName(bool ConsumeLastToken,
 
     if (Invalid) {
       // Try to find the closing '>'.
-      if (getLangOpts().CPlusPlus11)
-        SkipUntil(tok::greater, tok::greatergreater,
-                  tok::greatergreatergreater, StopAtSemi | StopBeforeMatch);
-      else
-        SkipUntil(tok::greater, StopAtSemi | StopBeforeMatch);
+      SkipUntil(tok::greater, tok::greatergreater, tok::greatergreatergreater,
+                StopAtSemi | StopBeforeMatch);
     }
   }
 
@@ -1370,7 +1364,7 @@ ParsedTemplateArgument Parser::ParseTemplateArgument() {
   // Parse a non-type template argument.
   ExprResult ExprArg;
   SourceLocation Loc = Tok.getLocation();
-  if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace))
+  if (Tok.is(tok::l_brace))
     ExprArg = ParseBraceInitializer();
   else
     ExprArg = ParseConstantExpressionInExprEvalContext(
@@ -1576,9 +1570,8 @@ void Parser::checkPotentialAngleBracket(ExprResult &PotentialTemplateName) {
   // template-name, followed by a '<' token. Check for some easy cases.
 
   // If we have potential_template<>, then it's supposed to be a template-name.
-  if (NextToken().is(tok::greater) ||
-      (getLangOpts().CPlusPlus11 &&
-       NextToken().isOneOf(tok::greatergreater, tok::greatergreatergreater))) {
+  if (NextToken().isOneOf(tok::greater, tok::greatergreater,
+                         tok::greatergreatergreater)) {
     SourceLocation Less = ConsumeToken();
     SourceLocation Greater;
     ParseGreaterThanInTemplateList(Less, Greater, true, false);
@@ -1641,9 +1634,8 @@ bool Parser::checkPotentialAngleBracketDelimiter(
 
   // After a '>' (etc), we're no longer potentially in a construct that's
   // intended to be treated as a template-id.
-  if (OpToken.is(tok::greater) ||
-      (getLangOpts().CPlusPlus11 &&
-       OpToken.isOneOf(tok::greatergreater, tok::greatergreatergreater)))
+  if (OpToken.isOneOf(tok::greater, tok::greatergreater,
+                      tok::greatergreatergreater))
     AngleBrackets.clear(*this);
   return false;
 }

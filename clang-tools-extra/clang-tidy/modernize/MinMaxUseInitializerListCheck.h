@@ -39,7 +39,7 @@ public:
   void check(const ast_matchers::MatchFinder::MatchResult &Match) override;
 
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   std::optional<TraversalKind> getCheckTraversalKind() const override {
     return TK_IgnoreUnlessSpelledInSource;

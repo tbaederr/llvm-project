@@ -1,9 +1,7 @@
 // RUN: %clang_cc1 -verify -fopenmp %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp %s -std=c++98 -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp %s -std=c++11 -Wuninitialized
 
 // RUN: %clang_cc1 -verify -fopenmp-simd %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp-simd %s -std=c++98 -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp-simd %s -std=c++11 -Wuninitialized
 
 // expected-note@* 0+{{declared here}}
@@ -61,11 +59,7 @@ T tmain(T argc, S **argv) {
   for (int i = ST; i < N; i++)
     argv[0][i] = argv[0][i] - argv[0][i-ST];
 
-#if __cplusplus >= 201103L
-// expected-error@+4 2 {{integral constant expression must have integral or unscoped enumeration type}}
-#else
-// expected-error@+2 2 {{integral constant expression}} expected-note@+2 0+{{constant expression}}
-#endif
+// expected-error@+1 2 {{integral constant expression must have integral or unscoped enumeration type}}
 #pragma omp target teams distribute parallel for collapse (argv[1]=2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = ST; i < N; i++)
     argv[0][i] = argv[0][i] - argv[0][i-ST];
@@ -119,11 +113,7 @@ int main(int argc, char **argv) {
   for (int i = 4; i < 12; i++)
     argv[0][i] = argv[0][i] - argv[0][i-4];
 
-#if __cplusplus >= 201103L
-// expected-error@+4 {{integral constant expression must have integral or unscoped enumeration type}}
-#else
-// expected-error@+2 {{integral constant expression}} expected-note@+2 0+{{constant expression}}
-#endif
+// expected-error@+1 {{integral constant expression must have integral or unscoped enumeration type}}
 #pragma omp target teams distribute parallel for collapse (argv[1]=2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = 4; i < 12; i++)
     argv[0][i] = argv[0][i] - argv[0][i-4];

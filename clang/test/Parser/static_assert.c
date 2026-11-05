@@ -5,8 +5,8 @@
 // RUN: %clang_cc1 -fsyntax-only -std=c99 -pedantic -verify=c99-pedantic %s
 // RUN: %clang_cc1 -fsyntax-only -std=c++17 -verify=cxx17 -x c++ %s
 // RUN: %clang_cc1 -fsyntax-only -std=c++17 -pedantic -verify=cxx17-pedantic -x c++ %s
-// RUN: %clang_cc1 -fsyntax-only -std=c++98 -verify=cxx98 -x c++ %s
-// RUN: %clang_cc1 -fsyntax-only -std=c++98 -pedantic -verify=cxx98-pedantic -x c++ %s
+// RUN: %clang_cc1 -fsyntax-only -std=c++11 -verify=cxx98 -x c++ %s
+// RUN: %clang_cc1 -fsyntax-only -std=c++11 -pedantic -verify=cxx98-pedantic -x c++ %s
 // RUN: %clang_cc1 -fsyntax-only -std=c++17 -Wpre-c++17-compat -verify=cxx17-compat -x c++ %s
 
 // cxx17-no-diagnostics

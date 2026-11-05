@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -fshow-overloads=best -verify -triple x86_64-linux-gnu %s
-// RUN: %clang_cc1 -fsyntax-only -fshow-overloads=best -verify -triple x86_64-linux-gnu -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -fshow-overloads=best -verify -triple x86_64-linux-gnu -std=c++11 %s
 
 struct yes;
@@ -67,9 +66,7 @@ struct BoolRef {
 };
 
 struct ShortRef { // expected-note{{candidate function (the implicit copy assignment operator) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 {{candidate function (the implicit move assignment operator) not viable}}
-#endif
+// expected-note@-1 {{candidate function (the implicit move assignment operator) not viable}}
   operator short&();
 };
 
@@ -82,9 +79,7 @@ struct FloatRef {
 };
 
 struct XpmfRef { // expected-note{{candidate function (the implicit copy assignment operator) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 {{candidate function (the implicit move assignment operator) not viable}}
-#endif
+// expected-note@-1 {{candidate function (the implicit move assignment operator) not viable}}
   operator pmf&();
 };
 

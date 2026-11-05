@@ -16875,13 +16875,6 @@ TEST_F(FormatTest, SkipsUnknownStringLiterals) {
                "    OtherParameter);");
 }
 
-TEST_F(FormatTest, DoesNotTryToParseUDLiteralsInPreCpp11Code) {
-  FormatStyle Style = getLLVMStyle();
-  Style.Standard = FormatStyle::LS_Cpp03;
-  verifyFormat("#define x(_a) printf(\"foo\" _a);",
-               "#define x(_a) printf(\"foo\"_a);", Style);
-}
-
 TEST_F(FormatTest, CppLexVersion) {
   FormatStyle Style = getLLVMStyle();
   // Formatting of x * y differs if x is a type.

@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -Wreorder -fsyntax-only -verify %s
-// RUN: %clang_cc1 -Wreorder -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -Wreorder -fsyntax-only -verify -std=c++11 %s
 
 class A { 
@@ -103,10 +102,8 @@ struct Current : Derived {
 };
 
 struct M {              // expected-note 2 {{candidate constructor (the implicit copy constructor)}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
-// expected-note@-4 2 {{'M' declared here}}
+// expected-note@-1 2 {{candidate constructor (the implicit move constructor) not viable}}
+// expected-note@-2 2 {{'M' declared here}}
   M(int i, int j);      // expected-note 2 {{candidate constructor}}
 };
 
@@ -240,10 +237,8 @@ namespace PR7402 {
 namespace test3 {
   class A : public std::exception {}; // expected-error {{undeclared identifier}} expected-error {{expected class name}}
   // expected-note@-1 {{candidate constructor (the implicit copy constructor) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-  // expected-note@-3 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
-  // expected-note@-5 {{candidate constructor (the implicit default constructor) not viable}}
+  // expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
+  // expected-note@-3 {{candidate constructor (the implicit default constructor) not viable}}
 
   class B : public A {
   public:

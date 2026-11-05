@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -verify=expected,cxx17-ext -pedantic %s
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify=expected,cxx17-ext -pedantic %s
 // RUN: %clang_cc1 -std=c++14 -fsyntax-only -verify=expected,cxx17-ext -pedantic %s
 // RUN: %clang_cc1 -std=c++17 -fsyntax-only -verify -pedantic %s
@@ -18,8 +17,6 @@ double foo0p = 1, j = PREFIX(0p+3); // ok
 double k = 0x42_amp+3;
 #if __cplusplus > 201402L
 // expected-error@-2 {{no matching literal operator for call to 'operator""_amp+3'}}
-#elif __cplusplus >= 201103L
-// expected-error@-4 {{no matching literal operator for call to 'operator""_amp'}}
 #else
-// expected-error@-6 {{invalid suffix '_amp' on integer constant}}
+// expected-error@-4 {{no matching literal operator for call to 'operator""_amp'}}
 #endif

@@ -102,9 +102,7 @@ static KeywordStatus getKeywordStatusHelper(const LangOptions &LangOpts,
   case KEYCXX:
     return LangOpts.CPlusPlus ? KS_Enabled : KS_Unknown;
   case KEYCXX11:
-    if (LangOpts.CPlusPlus11)
-      return KS_Enabled;
-    return LangOpts.CPlusPlus ? KS_Future : KS_Unknown;
+    return LangOpts.CPlusPlus ? KS_Enabled : KS_Unknown;
   case KEYCXX20:
     if (LangOpts.CPlusPlus20)
       return KS_Enabled;
@@ -340,7 +338,6 @@ bool IdentifierInfo::isCPlusPlusKeyword(const LangOptions &LangOpts) const {
   // using LangOptions without C++ support.
   LangOptions LangOptsNoCPP = LangOpts;
   LangOptsNoCPP.CPlusPlus = false;
-  LangOptsNoCPP.CPlusPlus11 = false;
   LangOptsNoCPP.CPlusPlus20 = false;
   return !isKeyword(LangOptsNoCPP);
 }

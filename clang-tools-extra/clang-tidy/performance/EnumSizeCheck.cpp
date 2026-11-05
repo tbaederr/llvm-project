@@ -95,7 +95,7 @@ void EnumSizeCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
 
 bool EnumSizeCheck::isLanguageVersionSupported(
     const LangOptions &LangOpts) const {
-  return LangOpts.CPlusPlus11;
+  return LangOpts.CPlusPlus;
 }
 
 void EnumSizeCheck::registerMatchers(MatchFinder *Finder) {

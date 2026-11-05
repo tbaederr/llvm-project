@@ -8113,7 +8113,7 @@ static bool CheckMissingFormatAttribute(
       SL = Caller->getEndLoc();
     }
     const LangOptions &LO = S->getLangOpts();
-    if (LO.C23 || LO.CPlusPlus11)
+    if (LO.C23 || LO.CPlusPlus)
       IS << "[[gnu::" << Attr << "]]";
     else if (LO.ObjC || LO.GNUMode)
       IS << "__attribute__((" << Attr << "))";
@@ -9979,8 +9979,7 @@ bool CheckPrintfHandler::checkFormatExpr(
     // after the switch below.
     bool EmitOSLogError = false;
     switch (S.isValidVarArgType(ExprTy)) {
-    case VarArgKind::Valid:
-    case VarArgKind::ValidInCXX11: {
+    case VarArgKind::Valid: {
       unsigned Diag;
       switch (Match) {
       case ArgType::Match:
@@ -10020,7 +10019,7 @@ bool CheckPrintfHandler::checkFormatExpr(
       } else {
         EmitFormatDiagnostic(
             S.PDiag(diag::warn_non_pod_vararg_with_format_string)
-                << S.getLangOpts().CPlusPlus11 << ExprTy << CallType
+                << S.getLangOpts().CPlusPlus << ExprTy << CallType
                 << AT.getRepresentativeTypeName(S.Context) << CSR
                 << E->getSourceRange(),
             E->getBeginLoc(), /*IsStringLocation*/ false, CSR);
@@ -10034,7 +10033,7 @@ bool CheckPrintfHandler::checkFormatExpr(
       else if (ExprTy->isObjCObjectType())
         EmitFormatDiagnostic(
             S.PDiag(diag::err_cannot_pass_objc_interface_to_vararg_format)
-                << S.getLangOpts().CPlusPlus11 << ExprTy << CallType
+                << S.getLangOpts().CPlusPlus << ExprTy << CallType
                 << AT.getRepresentativeTypeName(S.Context) << CSR
                 << E->getSourceRange(),
             E->getBeginLoc(), /*IsStringLocation*/ false, CSR);
@@ -11828,7 +11827,7 @@ Sema::CheckReturnValExpr(Expr *RetValExp, QualType lhsType,
       if (!Proto->isNothrow(/*ResultIfDependent*/true) &&
           CheckNonNullExpr(*this, RetValExp))
         Diag(ReturnLoc, diag::warn_operator_new_returns_null)
-          << FD << getLangOpts().CPlusPlus11;
+            << FD << /*CPlusPlus11=*/1;
     }
   }
 
@@ -13012,7 +13011,7 @@ static bool AnalyzeBitFieldAssignment(Sema &S, FieldDecl *Bitfield, Expr *Init,
     // If the underlying enum type was not explicitly specified as an unsigned
     // type and the enum contain only positive values, MSVC++ will cause an
     // inconsistency by storing this as a signed type.
-    if (S.getLangOpts().CPlusPlus11 &&
+    if (S.getLangOpts().CPlusPlus &&
         !BitfieldEnumDecl->getIntegerTypeSourceInfo() &&
         BitfieldEnumDecl->getNumPositiveBits() > 0 &&
         BitfieldEnumDecl->getNumNegativeBits() == 0) {
@@ -15653,7 +15652,7 @@ public:
   }
 
   void VisitInitListExpr(const InitListExpr *ILE) {
-    if (!SemaRef.getLangOpts().CPlusPlus11)
+    if (!SemaRef.getLangOpts().CPlusPlus)
       return VisitExpr(ILE);
 
     // In C++11, list initializations are sequenced.

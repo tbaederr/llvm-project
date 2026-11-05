@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -verify %std_cxx98-14 %s
+// RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -verify %std_cxx11-14 %s
 // RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -Wc++14-compat -verify %std_cxx17- %s -DCPP17
 
 int f();

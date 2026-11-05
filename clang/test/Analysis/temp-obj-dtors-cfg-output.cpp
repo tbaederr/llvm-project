@@ -1,10 +1,6 @@
 // RUN: rm -f %t
-// RUN: %clang_analyze_cc1 -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=false -std=c++98 %s > %t 2>&1
-// RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX98,WARNINGS,CXX98-WARNINGS %s
 // RUN: %clang_analyze_cc1 -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=false -std=c++11 %s > %t 2>&1
 // RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX11,WARNINGS,CXX11-WARNINGS %s
-// RUN: %clang_analyze_cc1 -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=true -std=c++98 %s > %t 2>&1
-// RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX98,ANALYZER,CXX98-ANALYZER %s
 // RUN: %clang_analyze_cc1 -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=true -std=c++11 %s > %t 2>&1
 // RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX11,ANALYZER,CXX11-ANALYZER %s
 
@@ -750,18 +746,6 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (1): B3
 // CHECK:     Succs (1): B0
 // CHECK:   [B3]
-// CXX98-WARNINGS:     1: D() (CXXConstructExpr, D)
-// CXX98-ANALYZER:     1: D() (CXXConstructExpr, [B3.3], [B3.4], D)
-// CXX98:     2: [B3.1] (ImplicitCastExpr, NoOp, const D)
-// CXX98:     3: [B3.2]
-// CXX98-WARNINGS:     4: [B3.3] (CXXConstructExpr, D)
-// CXX98-ANALYZER:     4: [B3.3] (CXXConstructExpr, [B3.5], D)
-// CXX98:     5: D d = D();
-// CXX98:     6: d
-// CXX98:     7: [B3.6].operator bool
-// CXX98:     8: [B3.6]
-// CXX98:     9: [B3.8] (ImplicitCastExpr, UserDefinedConversion, _Bool)
-// CXX98:     T: if [B3.9]
 // CXX11-WARNINGS:     1: D() (CXXConstructExpr, D)
 // CXX11-ANALYZER:     1: D() (CXXConstructExpr, [B3.2], [B3.3], D)
 // CXX11:     2: [B3.1]
@@ -933,7 +917,6 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (1): B4
 // CHECK:     Succs (1): B1
 // CHECK:   [B4]
-// CXX98:     1: [B7.2] ?: [B6.6]
 // CXX11:     1: [B7.3] ?: [B6.6]
 // CHECK:     2: [B4.1] (ImplicitCastExpr, NoOp, const A)
 // CHECK:     3: [B4.2]
@@ -944,11 +927,8 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (2): B5 B6
 // CHECK:     Succs (2): B3 B2
 // CHECK:   [B5]
-// CXX98:     1: [B7.2] (ImplicitCastExpr, NoOp, const A)
-// CXX98:     2: [B5.1]
 // WARNINGS-CXX98:     3: [B5.2] (CXXConstructExpr, A)
 // ANALYZER-CXX98:     3: [B5.2] (CXXConstructExpr, [B5.4], A)
-// CXX98:     4: [B5.3] (BindTemporary)
 // CXX11:     1: [B7.3] (ImplicitCastExpr, NoOp, const A)
 // WARNINGS-CXX11:     2: [B5.1] (CXXConstructExpr, A)
 // ANALYZER-CXX11:     2: [B5.1] (CXXConstructExpr, [B5.3], A)
@@ -997,7 +977,6 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (1): B4
 // CHECK:     Succs (1): B1
 // CHECK:   [B4]
-// CXX98:     1: [B7.4] ?: [B6.6]
 // CXX11:     1: [B7.5] ?: [B6.6]
 // CHECK:     2: [B4.1] (ImplicitCastExpr, NoOp, const A)
 // CHECK:     3: [B4.2]
@@ -1006,11 +985,8 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (2): B5 B6
 // CHECK:     Succs (2): B3 B2
 // CHECK:   [B5]
-// CXX98:     1: [B7.4] (ImplicitCastExpr, NoOp, const A)
-// CXX98:     2: [B5.1]
 // WARNINGS-CXX98:     3: [B5.2] (CXXConstructExpr, A)
 // ANALYZER-CXX98:     3: [B5.2] (CXXConstructExpr, [B5.4], A)
-// CXX98:     4: [B5.3] (BindTemporary)
 // CXX11:     1: [B7.5] (ImplicitCastExpr, NoOp, const A)
 // WARNINGS-CXX11:     2: [B5.1] (CXXConstructExpr, A)
 // ANALYZER-CXX11:     2: [B5.1] (CXXConstructExpr, [B5.3], A)
@@ -1047,7 +1023,6 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (1): B9
 // CHECK:     Succs (1): B7
 // CHECK:   [B9]
-// CXX98:     1: [B12.2] ?: [B11.6]
 // CXX11:     1: [B12.3] ?: [B11.6]
 // CHECK:     2: [B9.1] (ImplicitCastExpr, NoOp, const A)
 // CHECK:     3: [B9.2]
@@ -1056,11 +1031,8 @@ const C &bar3(bool coin) {
 // CHECK:     Preds (2): B10 B11
 // CHECK:     Succs (2): B8 B7
 // CHECK:   [B10]
-// CXX98:     1: [B12.2] (ImplicitCastExpr, NoOp, const A)
-// CXX98:     2: [B10.1]
 // WARNINGS-CXX98:     3: [B10.2] (CXXConstructExpr, A)
 // ANALYZER-CXX98:     3: [B10.2] (CXXConstructExpr, [B10.4], A)
-// CXX98:     4: [B10.3] (BindTemporary)
 // CXX11:     1: [B12.3] (ImplicitCastExpr, NoOp, const A)
 // WARNINGS-CXX11:     2: [B10.1] (CXXConstructExpr, A)
 // ANALYZER-CXX11:     2: [B10.1] (CXXConstructExpr, [B10.3], A)

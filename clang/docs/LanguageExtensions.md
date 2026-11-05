@@ -114,15 +114,14 @@ feature) or 0 if not. They can be used like this:
 #endif
 
 ...
-#if __has_feature(cxx_rvalue_references)
-// This code will only be compiled with the -std=c++11 and -std=gnu++11
-// options, because rvalue references are only standardized in C++11.
+#if __has_feature(cxx_binary_literals)
+// This code will only be compiled with -std=c++14 or later, because binary
+// literals are only standardized in C++14.
 #endif
 
-#if __has_extension(cxx_rvalue_references)
-// This code will be compiled with the -std=c++11, -std=gnu++11, -std=c++98
-// and -std=gnu++98 options, because rvalue references are supported as a
-// language extension in C++98.
+#if __has_extension(cxx_binary_literals)
+// This code will also be compiled with -std=c++11, because binary literals
+// are supported as a language extension in C++11.
 #endif
 ```
 
@@ -1526,9 +1525,7 @@ Use `__has_feature(cxx_thread_local)` to determine if support for
 #### C++11 type inference
 
 Use `__has_feature(cxx_auto_type)` or `__has_extension(cxx_auto_type)` to
-determine C++11 type inference is supported using the `auto` specifier. If
-this is disabled, `auto` will instead be a storage class specifier, as in C
-or C++98.
+determine C++11 type inference is supported using the `auto` specifier.
 
 #### C++11 strongly typed enumerations
 
@@ -1741,50 +1738,50 @@ More information can be found [here](Modules.md).
 
 | Feature                                       | Feature Test Macro                 | Introduced In | Backported To |
 | --------------------------------------------- | ---------------------------------- | ------------- | ------------- |
-| variadic templates                            | \_\_cpp_variadic_templates         | C++11         | C++03         |
-| Alias templates                               | \_\_cpp_alias_templates            | C++11         | C++03         |
-| Non-static data member initializers           | \_\_cpp_nsdmi                      | C++11         | C++03         |
-| Range-based `for` loop                        | \_\_cpp_range_based_for            | C++11         | C++03         |
-| RValue references                             | \_\_cpp_rvalue_references          | C++11         | C++03         |
-| Attributes                                    | \_\_cpp_attributes                 | C++11         | C++03         |
-| Lambdas                                       | \_\_cpp_lambdas                    | C++11         | C++03         |
-| Generalized lambda captures                   | \_\_cpp_init_captures              | C++14         | C++03         |
-| Generic lambda expressions                    | \_\_cpp_generic_lambdas            | C++14         | C++03         |
-| variable templates                            | \_\_cpp_variable_templates         | C++14         | C++03         |
-| Binary literals                               | \_\_cpp_binary_literals            | C++14         | C++03         |
+| variadic templates                            | \_\_cpp_variadic_templates         | C++11         | C++11         |
+| Alias templates                               | \_\_cpp_alias_templates            | C++11         | C++11         |
+| Non-static data member initializers           | \_\_cpp_nsdmi                      | C++11         | C++11         |
+| Range-based `for` loop                        | \_\_cpp_range_based_for            | C++11         | C++11         |
+| RValue references                             | \_\_cpp_rvalue_references          | C++11         | C++11         |
+| Attributes                                    | \_\_cpp_attributes                 | C++11         | C++11         |
+| Lambdas                                       | \_\_cpp_lambdas                    | C++11         | C++11         |
+| Generalized lambda captures                   | \_\_cpp_init_captures              | C++14         | C++11         |
+| Generic lambda expressions                    | \_\_cpp_generic_lambdas            | C++14         | C++11         |
+| variable templates                            | \_\_cpp_variable_templates         | C++14         | C++11         |
+| Binary literals                               | \_\_cpp_binary_literals            | C++14         | C++11         |
 | Relaxed constexpr                             | \_\_cpp_constexpr                  | C++14         | C++11         |
 | Static assert with no message                 | \_\_cpp_static_assert >= 201411L   | C++17         | C++11         |
-| Pack expansion in generalized lambda-capture  | \_\_cpp_init_captures              | C++17         | C++03         |
+| Pack expansion in generalized lambda-capture  | \_\_cpp_init_captures              | C++17         | C++11         |
 | `if constexpr`                                | \_\_cpp_if_constexpr               | C++17         | C++11         |
-| fold expressions                              | \_\_cpp_fold_expressions           | C++17         | C++03         |
-| Lambda capture of \*this by value             | \_\_cpp_capture_star_this          | C++17         | C++03         |
-| Attributes on enums                           | \_\_cpp_enumerator_attributes      | C++17         | C++03         |
-| Guaranteed copy elision                       | \_\_cpp_guaranteed_copy_elision    | C++17         | C++03         |
-| Hexadecimal floating literals                 | \_\_cpp_hex_float                  | C++17         | C++03         |
-| `inline` variables                            | \_\_cpp_inline_variables           | C++17         | C++03         |
+| fold expressions                              | \_\_cpp_fold_expressions           | C++17         | C++11         |
+| Lambda capture of \*this by value             | \_\_cpp_capture_star_this          | C++17         | C++11         |
+| Attributes on enums                           | \_\_cpp_enumerator_attributes      | C++17         | C++11         |
+| Guaranteed copy elision                       | \_\_cpp_guaranteed_copy_elision    | C++17         | C++11         |
+| Hexadecimal floating literals                 | \_\_cpp_hex_float                  | C++17         | C++11         |
+| `inline` variables                            | \_\_cpp_inline_variables           | C++17         | C++11         |
 | Attributes on namespaces                      | \_\_cpp_namespace_attributes       | C++17         | C++11         |
-| Structured bindings                           | \_\_cpp_structured_bindings        | C++17         | C++03         |
-| template template arguments                   | \_\_cpp_template_template_args     | C++17         | C++03         |
-| Familiar template syntax for generic lambdas  | \_\_cpp_generic_lambdas            | C++20         | C++03         |
-| `static operator[]`                           | \_\_cpp_multidimensional_subscript | C++20         | C++03         |
-| Designated initializers                       | \_\_cpp_designated_initializers    | C++20         | C++03         |
-| Conditional `explicit`                        | \_\_cpp_conditional_explicit       | C++20         | C++03         |
-| `using enum`                                  | \_\_cpp_using_enum                 | C++20         | C++03         |
-| `auto` parameters                             |                                    | C++20         | C++03         |
+| Structured bindings                           | \_\_cpp_structured_bindings        | C++17         | C++11         |
+| template template arguments                   | \_\_cpp_template_template_args     | C++17         | C++11         |
+| Familiar template syntax for generic lambdas  | \_\_cpp_generic_lambdas            | C++20         | C++11         |
+| `static operator[]`                           | \_\_cpp_multidimensional_subscript | C++20         | C++11         |
+| Designated initializers                       | \_\_cpp_designated_initializers    | C++20         | C++11         |
+| Conditional `explicit`                        | \_\_cpp_conditional_explicit       | C++20         | C++11         |
+| `using enum`                                  | \_\_cpp_using_enum                 | C++20         | C++11         |
+| `auto` parameters                             |                                    | C++20         | C++11         |
 | `if consteval`                                | \_\_cpp_if_consteval               | C++23         | C++20         |
-| `static operator()`                           | \_\_cpp_static_call_operator       | C++23         | C++03         |
+| `static operator()`                           | \_\_cpp_static_call_operator       | C++23         | C++11         |
 | Attributes on Lambda-Expressions              |                                    | C++23         | C++11         |
-| Attributes on Structured Bindings             | \_\_cpp_structured_bindings        | C++26         | C++03         |
-| Packs in Structured Bindings                  | \_\_cpp_structured_bindings        | C++26         | C++03         |
+| Attributes on Structured Bindings             | \_\_cpp_structured_bindings        | C++26         | C++11         |
+| Packs in Structured Bindings                  | \_\_cpp_structured_bindings        | C++26         | C++11         |
 | Structured binding declaration as a condition | \_\_cpp_structured_bindings        | C++26         | C++98         |
 | Static assert with user-generated message     | \_\_cpp_static_assert >= 202306L   | C++26         | C++11         |
-| Pack Indexing                                 | \_\_cpp_pack_indexing              | C++26         | C++03         |
-| `= delete ("should have a reason");`          | \_\_cpp_deleted_function           | C++26         | C++03         |
-| Variadic Friends                              | \_\_cpp_variadic_friend            | C++26         | C++03         |
-| Trivial Relocatability                        | \_\_cpp_trivial_relocatability     | C++26         | C++03         |
-| `#embed`                                      | \_\_cpp_pp_embed                   | C++26         | C++03         |
-|``auto()`` cast                                | \_\_cpp_auto_cast                  | C++26         | C++03         |
-| Pack Indexing for Template Names              | \_\_cpp_pack_indexing >= 202606L   | C++2d         | C++03         |
+| Pack Indexing                                 | \_\_cpp_pack_indexing              | C++26         | C++11         |
+| `= delete ("should have a reason");`          | \_\_cpp_deleted_function           | C++26         | C++11         |
+| Variadic Friends                              | \_\_cpp_variadic_friend            | C++26         | C++11         |
+| Trivial Relocatability                        | \_\_cpp_trivial_relocatability     | C++26         | C++11         |
+| `#embed`                                      | \_\_cpp_pp_embed                   | C++26         | C++11         |
+|``auto()`` cast                                | \_\_cpp_auto_cast                  | C++26         | C++11         |
+| Pack Indexing for Template Names              | \_\_cpp_pack_indexing >= 202606L   | C++2d         | C++11         |
 | Designated initializers (N494)                |                                    | C99           | C89           |
 | `_Complex` (N693)                             |                                    | C99           | C89, C++      |
 | `_Bool` (N815)                                |                                    | C99           | C89           |

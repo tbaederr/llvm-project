@@ -113,8 +113,7 @@ struct TestClangConfig {
   }
 
   bool supportsCXXDynamicExceptionSpecification() const {
-    return Language == Lang_CXX03 || Language == Lang_CXX11 ||
-           Language == Lang_CXX14;
+    return Language == Lang_CXX11 || Language == Lang_CXX14;
   }
 
   bool hasDelayedTemplateParsing() const {

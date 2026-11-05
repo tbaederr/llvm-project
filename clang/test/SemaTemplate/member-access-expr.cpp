@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 template<typename T>
@@ -32,14 +31,8 @@ void test_f0_through_typedef(X0 x0) {
 template<typename TheBase, typename T>
 void call_f0_through_typedef2(T x) {
   typedef TheBase CrazyBase;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{lookup from the current scope refers here}}
-#endif
 
   x.CrazyBase::f0(); // expected-error 2{{no member named}}
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{lookup of 'CrazyBase' in member access expression is ambiguous}}
-#endif
 
 }
 
@@ -47,9 +40,6 @@ struct OtherBase { };
 
 struct X1 : Base, OtherBase { 
   typedef OtherBase CrazyBase;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{lookup in the object type 'X1' refers here}}
-#endif
 };
 
 void test_f0_through_typedef2(X0 x0, X1 x1) {

@@ -94,7 +94,7 @@ public:
 
   bool prepare(const Selection &Inputs) override {
     // This tweak relies on =default and =delete.
-    if (!Inputs.AST->getLangOpts().CPlusPlus11)
+    if (!Inputs.AST->getLangOpts().CPlusPlus)
       return false;
 
     // Trigger only on class definitions.

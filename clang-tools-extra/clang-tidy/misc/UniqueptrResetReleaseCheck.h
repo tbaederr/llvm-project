@@ -33,7 +33,7 @@ public:
     // Only register the matchers for C++11; the functionality currently does
     // not
     // provide any benefit to other languages, despite being benign.
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
                            Preprocessor *ModuleExpanderPP) override;

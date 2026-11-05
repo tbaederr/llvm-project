@@ -35,7 +35,7 @@ MakeUniqueCheck::getSmartPointerTypeMatcher() const {
 
 bool MakeUniqueCheck::isLanguageVersionSupported(
     const LangOptions &LangOpts) const {
-  return RequireCPlusPlus14 ? LangOpts.CPlusPlus14 : LangOpts.CPlusPlus11;
+  return RequireCPlusPlus14 ? LangOpts.CPlusPlus14 : LangOpts.CPlusPlus;
 }
 
 // FixItHint is done by MakeSmartPtrCheck

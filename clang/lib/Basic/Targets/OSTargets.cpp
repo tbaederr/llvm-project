@@ -224,7 +224,7 @@ static void addVisualCDefines(const LangOptions &Opts, MacroBuilder &Builder) {
     // Exposed by MSVC, used in their stddef.h.
     Builder.defineMacro("_CRT_USE_BUILTIN_OFFSETOF", Twine(1));
 
-    if (Opts.CPlusPlus11 && Opts.isCompatibleWithMSVC(LangOptions::MSVC2015))
+    if (Opts.CPlusPlus && Opts.isCompatibleWithMSVC(LangOptions::MSVC2015))
       Builder.defineMacro("_HAS_CHAR16_T_LANGUAGE_SUPPORT", Twine(1));
 
     if (Opts.isCompatibleWithMSVC(LangOptions::MSVC2015)) {
@@ -251,7 +251,7 @@ static void addVisualCDefines(const LangOptions &Opts, MacroBuilder &Builder) {
   if (Opts.MicrosoftExt) {
     Builder.defineMacro("_MSC_EXTENSIONS");
 
-    if (Opts.CPlusPlus11) {
+    if (Opts.CPlusPlus) {
       Builder.defineMacro("_RVALUE_REFERENCES_V2_SUPPORTED");
       Builder.defineMacro("_RVALUE_REFERENCES_SUPPORTED");
       Builder.defineMacro("_NATIVE_NULLPTR_SUPPORTED");

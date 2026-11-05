@@ -496,7 +496,7 @@ void Sema::DiagnoseSentinelCalls(const NamedDecl *D, SourceLocation Loc,
   std::string NullValue;
   if (CalleeKind == CK_Method && PP.isMacroDefined("nil"))
     NullValue = "nil";
-  else if (getLangOpts().CPlusPlus11)
+  else if (getLangOpts().CPlusPlus)
     NullValue = "nullptr";
   else if (PP.isMacroDefined("NULL"))
     NullValue = "NULL";
@@ -998,12 +998,12 @@ VarArgKind Sema::isValidVarArgType(const QualType &Ty) {
   //   having a non-trivial copy constructor, a non-trivial move constructor,
   //   or a non-trivial destructor, with no corresponding parameter,
   //   is conditionally-supported with implementation-defined semantics.
-  if (getLangOpts().CPlusPlus11 && !Ty->isDependentType())
+  if (getLangOpts().CPlusPlus && !Ty->isDependentType())
     if (CXXRecordDecl *Record = Ty->getAsCXXRecordDecl())
       if (!Record->hasNonTrivialCopyConstructor() &&
           !Record->hasNonTrivialMoveConstructor() &&
           !Record->hasNonTrivialDestructor())
-        return VarArgKind::ValidInCXX11;
+        return VarArgKind::Valid;
 
   if (getLangOpts().ObjCAutoRefCount && Ty->isObjCLifetimeType())
     return VarArgKind::Valid;
@@ -1032,11 +1032,6 @@ void Sema::checkVariadicArgument(const Expr *E, VariadicCallType CT) {
 
   // Complain about passing non-POD types through varargs.
   switch (VAK) {
-  case VarArgKind::ValidInCXX11:
-    DiagRuntimeBehavior(
-        E->getBeginLoc(), nullptr,
-        PDiag(diag::warn_cxx98_compat_pass_non_pod_arg_to_vararg) << Ty << CT);
-    [[fallthrough]];
   case VarArgKind::Valid:
     if (Ty->isRecordType()) {
       // This is unlikely to be what the user intended. If the class has a
@@ -1051,7 +1046,7 @@ void Sema::checkVariadicArgument(const Expr *E, VariadicCallType CT) {
   case VarArgKind::MSVCUndefined:
     DiagRuntimeBehavior(E->getBeginLoc(), nullptr,
                         PDiag(diag::warn_cannot_pass_non_pod_arg_to_vararg)
-                            << getLangOpts().CPlusPlus11 << Ty << CT);
+                            << getLangOpts().CPlusPlus << Ty << CT);
     break;
 
   case VarArgKind::Invalid:
@@ -4264,18 +4259,11 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
             Ty = Context.LongTy;
           else if (AllowUnsigned)
             Ty = Context.UnsignedLongTy;
-          // Check according to the rules of C90 6.1.3.2p5. C++03 [lex.icon]p2
-          // is compatible.
-          else if (!getLangOpts().C99 && !getLangOpts().CPlusPlus11) {
+          // Check according to the rules of C90 6.1.3.2p5.
+          else if (!getLangOpts().C99 && !getLangOpts().CPlusPlus) {
             const unsigned LongLongSize =
                 Context.getTargetInfo().getLongLongWidth();
-            Diag(Tok.getLocation(),
-                 getLangOpts().CPlusPlus
-                     ? Literal.isLong
-                           ? diag::warn_old_implicitly_unsigned_long_cxx
-                           : /*C++98 UB*/ diag::
-                                 ext_old_implicitly_unsigned_long_cxx
-                     : diag::warn_old_implicitly_unsigned_long)
+            Diag(Tok.getLocation(), diag::warn_old_implicitly_unsigned_long)
                 << (LongLongSize > LongSize ? /*will have type 'long long'*/ 0
                                             : /*will be ill-formed*/ 1);
             Ty = Context.UnsignedLongTy;
@@ -4302,11 +4290,7 @@ ExprResult Sema::ActOnNumericConstant(const Token &Tok, Scope *UDLScope) {
 
           // 'long long' is a C99 or C++11 feature, whether the literal
           // explicitly specified 'long long' or we needed the extra width.
-          if (getLangOpts().CPlusPlus)
-            Diag(Tok.getLocation(), getLangOpts().CPlusPlus11
-                                        ? diag::warn_cxx98_compat_longlong
-                                        : diag::ext_cxx11_longlong);
-          else if (!getLangOpts().C99)
+          if (!getLangOpts().CPlusPlus && !getLangOpts().C99)
             Diag(Tok.getLocation(), diag::ext_c99_longlong);
         }
       }
@@ -5479,7 +5463,7 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
 
   // Per C++ core issue 1213, the result is an xvalue if either operand is
   // a non-lvalue array, and an lvalue otherwise.
-  if (getLangOpts().CPlusPlus11) {
+  if (getLangOpts().CPlusPlus) {
     for (auto *Op : {LHSExp, RHSExp}) {
       Op = Op->IgnoreImplicit();
       if (Op->getType()->isArrayType() && !Op->isLValue())
@@ -5560,7 +5544,7 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
     BaseExpr = LHSExp; // vectors: V[123]
     IndexExpr = RHSExp;
     // We apply C++ DR1213 to vector subscripting too.
-    if (getLangOpts().CPlusPlus11 && LHSExp->isPRValue()) {
+    if (getLangOpts().CPlusPlus && LHSExp->isPRValue()) {
       ExprResult Materialized = TemporaryMaterializationConversion(LHSExp);
       if (Materialized.isInvalid())
         return ExprError();
@@ -15845,7 +15829,7 @@ static bool needsConversionOfHalfVec(bool OpRequiresConversion, ASTContext &Ctx,
 ExprResult Sema::CreateBuiltinBinOp(SourceLocation OpLoc,
                                     BinaryOperatorKind Opc, Expr *LHSExpr,
                                     Expr *RHSExpr, bool ForFoldExpression) {
-  if (getLangOpts().CPlusPlus11 && isa<InitListExpr>(RHSExpr)) {
+  if (getLangOpts().CPlusPlus && isa<InitListExpr>(RHSExpr)) {
     // The syntax only allows initializer lists on the RHS of assignment,
     // so we don't need to worry about accepting invalid code for
     // non-assignment operators.
@@ -17087,21 +17071,13 @@ ExprResult Sema::BuildBuiltinOffsetOf(SourceLocation BuiltinLoc,
       return ExprError(Diag(D.getEndLoc(), diag::err_offsetof_record_type)
                        << CurrentType);
 
-    // C++ [lib.support.types]p5:
-    //   The macro offsetof accepts a restricted set of type arguments in this
-    //   International Standard. type shall be a POD structure or a POD union
-    //   (clause 9).
     // C++11 [support.types]p4:
     //   If type is not a standard-layout class (Clause 9), the results are
     //   undefined.
     if (CXXRecordDecl *CRD = dyn_cast<CXXRecordDecl>(RD)) {
-      bool IsSafe = LangOpts.CPlusPlus11? CRD->isStandardLayout() : CRD->isPOD();
-      unsigned DiagID =
-        LangOpts.CPlusPlus11? diag::ext_offsetof_non_standardlayout_type
-                            : diag::ext_offsetof_non_pod_type;
-
-      if (!IsSafe && !DidWarnAboutNonPOD && !isUnevaluatedContext()) {
-        Diag(BuiltinLoc, DiagID)
+      if (!CRD->isStandardLayout() && !DidWarnAboutNonPOD &&
+          !isUnevaluatedContext()) {
+        Diag(BuiltinLoc, diag::ext_offsetof_non_standardlayout_type)
             << SourceRange(Desig.getDesignator(0).getBeginLoc(), D.getEndLoc())
             << CurrentType;
         DidWarnAboutNonPOD = true;
@@ -18294,7 +18270,7 @@ Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
                                       AllowFoldKind CanFold) {
   SourceLocation DiagLoc = E->getBeginLoc();
 
-  if (getLangOpts().CPlusPlus11) {
+  if (getLangOpts().CPlusPlus) {
     // C++11 [expr.const]p5:
     //   If an expression of literal class type is used in a context where an
     //   integral constant expression is required, then that class type shall
@@ -18376,7 +18352,7 @@ Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
 
   // Circumvent ICE checking in C++11 to avoid evaluating the expression twice
   // in the non-ICE case.
-  if (!getLangOpts().CPlusPlus11 && E->isIntegerConstantExpr(Context)) {
+  if (!getLangOpts().CPlusPlus && E->isIntegerConstantExpr(Context)) {
 
     if (!Result)
       return E;
@@ -18448,7 +18424,7 @@ Sema::VerifyIntegerConstantExpression(Expr *E, llvm::APSInt *Result,
   // In C++11, we can rely on diagnostics being produced for any expression
   // which is not a constant expression. If no diagnostics were produced, then
   // this is a constant expression.
-  if (Folded && getLangOpts().CPlusPlus11 && Notes.empty()) {
+  if (Folded && getLangOpts().CPlusPlus && Notes.empty()) {
     if (Result)
       *Result = EvalResult.Val.getInt();
     return E;

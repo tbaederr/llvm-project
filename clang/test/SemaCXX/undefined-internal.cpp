@@ -1,19 +1,15 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wbind-to-temporary-copy %s
-// RUN: %clang_cc1 -fsyntax-only -verify -Wbind-to-temporary-copy -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wbind-to-temporary-copy -std=c++11 %s
 
 // RUN: %clang_cc1 -fsyntax-only -verify -Wbind-to-temporary-copy %s -fexperimental-new-constant-interpreter
-// RUN: %clang_cc1 -fsyntax-only -verify -Wbind-to-temporary-copy -std=c++98 %s -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -fsyntax-only -verify -Wbind-to-temporary-copy -std=c++11 %s -fexperimental-new-constant-interpreter
 
 
 // Make sure we don't produce invalid IR.
 // RUN: %clang_cc1 -emit-llvm-only %s
-// RUN: %clang_cc1 -emit-llvm-only -std=c++98 %s
 // RUN: %clang_cc1 -emit-llvm-only -std=c++11 %s
 
 // RUN: %clang_cc1 -emit-llvm-only %s -fexperimental-new-constant-interpreter
-// RUN: %clang_cc1 -emit-llvm-only -std=c++98 %s -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -emit-llvm-only -std=c++11 %s -fexperimental-new-constant-interpreter
 
 
@@ -128,17 +124,12 @@ namespace PR9323 {
     struct Uncopyable {
       Uncopyable() {}
     private:
-      Uncopyable(const Uncopyable&); // expected-note {{declared private here}}
+      Uncopyable(const Uncopyable&);
     };
   }
   void f(const Uncopyable&) {}
   void test() {
     f(Uncopyable());
-#if __cplusplus <= 199711L // C++03 or earlier modes
-    // expected-warning@-2 {{C++98 requires an accessible copy constructor}}
-#else
-    // expected-warning@-4 {{copying parameter of type 'Uncopyable' when binding a reference to a temporary would invoke an inaccessible constructor in C++98}}
-#endif
   };
 }
 
@@ -196,10 +187,6 @@ namespace OverloadUse {
     void f();
     void f(int); // expected-warning {{function 'OverloadUse::(anonymous namespace)::f' has internal linkage but is not defined}}
     void f(int, int); // expected-warning {{function 'OverloadUse::(anonymous namespace)::f' has internal linkage but is not defined}}
-#if __cplusplus < 201103L
-    // expected-note@-3 {{here}}
-    // expected-note@-3 {{here}}
-#endif
   }
   template<void x()> void t() { x(); }
   template<void x(int)> void t(int*) { x(10); }
@@ -207,12 +194,6 @@ namespace OverloadUse {
   void g(int n) {
     t<f>(&n); // expected-note {{used here}}
     t<f>(&n, &n); // expected-note {{used here}}
-#if __cplusplus < 201103L
-    // expected-warning@-3 {{non-type template argument referring to function 'f' with internal linkage}}
-    // expected-note@-4 {{while substituting explicitly-specified template arguments}}
-    // expected-warning@-4 {{non-type template argument referring to function 'f' with internal linkage}}
-    // expected-note@-5 {{while substituting explicitly-specified template arguments}}
-#endif
   }
 }
 

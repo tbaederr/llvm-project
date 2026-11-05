@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-14,cxx98-14,since-cxx11,cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-14,since-cxx14,cxx98-14,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,since-cxx14,since-cxx17,since-cxx11
@@ -6,12 +5,7 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx23,since-cxx14,since-cxx20,since-cxx17,since-cxx11
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx23,since-cxx14,since-cxx20,since-cxx17,since-cxx11
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
-#if __cplusplus >= 201103L
 namespace std {
   typedef decltype(sizeof(int)) size_t;
 
@@ -23,11 +17,9 @@ namespace std {
     initializer_list();
   };
 } // std
-#endif
 
 namespace cwg1601 { // cwg1601: 10
 enum E : char { e };
-// cxx98-error@-1 {{enumeration types with a fixed underlying type are a C++11 extension}}
 void f(char);
 void f(int);
 void g() {
@@ -36,14 +28,12 @@ void g() {
 } // namespace cwg1601
 
 namespace cwg1606 { // cwg1606: 3.1
-#if __cplusplus >= 201103L
   std::size_t test() {
     int i = 1;
     int j = 1;
     auto f = [=]{ return i + j; };
     return sizeof(f);
   }
-#endif
 } // namespace cwg1606
 
 namespace cwg1611 { // cwg1611: dup 1658
@@ -54,7 +44,6 @@ namespace cwg1611 { // cwg1611: dup 1658
 } // namespace cwg1611
 
 namespace cwg1631 {  // cwg1631: 3.7
-#if __cplusplus >= 201103L
   // Incorrect overload resolution for single-element initializer-list
 
   struct A { int a[1]; };
@@ -80,11 +69,9 @@ namespace cwg1631 {  // cwg1631: 3.7
       //   since-cxx11-note@#cwg1631-f-int {{candidate function}}
     }
   }
-#endif
 } // namespace cwg1631
 
 namespace cwg1638 { // cwg1638: 3.1
-#if __cplusplus >= 201103L
   template<typename T> struct A {
     enum class E; // #cwg1638-E
     enum class F : T; // #cwg1638-F
@@ -121,11 +108,9 @@ namespace cwg1638 { // cwg1638: 3.1
     // since-cxx11-error@-2 {{elaborated enum specifier cannot be declared as a friend}}
     //   since-cxx11-note@-3 {{remove 'enum class' to befriend an enum}}
   };
-#endif
 } // namespace cwg1638
 
 namespace cwg1645 { // cwg1645: 3.9
-#if __cplusplus >= 201103L
   struct A {
     constexpr A(int, float = 0); // #cwg1645-int-float
     explicit A(int, int = 0); // #cwg1645-int-int
@@ -148,7 +133,6 @@ namespace cwg1645 { // cwg1645: 3.9
   //   since-cxx11-note@#cwg1645-using {{constructor from base class 'A' inherited here}}
   //   since-cxx11-note@#cwg1645-int-int-int {{candidate inherited constructor has been explicitly deleted}}
   //   since-cxx11-note@#cwg1645-using {{constructor from base class 'A' inherited here}}
-#endif
 } // namespace cwg1645
 
 namespace cwg1652 { // cwg1652: 3.6
@@ -176,7 +160,6 @@ namespace cwg1653 { // cwg1653: 4 c++17
 } // namespace cwg1653
 
 namespace cwg1657 { // cwg1657: 3.6
-#if __cplusplus >= 201103L
 enum {
   one [[]]
   // cxx11-14-error@-1 {{attributes on an enumerator declaration are a C++17 extension}}
@@ -202,7 +185,6 @@ inline namespace [[]] N {}
 
 namespace [[]] M {}
 // cxx11-14-error@-1 {{attributes on a namespace declaration are a C++17 extension}}
-#endif
 } // namespace cwg1657
 
 namespace cwg1658 { // cwg1658: 5
@@ -213,43 +195,25 @@ namespace cwg1658 { // cwg1658: 5
     // The stars align! An abstract class does not construct its virtual bases.
     struct C : virtual A { C(); virtual void foo() = 0; };
     C::C() = default; // ok, not deleted
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
     struct D : virtual B { D(); virtual void foo() = 0; };
     D::D() = default; // ok, not deleted
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
 
     // In all other cases, we are not so lucky.
     struct E : A { E(); virtual void foo() = 0; }; // #cwg1658-E1
     E::E() = default; // #cwg1658-E1-ctor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@-2 {{base class 'A' has private default constructor}}
-    //   cxx98-note@-3 {{in defaulted default constructor for 'cwg1658::DefCtor::E' first required here}}
-    //   cxx98-note@#cwg1658-A1 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-E1-ctor {{defaulting this default constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-E1 {{default constructor of 'E' is implicitly deleted because base class 'A' has an inaccessible default constructor}}
     struct F : virtual A { F(); }; // #cwg1658-F1
     F::F() = default; // #cwg1658-F1-ctor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@-2 {{inherited virtual base class 'A' has private default constructor}}
-    //   cxx98-note@-3 {{in defaulted default constructor for 'cwg1658::DefCtor::F' first required here}}
-    //   cxx98-note@#cwg1658-A1 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-F1-ctor {{defaulting this default constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-F1 {{default constructor of 'F' is implicitly deleted because base class 'A' has an inaccessible default constructor}}
 
     struct G : B { G(); virtual void foo() = 0; }; // #cwg1658-G1
     G::G() = default; // #cwg1658-G1-ctor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@#cwg1658-G1 {{base class 'B' has private destructor}}
-    //   cxx98-note@#cwg1658-G1-ctor {{in defaulted default constructor for 'cwg1658::DefCtor::G' first required here}}
-    //   cxx98-note@#cwg1658-B1 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-G1-ctor {{defaulting this default constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-G1 {{default constructor of 'G' is implicitly deleted because base class 'B' has an inaccessible destructor}}
     struct H : virtual B { H(); }; // #cwg1658-H1
     H::H() = default; // #cwg1658-H1-ctor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@#cwg1658-H1 {{base class 'B' has private destructor}}
-    //   cxx98-note@#cwg1658-H1-ctor {{in defaulted default constructor for 'cwg1658::DefCtor::H' first required here}}
-    //   cxx98-note@#cwg1658-B1 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-H1-ctor {{defaulting this default constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-H1 {{default constructor of 'H' is implicitly deleted because base class 'B' has an inaccessible destructor}}
   }
@@ -259,22 +223,13 @@ namespace cwg1658 { // cwg1658: 5
 
     struct D : virtual B { ~D(); virtual void foo() = 0; };
     D::~D() = default; // ok, not deleted
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
 
     struct G : B { ~G(); virtual void foo() = 0; }; // #cwg1658-G2
     G::~G() = default; // #cwg1658-G2-dtor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@#cwg1658-G2 {{base class 'B' has private destructor}}
-    //   cxx98-note@#cwg1658-G2-dtor {{in defaulted destructor for 'cwg1658::Dtor::G' first required here}}
-    //   cxx98-note@#cwg1658-B2 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-G2-dtor {{defaulting this destructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-G2 {{destructor of 'G' is implicitly deleted because base class 'B' has an inaccessible destructor}}
     struct H : virtual B { ~H(); }; // #cwg1658-H2
     H::~H() = default; // #cwg1658-H2-dtor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@#cwg1658-H2 {{base class 'B' has private destructor}}
-    //   cxx98-note@#cwg1658-H2-dtor {{in defaulted destructor for 'cwg1658::Dtor::H' first required here}}
-    //   cxx98-note@#cwg1658-B2 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-H2-dtor {{defaulting this destructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-H2 {{destructor of 'H' is implicitly deleted because base class 'B' has an inaccessible destructor}}
   }
@@ -321,48 +276,23 @@ namespace cwg1658 { // cwg1658: 5
 
   namespace CopyCtor {
     class A { A(const A&); A(A&&); }; // #cwg1658-A5
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
 
     struct C : virtual A { C(const C&); C(C&&); virtual void foo() = 0; };
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
     C::C(const C&) = default;
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
     C::C(C&&) = default;
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
-    // cxx98-error@-2 {{defaulted function definitions are a C++11 extension}}
 
     struct E : A { E(const E&); E(E&&); virtual void foo() = 0; }; // #cwg1658-E5
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
     E::E(const E&) = default; // #cwg1658-E5-copy-ctor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@-2 {{base class 'A' has private copy constructor}}
-    //   cxx98-note@-3 {{in defaulted copy constructor for 'cwg1658::CopyCtor::E' first required here}}
-    //   cxx98-note@#cwg1658-A5 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-E5-copy-ctor {{defaulting this copy constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-E5 {{copy constructor of 'E' is implicitly deleted because base class 'A' has an inaccessible copy constructor}}
     E::E(E&&) = default; // #cwg1658-E5-move-ctor
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
-    // cxx98-error@-2 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@-3 {{base class 'A' has private move constructor}}
-    //   cxx98-note@-4 {{in defaulted move constructor for 'cwg1658::CopyCtor::E' first required here}}
-    //   cxx98-note@#cwg1658-A5 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-E5-move-ctor {{defaulting this move constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-E5 {{move constructor of 'E' is implicitly deleted because base class 'A' has an inaccessible move constructor}}
     struct F : virtual A { F(const F&); F(F&&); }; // #cwg1658-F5
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
     F::F(const F&) = default; // #cwg1658-F5-copy-ctor
-    // cxx98-error@-1 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@-2 {{inherited virtual base class 'A' has private copy constructor}}
-    //   cxx98-note@-3 {{in defaulted copy constructor for 'cwg1658::CopyCtor::F' first required here}}
-    //   cxx98-note@#cwg1658-A5 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-F5-copy-ctor {{defaulting this copy constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-F5 {{copy constructor of 'F' is implicitly deleted because base class 'A' has an inaccessible copy constructor}}
     F::F(F&&) = default; // #cwg1658-F5-move-ctor
-    // cxx98-error@-1 {{rvalue references are a C++11 extension}}
-    // cxx98-error@-2 {{defaulted function definitions are a C++11 extension}}
-    // cxx98-error@-3 {{inherited virtual base class 'A' has private move constructor}}
-    //   cxx98-note@-4 {{in defaulted move constructor for 'cwg1658::CopyCtor::F' first required here}}
-    //   cxx98-note@#cwg1658-A5 {{implicitly declared private here}}
     // since-cxx11-error@#cwg1658-F5-move-ctor {{defaulting this move constructor would delete it after its first declaration}}
     //   since-cxx11-note@#cwg1658-F5 {{move constructor of 'F' is implicitly deleted because base class 'A' has an inaccessible move constructor}}
   }
@@ -374,7 +304,6 @@ namespace cwg1670 { // cwg1670: no
 #if __cpusplus >= 201103L
 struct S {
   operator auto() { return 0; }
-  // FIXME-error@-1 {{'auto' not allowed in declaration of conversion function}}
 };
 #endif
 } // namespace cwg1670
@@ -405,7 +334,6 @@ namespace cwg1672 { // cwg1672: 7
 } // namespace cwg1672
 
 namespace cwg1684 { // cwg1684: 3.6
-#if __cplusplus >= 201103L
   struct NonLiteral { // #cwg1684-struct
     NonLiteral();
     constexpr int f() { return 0; }
@@ -415,7 +343,6 @@ namespace cwg1684 { // cwg1684: 3.6
   constexpr int f(NonLiteral) { return 0; }
   // cxx11-20-error@-1 {{constexpr function's 1st parameter type 'NonLiteral' is not a literal type}}
   //   cxx11-20-note@#cwg1684-struct {{'NonLiteral' is not literal because it is not an aggregate and has no constexpr constructors other than copy or move constructors}}
-#endif
 } // namespace cwg1684
 
 namespace cwg1687 { // cwg1687: 7
@@ -443,7 +370,6 @@ namespace cwg1687 { // cwg1687: 7
 
 namespace cwg1690 { // cwg1690: 9
   // See also the various tests in "CXX/basic/basic.lookup/basic.lookup.argdep".
-#if __cplusplus >= 201103L
   namespace N {
     static auto lambda = []() { struct S {} s; return s; };
     void f(decltype(lambda()));
@@ -453,11 +379,9 @@ namespace cwg1690 { // cwg1690: 9
     auto s = N::lambda();
     f(s); // ok
   }
-#endif
 } // namespace cwg1690
 
 namespace cwg1691 { // cwg1691: 9
-#if __cplusplus >= 201103L
   namespace N {
     namespace M {
       enum E : int;
@@ -473,7 +397,6 @@ namespace cwg1691 { // cwg1691: 9
     // since-cxx11-error@-1 {{use of undeclared identifier 'g'; did you mean 'N::g'?}}
     //   since-cxx11-note@#cwg1691-g {{'N::g' declared here}}
   }
-#endif
 } // namespace cwg1691
 
 namespace cwg1692 { // cwg1692: 9
@@ -527,14 +450,12 @@ namespace cwg1696 { // cwg1696: 7
   }
 
   struct A { A(); ~A(); };
-#if __cplusplus >= 201103L
   struct B {
     A &&a; // #cwg1696-a
     B() : a{} {}
     // since-cxx11-error@-1 {{reference member 'a' binds to a temporary object whose lifetime would be shorter than the lifetime of the constructed object}}
     //   since-cxx11-note@#cwg1696-a {{reference member declared here}}
   } b;
-#endif
 
   struct C {
     C();
@@ -544,7 +465,6 @@ namespace cwg1696 { // cwg1696: 7
   // expected-error@-1 {{reference member 'a' binds to a temporary object whose lifetime would be shorter than the lifetime of the constructed object}}
   //   expected-note@#cwg1696-C-a {{reference member declared here}}
 
-#if __cplusplus >= 201103L
   // This is OK in C++14 onwards, per CWG1815, though we don't support that yet:
   //   D1 d1 = {};
   // is equivalent to
@@ -606,5 +526,4 @@ namespace cwg1696 { // cwg1696: 7
     // since-cxx11-error@-1 {{backing array for 'std::initializer_list' member 'il' is a temporary object whose lifetime would be shorter than the lifetime of the constructed object}}
     //   since-cxx11-note@#cwg1696-il-5 {{initializing field 'il' with default member initializer}}
   };
-#endif
 } // namespace cwg1696

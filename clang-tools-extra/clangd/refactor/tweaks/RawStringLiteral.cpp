@@ -47,7 +47,7 @@ REGISTER_TWEAK(RawStringLiteral)
 static bool isFeatureAvailable(const ASTContext &Context) {
   // Raw strings are available only for C++11 or later versions, and they are
   // not available for C.
-  return Context.getLangOpts().CPlusPlus11;
+  return Context.getLangOpts().CPlusPlus;
 }
 
 static bool isNormalString(const StringLiteral &Str, SourceLocation Cursor,

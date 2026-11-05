@@ -79,7 +79,7 @@ class ScopifyEnum : public Tweak {
 REGISTER_TWEAK(ScopifyEnum)
 
 bool ScopifyEnum::prepare(const Selection &Inputs) {
-  if (!Inputs.AST->getLangOpts().CPlusPlus11)
+  if (!Inputs.AST->getLangOpts().CPlusPlus)
     return false;
   const SelectionTree::Node *N = Inputs.ASTSelection.commonAncestor();
   if (!N)

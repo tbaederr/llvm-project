@@ -53,7 +53,6 @@ enum LangFeatures {
   C23 = (1 << 4),
   C2y = (1 << 5),
   CPlusPlus = (1 << 6),
-  CPlusPlus11 = (1 << 7),
   CPlusPlus14 = (1 << 8),
   CPlusPlus17 = (1 << 9),
   CPlusPlus20 = (1 << 10),
@@ -116,9 +115,6 @@ public:
   /// isCPlusPlus - Language is a C++ variant.
   bool isCPlusPlus() const { return Flags & CPlusPlus; }
 
-  /// isCPlusPlus11 - Language is a C++11 variant (or later).
-  bool isCPlusPlus11() const { return Flags & CPlusPlus11; }
-
   /// isCPlusPlus14 - Language is a C++14 variant (or later).
   bool isCPlusPlus14() const { return Flags & CPlusPlus14; }
 
@@ -144,7 +140,7 @@ public:
   bool hasRawStringLiterals() const {
     // GCC supports raw string literals in C99 and later, but not in C++
     // before C++11.
-    return isCPlusPlus11() || (!isCPlusPlus() && isC99() && isGNUMode());
+    return isCPlusPlus() || (isC99() && isGNUMode());
   }
 
   /// allowLiteralDigitSeparator - Language supports literal digit seperator

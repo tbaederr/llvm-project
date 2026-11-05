@@ -174,18 +174,6 @@ The default C language standard is `gnu17`, except on PS4, where it is
 
 Supported values for the C++ language are:
 
-> `c++98`
->
-> `c++03`
->
-> > ISO C++ 1998 with amendments
->
-> `gnu++98`
->
-> `gnu++03`
->
-> > ISO C++ 1998 with amendments and GNU extensions
->
 > `c++11`
 >
 > > ISO C++ 2011 with amendments

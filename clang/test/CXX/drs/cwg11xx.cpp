@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98 
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
@@ -7,7 +6,6 @@
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
 
 namespace cwg1110 { // cwg1110: 3.1
-#if __cplusplus >= 201103L
 template <typename T>
 T return_T();
 
@@ -18,7 +16,6 @@ struct B;
 
 decltype(return_T<A>())* a;
 decltype(return_T<B<int>>())* b;
-#endif
 } // namespace cwg1110
 
 namespace cwg1111 { // cwg1111: partial
@@ -32,9 +29,6 @@ void foo() {
   X x;
   // FIXME: should we backport C++11 behavior?
   x.set<double>(3.2);
-  // cxx98-error@-1 {{lookup of 'set' in member access expression is ambiguous; using member of 'X'}}
-  //   cxx98-note@#cwg1111-func-set {{lookup in the object type 'X' refers here}}
-  //   cxx98-note@#cwg1111-struct-set {{lookup from the current scope refers here}}
 }
 
 struct Y {};

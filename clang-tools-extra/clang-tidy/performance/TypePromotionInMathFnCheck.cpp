@@ -11,7 +11,6 @@
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
-#include "llvm/ADT/StringSet.h"
 
 using namespace clang::ast_matchers;
 
@@ -156,21 +155,10 @@ void TypePromotionInMathFnCheck::check(const MatchFinder::MatchResult &Result) {
 
   const StringRef OldFnName = Call->getDirectCallee()->getName();
 
-  // In C++ mode, we prefer std::foo to ::foof.  But some of these suggestions
-  // are only valid in C++11 and newer.
-  static const llvm::StringSet<> Cpp11OnlyFns = {
-      "acosh",     "asinh",      "atanh",     "cbrt",   "copysign", "erf",
-      "erfc",      "exp2",       "expm1",     "fdim",   "fma",      "fmax",
-      "fmin",      "hypot",      "ilogb",     "lgamma", "llrint",   "llround",
-      "log1p",     "log2",       "logb",      "lrint",  "lround",   "nearbyint",
-      "nextafter", "nexttoward", "remainder", "remquo", "rint",     "round",
-      "scalbln",   "scalbn",     "tgamma",    "trunc"};
-  const bool StdFnRequiresCpp11 = Cpp11OnlyFns.contains(OldFnName);
-
+  // In C++ mode, we prefer std::foo to ::foof.
   std::string NewFnName;
   bool FnInCmath = false;
-  if (getLangOpts().CPlusPlus &&
-      (!StdFnRequiresCpp11 || getLangOpts().CPlusPlus11)) {
+  if (getLangOpts().CPlusPlus) {
     NewFnName = ("std::" + OldFnName).str();
     FnInCmath = true;
   } else {

@@ -209,8 +209,7 @@ void SpecialMemberFunctionsCheck::checkForMissingMembers(
       HasMember(SpecialMemberFunctionKind::MoveAssignment);
 
   const bool RequireFive =
-      (!AllowMissingMoveFunctions && RequireThree &&
-       getLangOpts().CPlusPlus11) ||
+      (!AllowMissingMoveFunctions && RequireThree) ||
       HasMember(SpecialMemberFunctionKind::MoveConstructor) ||
       HasMember(SpecialMemberFunctionKind::MoveAssignment);
 

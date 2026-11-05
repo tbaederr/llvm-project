@@ -1,4 +1,4 @@
-// RUN: %clang_cc1  -fcxx-exceptions -fexceptions -emit-llvm -debug-info-kind=limited -triple x86_64-apple-darwin10 -std=c++98 %s -o - | FileCheck %s
+// RUN: %clang_cc1  -fcxx-exceptions -fexceptions -emit-llvm -debug-info-kind=limited -triple x86_64-apple-darwin10 -std=c++11 %s -o - | FileCheck %s
 // The landing pad should have the line number of the closing brace of the function.
 // CHECK: ret i32
 // CHECK: landingpad {{.*}}
@@ -30,7 +30,7 @@ namespace std {
     _Vector_base(const allocator_type& __a)
     : _M_impl(__a)
     {  }
-    ~_Vector_base()  {  }
+    ~_Vector_base() noexcept(false) {  }
     _Vector_impl _M_impl;
   };
   template<typename _Tp, typename _Alloc = std::allocator<_Tp> >

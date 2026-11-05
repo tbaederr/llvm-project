@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -verify -Wclass-varargs -std=c++98 %s
 // RUN: %clang_cc1 -verify -Wclass-varargs -std=c++11 %s
 
 struct A {};
@@ -18,13 +17,8 @@ void test(A a, B b, C c, D d, E e, F f) {
   v(d); // expected-warning {{passing object of class type 'D' through variadic function; did you mean to call '.c_str()'?}}
   v(e);
   v(f);
-#if __cplusplus < 201103L
-  // expected-error@-3 {{cannot pass object of non-POD type 'E' through variadic function; call will abort at runtime}}
-  // expected-error@-3 {{cannot pass object of non-POD type 'F' through variadic function; call will abort at runtime}}
-#else
-  // expected-warning-re@-6 {{passing object of class type 'E' through variadic function{{$}}}}
-  // expected-warning@-6 {{passing object of class type 'F' through variadic function; did you mean to call '.c_str()'?}}
-#endif
+  // expected-warning-re@-2 {{passing object of class type 'E' through variadic function{{$}}}}
+  // expected-warning@-2 {{passing object of class type 'F' through variadic function; did you mean to call '.c_str()'?}}
 
   v(d.c_str());
   v(f.c_str());
@@ -37,12 +31,6 @@ void test(A a, B b, C c, D d, E e, F f) {
   w("%s", d); // expected-warning {{format specifies type 'char *' but the argument has type 'D'}}
   w("%s", e);
   w("%s", f);
-#if __cplusplus < 201103L
-  // expected-error@-3 {{cannot pass non-POD object of type 'E' to variadic function; expected type from format string was 'char *'}}
-  // expected-error@-3 {{cannot pass non-POD object of type 'F' to variadic function; expected type from format string was 'char *'}}
-  // expected-note@-4 {{did you mean to call the c_str() method?}}
-#else
-  // expected-warning@-7 {{format specifies type 'char *' but the argument has type 'E'}}
-  // expected-warning@-7 {{format specifies type 'char *' but the argument has type 'F'}}
-#endif
+  // expected-warning@-2 {{format specifies type 'char *' but the argument has type 'E'}}
+  // expected-warning@-2 {{format specifies type 'char *' but the argument has type 'F'}}
 }

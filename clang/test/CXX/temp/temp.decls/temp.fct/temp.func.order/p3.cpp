@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // expected-no-diagnostics
 
@@ -14,7 +13,6 @@ namespace OrderWithStaticMember {
   }
 }
 
-#if __cplusplus >= 201103L
 namespace OperatorWithRefQualifier {
   struct A { };
   template<class T> struct B {
@@ -36,4 +34,3 @@ namespace PR17075 {
   template<typename T> S &operator>>(S &s, V<T> &v);
   void f(S s, V<int> v) { s >> v; }
 }
-#endif

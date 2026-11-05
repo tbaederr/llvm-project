@@ -1,23 +1,23 @@
-// RUN: %clang_cc1 -std=gnu++98 -fsyntax-only -verify -Wno-objc-root-class %s
+// RUN: %clang_cc1 -std=gnu++11 -fsyntax-only -verify -Wno-objc-root-class %s
 struct Y { 
   Y(); 
 
 private:
-  ~Y(); // expected-note 3{{declared private here}}
+  ~Y(); // expected-note {{declared private here}}
 };
 
 template<typename T>
-struct X : T { }; // expected-error 2{{private destructor}}
+struct X : T { }; // expected-note {{default constructor of 'X<Y>' is implicitly deleted because base class 'Y' has an inaccessible destructor}}
 
 struct Z; // expected-note{{forward declaration}}
 
 @interface A {
-  X<Y> x; // expected-note{{implicit destructor}}
+  X<Y> x; // expected-note{{default constructed field 'x' declared here}}
   Y y; // expected-error{{private destructor}}
 }
 @end
 
-@implementation A // expected-note{{implicit default constructor}}
+@implementation A // expected-error{{call to implicitly-deleted default constructor of 'X<Y>'}}
 @end
 
 @interface B {

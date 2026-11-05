@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %std_cxx98- -fsyntax-only -verify -w %s
+// RUN: %clang_cc1 %std_cxx11- -fsyntax-only -verify -w %s
 
 struct ABC {
   static double a;

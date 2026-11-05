@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later --extra-arg=-Wno-error=parentheses %s bugprone-chained-comparison %t -- -config="{CheckOptions: {bugprone-chained-comparison.IgnoreMacros: true}}"
+// RUN: %check_clang_tidy -std=c++11-or-later --extra-arg=-Wno-error=parentheses %s bugprone-chained-comparison %t -- -config="{CheckOptions: {bugprone-chained-comparison.IgnoreMacros: true}}"
 
 #define CHAINED_COMPARE(a, b, c) (a < b < c)
 

@@ -627,14 +627,13 @@ ExprResult InitListChecker::PerformEmptyInit(SourceLocation Loc,
   //   If there are fewer initializer-clauses in the list than there are
   //   members in the aggregate, then each member not explicitly initialized
   //   ...
-  bool EmptyInitList = SemaRef.getLangOpts().CPlusPlus11 &&
+  bool EmptyInitList = SemaRef.getLangOpts().CPlusPlus &&
       Entity.getType()->getBaseElementTypeUnsafe()->isRecordType();
   if (EmptyInitList) {
     // C++1y / DR1070:
     //   shall be initialized [...] from an empty initializer list.
     //
-    // We apply the resolution of this DR to C++11 but not C++98, since C++98
-    // does not have useful semantics for initialization from an init list.
+    // We apply the resolution of this DR to C++11 onwards.
     // We treat this as copy-initialization, because aggregate initialization
     // always performs copy-initialization on its elements.
     //
@@ -1746,24 +1745,7 @@ void InitListChecker::CheckScalarType(const InitializedEntity &Entity,
                                       InitListExpr *StructuredList,
                                       unsigned &StructuredIndex) {
   if (Index >= IList->getNumInits()) {
-    if (!VerifyOnly) {
-      if (SemaRef.getLangOpts().CPlusPlus) {
-        if (DeclType->isSizelessBuiltinType())
-          SemaRef.Diag(IList->getBeginLoc(),
-                       SemaRef.getLangOpts().CPlusPlus11
-                           ? diag::warn_cxx98_compat_empty_sizeless_initializer
-                           : diag::err_empty_sizeless_initializer)
-              << DeclType << IList->getSourceRange();
-        else
-          SemaRef.Diag(IList->getBeginLoc(),
-                       SemaRef.getLangOpts().CPlusPlus11
-                           ? diag::warn_cxx98_compat_empty_scalar_initializer
-                           : diag::err_empty_scalar_initializer)
-              << IList->getSourceRange();
-      }
-    }
-    hadError =
-        SemaRef.getLangOpts().CPlusPlus && !SemaRef.getLangOpts().CPlusPlus11;
+    hadError = false;
     ++Index;
     ++StructuredIndex;
     return;
@@ -1848,15 +1830,6 @@ void InitListChecker::CheckReferenceType(const InitializedEntity &Entity,
   }
 
   Expr *expr = IList->getInit(Index);
-  if (isa<InitListExpr>(expr) && !SemaRef.getLangOpts().CPlusPlus11) {
-    if (!VerifyOnly)
-      SemaRef.Diag(IList->getBeginLoc(), diag::err_init_non_aggr_init_list)
-          << DeclType << IList->getSourceRange();
-    hadError = true;
-    ++Index;
-    ++StructuredIndex;
-    return;
-  }
 
   ExprResult Result;
   if (VerifyOnly) {
@@ -3980,7 +3953,6 @@ void InitializationSequence::Step::Destroy() {
   case SK_BindReference:
   case SK_BindReferenceToTemporary:
   case SK_FinalCopy:
-  case SK_ExtraneousCopyToTemporary:
   case SK_UserConversion:
   case SK_QualificationConversionPRValue:
   case SK_QualificationConversionXValue:
@@ -4127,13 +4099,6 @@ void InitializationSequence::AddReferenceBindingStep(QualType T,
 void InitializationSequence::AddFinalCopy(QualType T) {
   Step S;
   S.Kind = SK_FinalCopy;
-  S.Type = T;
-  Steps.push_back(S);
-}
-
-void InitializationSequence::AddExtraneousCopyToTemporary(QualType T) {
-  Step S;
-  S.Kind = SK_ExtraneousCopyToTemporary;
   S.Type = T;
   Steps.push_back(S);
 }
@@ -4562,9 +4527,6 @@ static OverloadingResult ResolveConstructorOverload(
   // U that convert to the non-reference type cv T are candidates.
   // Explicit conversion functions are only candidates during
   // direct-initialization.
-  //
-  // Note: SecondStepOfCopyInit is only ever true in this case when
-  // evaluating whether to produce a C++98 compatibility warning.
   if (S.getLangOpts().CPlusPlus17 && Args.size() == 1 &&
       !RequireActualConstructor && !SecondStepOfCopyInit) {
     Expr *Initializer = Args[0];
@@ -4952,11 +4914,6 @@ static void TryReferenceListInitialization(Sema &S,
                                            InitListExpr *InitList,
                                            InitializationSequence &Sequence,
                                            bool TreatUnavailableAsInvalid) {
-  // First, catch C++03 where this isn't possible.
-  if (!S.getLangOpts().CPlusPlus11) {
-    Sequence.SetFailed(InitializationSequence::FK_ReferenceBindingToInitList);
-    return;
-  }
   // Can't reference initialize a compound literal.
   if (Entity.getKind() == InitializedEntity::EK_CompoundLiteralInit) {
     Sequence.SetFailed(InitializationSequence::FK_ReferenceBindingToInitList);
@@ -5112,7 +5069,7 @@ static void TryListInitialization(Sema &S,
   //   (8.5.2 [dcl.init.string]), initialization is performed as described
   //   in that section.
   // - Otherwise, if T is an aggregate, [...] (continue below).
-  if (S.getLangOpts().CPlusPlus11 && InitList->hasOneInit() &&
+  if (S.getLangOpts().CPlusPlus && InitList->hasOneInit() &&
       !IsDesignatedInit) {
     if (DestType->isRecordType() && DestType->isAggregateType()) {
       QualType InitType = InitList->getInit(0)->getType();
@@ -5188,32 +5145,29 @@ static void TryListInitialization(Sema &S,
   // C++11 [dcl.init.list]p3:
   //   - If T is an aggregate, aggregate initialization is performed.
   if ((DestType->isRecordType() && !DestType->isAggregateType()) ||
-      (S.getLangOpts().CPlusPlus11 &&
+      (S.getLangOpts().CPlusPlus &&
        S.isStdInitializerList(DestType, nullptr) && !IsDesignatedInit)) {
-    if (S.getLangOpts().CPlusPlus11) {
-      //   - Otherwise, if the initializer list has no elements and T is a
-      //     class type with a default constructor, the object is
-      //     value-initialized.
-      if (InitList->hasZeroInits()) {
-        CXXRecordDecl *RD = DestType->castAsCXXRecordDecl();
-        if (S.LookupDefaultConstructor(RD)) {
-          TryValueInitialization(S, Entity, Kind, Sequence, InitList);
-          return;
-        }
-      }
-
-      //   - Otherwise, if T is a specialization of std::initializer_list<E>,
-      //     an initializer_list object constructed [...]
-      if (TryInitializerListConstruction(S, InitList, DestType, Sequence,
-                                         TreatUnavailableAsInvalid))
+    //   - Otherwise, if the initializer list has no elements and T is a
+    //     class type with a default constructor, the object is
+    //     value-initialized.
+    if (InitList->hasZeroInits()) {
+      CXXRecordDecl *RD = DestType->castAsCXXRecordDecl();
+      if (S.LookupDefaultConstructor(RD)) {
+        TryValueInitialization(S, Entity, Kind, Sequence, InitList);
         return;
+      }
+    }
 
-      //   - Otherwise, if T is a class type, constructors are considered.
-      Expr *InitListAsExpr = InitList;
-      TryConstructorInitialization(S, Entity, Kind, InitListAsExpr, DestType,
-                                   DestType, Sequence, /*InitListSyntax*/true);
-    } else
-      Sequence.SetFailed(InitializationSequence::FK_InitListBadDestinationType);
+    //   - Otherwise, if T is a specialization of std::initializer_list<E>,
+    //     an initializer_list object constructed [...]
+    if (TryInitializerListConstruction(S, InitList, DestType, Sequence,
+                                       TreatUnavailableAsInvalid))
+      return;
+
+    //   - Otherwise, if T is a class type, constructors are considered.
+    Expr *InitListAsExpr = InitList;
+    TryConstructorInitialization(S, Entity, Kind, InitListAsExpr, DestType,
+                                 DestType, Sequence, /*InitListSyntax*/true);
     return;
   }
 
@@ -5483,10 +5437,6 @@ static OverloadingResult TryRefInitWithConversionFunction(
   return OR_Success;
 }
 
-static void CheckCXX98CompatAccessibleCopy(Sema &S,
-                                           const InitializedEntity &Entity,
-                                           Expr *CurInitExpr);
-
 /// Attempt reference initialization (C++0x [dcl.init.ref])
 static void TryReferenceInitialization(Sema &S, const InitializedEntity &Entity,
                                        const InitializationKind &Kind,
@@ -5685,21 +5635,6 @@ static void TryReferenceInitializationCore(Sema &S,
         (S.getLangOpts().CPlusPlus17 || T2->isRecordType() ||
          T2->isArrayType())))) {
     ExprValueKind ValueKind = InitCategory.isXValue() ? VK_XValue : VK_PRValue;
-    if (InitCategory.isPRValue() && T2->isRecordType()) {
-      // The corresponding bullet in C++03 [dcl.init.ref]p5 gives the
-      // compiler the freedom to perform a copy here or bind to the
-      // object, while C++0x requires that we bind directly to the
-      // object. Hence, we always bind to the object without making an
-      // extra copy. However, in C++03 requires that we check for the
-      // presence of a suitable copy constructor:
-      //
-      //   The constructor that would be used to make the copy shall
-      //   be callable whether or not the copy is actually done.
-      if (!S.getLangOpts().CPlusPlus11 && !S.getLangOpts().MicrosoftExt)
-        Sequence.AddExtraneousCopyToTemporary(cv2T2);
-      else if (S.getLangOpts().CPlusPlus11)
-        CheckCXX98CompatAccessibleCopy(S, Entity, Initializer);
-    }
 
     // C++1z [dcl.init.ref]/5.2.1.2:
     //   If the converted initializer is a prvalue, its type T4 is adjusted
@@ -5877,7 +5812,7 @@ static void TryValueInitialization(Sema &S,
   assert((!InitList || InitList->getNumInits() == 0) &&
          "Shouldn't use value-init for non-empty init lists");
 
-  // C++98 [dcl.init]p5, C++11 [dcl.init]p7:
+  // C++11 [dcl.init]p7:
   //
   //   To value-initialize an object of type T means:
   QualType T = Entity.getType();
@@ -5888,18 +5823,9 @@ static void TryValueInitialization(Sema &S,
 
   if (auto *ClassDecl = T->getAsCXXRecordDecl()) {
     bool NeedZeroInitialization = true;
-    // C++98:
-    // -- if T is a class type (clause 9) with a user-declared constructor
-    //    (12.1), then the default constructor for T is called (and the
-    //    initialization is ill-formed if T has no accessible default
-    //    constructor);
-    // C++11:
     // -- if T is a class type (clause 9) with either no default constructor
     //    (12.1 [class.ctor]) or a default constructor that is user-provided
     //    or deleted, then the object is default-initialized;
-    //
-    // Note that the C++11 rule is the same as the C++98 rule if there are no
-    // defaulted or deleted constructors, so we just use it unconditionally.
     CXXConstructorDecl *CD = S.LookupDefaultConstructor(ClassDecl);
     if (!CD || !CD->getCanonicalDecl()->isDefaulted() || CD->isDeleted())
       NeedZeroInitialization = false;
@@ -5912,22 +5838,6 @@ static void TryValueInitialization(Sema &S,
     // constructor' part was removed by DR1507.
     if (NeedZeroInitialization)
       Sequence.AddZeroInitializationStep(Entity.getType());
-
-    // C++03:
-    // -- if T is a non-union class type without a user-declared constructor,
-    //    then every non-static data member and base class component of T is
-    //    value-initialized;
-    // [...] A program that calls for [...] value-initialization of an
-    // entity of reference type is ill-formed.
-    //
-    // C++11 doesn't need this handling, because value-initialization does not
-    // occur recursively there, and the implicit default constructor is
-    // defined as deleted in the problematic cases.
-    if (!S.getLangOpts().CPlusPlus11 &&
-        ClassDecl->hasUninitializedReferenceMember()) {
-      Sequence.SetFailed(InitializationSequence::FK_TooManyInitsForReference);
-      return;
-    }
 
     // If this is list-value-initialization, pass the empty init list on when
     // building the constructor call. This affects the semantics of a few
@@ -7353,18 +7263,12 @@ static SourceLocation getInitializationLoc(const InitializedEntity &Entity,
 ///
 /// \param CurInit The initializer expression.
 ///
-/// \param IsExtraneousCopy Whether this is an "extraneous" copy that
-/// is permitted in C++03 (but not C++0x) when binding a reference to
-/// an rvalue.
-///
 /// \returns An expression that copies the initializer expression into
 /// a temporary object, or an error expression if a copy could not be
 /// created.
-static ExprResult CopyObject(Sema &S,
-                             QualType T,
+static ExprResult CopyObject(Sema &S, QualType T,
                              const InitializedEntity &Entity,
-                             ExprResult CurInit,
-                             bool IsExtraneousCopy) {
+                             ExprResult CurInit) {
   if (CurInit.isInvalid())
     return CurInit;
   // Determine which class type we're copying to.
@@ -7397,16 +7301,12 @@ static ExprResult CopyObject(Sema &S,
 
   case OR_No_Viable_Function:
     CandidateSet.NoteCandidates(
-        PartialDiagnosticAt(
-            Loc, S.PDiag(IsExtraneousCopy && !S.isSFINAEContext()
-                             ? diag::ext_rvalue_to_reference_temp_copy_no_viable
-                             : diag::err_temp_copy_no_viable)
-                     << (int)Entity.getKind() << CurInitExpr->getType()
-                     << CurInitExpr->getSourceRange()),
+        PartialDiagnosticAt(Loc, S.PDiag(diag::err_temp_copy_no_viable)
+                                     << (int)Entity.getKind()
+                                     << CurInitExpr->getType()
+                                     << CurInitExpr->getSourceRange()),
         S, OCD_AllCandidates, CurInitExpr);
-    if (!IsExtraneousCopy || S.isSFINAEContext())
-      return ExprError();
-    return CurInit;
+    return ExprError();
 
   case OR_Ambiguous:
     CandidateSet.NoteCandidates(
@@ -7431,34 +7331,7 @@ static ExprResult CopyObject(Sema &S,
   SmallVector<Expr*, 8> ConstructorArgs;
   CurInit.get(); // Ownership transferred into MultiExprArg, below.
 
-  S.CheckConstructorAccess(Loc, Constructor, Best->FoundDecl, Entity,
-                           IsExtraneousCopy);
-
-  if (IsExtraneousCopy) {
-    // If this is a totally extraneous copy for C++03 reference
-    // binding purposes, just return the original initialization
-    // expression. We don't generate an (elided) copy operation here
-    // because doing so would require us to pass down a flag to avoid
-    // infinite recursion, where each step adds another extraneous,
-    // elidable copy.
-
-    // Instantiate the default arguments of any extra parameters in
-    // the selected copy constructor, as if we were going to create a
-    // proper call to the copy constructor.
-    for (unsigned I = 1, N = Constructor->getNumParams(); I != N; ++I) {
-      ParmVarDecl *Parm = Constructor->getParamDecl(I);
-      if (S.RequireCompleteType(Loc, Parm->getType(),
-                                diag::err_call_incomplete_argument))
-        break;
-
-      // Build the default argument expression; we don't actually care
-      // if this succeeds or not, because this routine will complain
-      // if there was a problem.
-      S.BuildCXXDefaultArgExpr(Loc, Constructor, Parm);
-    }
-
-    return CurInitExpr;
-  }
+  S.CheckConstructorAccess(Loc, Constructor, Best->FoundDecl, Entity);
 
   // Determine the arguments required to actually perform the
   // constructor call (we might have derived-to-base conversions, or
@@ -7504,63 +7377,6 @@ static ExprResult CopyObject(Sema &S,
   if (!CurInit.isInvalid() && shouldBindAsTemporary(Entity))
     CurInit = S.MaybeBindToTemporary(CurInit.getAs<Expr>());
   return CurInit;
-}
-
-/// Check whether elidable copy construction for binding a reference to
-/// a temporary would have succeeded if we were building in C++98 mode, for
-/// -Wc++98-compat.
-static void CheckCXX98CompatAccessibleCopy(Sema &S,
-                                           const InitializedEntity &Entity,
-                                           Expr *CurInitExpr) {
-  assert(S.getLangOpts().CPlusPlus11);
-
-  auto *Record = CurInitExpr->getType()->getAsCXXRecordDecl();
-  if (!Record)
-    return;
-
-  SourceLocation Loc = getInitializationLoc(Entity, CurInitExpr);
-  if (S.Diags.isIgnored(diag::warn_cxx98_compat_temp_copy, Loc))
-    return;
-
-  // Find constructors which would have been considered.
-  OverloadCandidateSet CandidateSet(Loc, OverloadCandidateSet::CSK_Normal);
-  DeclContext::lookup_result Ctors = S.LookupConstructors(Record);
-
-  // Perform overload resolution.
-  OverloadCandidateSet::iterator Best;
-  OverloadingResult OR = ResolveConstructorOverload(
-      S, Loc, CurInitExpr, CandidateSet, CurInitExpr->getType(), Ctors, Best,
-      /*CopyInitializing=*/false, /*AllowExplicit=*/true,
-      /*OnlyListConstructors=*/false, /*IsListInit=*/false,
-      /*RequireActualConstructor=*/false,
-      /*SecondStepOfCopyInit=*/true);
-
-  PartialDiagnostic Diag = S.PDiag(diag::warn_cxx98_compat_temp_copy)
-    << OR << (int)Entity.getKind() << CurInitExpr->getType()
-    << CurInitExpr->getSourceRange();
-
-  switch (OR) {
-  case OR_Success:
-    S.CheckConstructorAccess(Loc, cast<CXXConstructorDecl>(Best->Function),
-                             Best->FoundDecl, Entity, Diag);
-    // FIXME: Check default arguments as far as that's possible.
-    break;
-
-  case OR_No_Viable_Function:
-    CandidateSet.NoteCandidates(PartialDiagnosticAt(Loc, Diag), S,
-                                OCD_AllCandidates, CurInitExpr);
-    break;
-
-  case OR_Ambiguous:
-    CandidateSet.NoteCandidates(PartialDiagnosticAt(Loc, Diag), S,
-                                OCD_AmbiguousCandidates, CurInitExpr);
-    break;
-
-  case OR_Deleted:
-    S.Diag(Loc, Diag);
-    S.NoteDeletedFunction(Best->Function);
-    break;
-  }
 }
 
 void InitializationSequence::PrintInitLocationNote(Sema &S,
@@ -7920,14 +7736,7 @@ Sema::CreateMaterializeTemporaryExpr(QualType T, Expr *Temporary,
 }
 
 ExprResult Sema::TemporaryMaterializationConversion(Expr *E) {
-  // In C++98, we don't want to implicitly create an xvalue. C11 added the
-  // same rule, but C99 is broken without this behavior and so we treat the
-  // change as applying to all C language modes.
-  // FIXME: This means that AST consumers need to deal with "prvalues" that
-  // denote materialized temporaries. Maybe we should add another ValueKind
-  // for "xvalue pretending to be a prvalue" for C++98 support.
-  if (!E->isPRValue() ||
-      (!getLangOpts().CPlusPlus11 && getLangOpts().CPlusPlus))
+  if (!E->isPRValue())
     return E;
 
   // C++1z [conv.rval]/1: T shall be a complete type.
@@ -8034,17 +7843,6 @@ ExprResult InitializationSequence::Perform(Sema &S,
   if (Steps.empty())
     return ExprResult((Expr *)nullptr);
 
-  if (S.getLangOpts().CPlusPlus11 && Entity.getType()->isReferenceType() &&
-      Args.size() == 1 && isa<InitListExpr>(Args[0]) &&
-      !Entity.isParamOrTemplateParamKind()) {
-    // Produce a C++98 compatibility warning if we are initializing a reference
-    // from an initializer list. For parameters, we produce a better warning
-    // elsewhere.
-    Expr *Init = Args[0];
-    S.Diag(Init->getBeginLoc(), diag::warn_cxx98_compat_reference_list_init)
-        << Init->getSourceRange();
-  }
-
   if (S.getLangOpts().MicrosoftExt && Args.size() == 1 &&
       isa<PredefinedExpr>(Args[0]) && Entity.getType()->isArrayType()) {
     // Produce a Microsoft compatibility warning when initializing from a
@@ -8098,7 +7896,6 @@ ExprResult InitializationSequence::Perform(Sema &S,
   case SK_BindReference:
   case SK_BindReferenceToTemporary:
   case SK_FinalCopy:
-  case SK_ExtraneousCopyToTemporary:
   case SK_UserConversion:
   case SK_QualificationConversionLValue:
   case SK_QualificationConversionXValue:
@@ -8276,13 +8073,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
       // FIXME: This is a mess. Rationalize temporary destruction.
       if (!shouldBindAsTemporary(Entity))
         CurInit = S.MaybeBindToTemporary(CurInit.get());
-      CurInit = CopyObject(S, Step->Type, Entity, CurInit,
-                           /*IsExtraneousCopy=*/false);
-      break;
-
-    case SK_ExtraneousCopyToTemporary:
-      CurInit = CopyObject(S, Step->Type, Entity, CurInit,
-                           /*IsExtraneousCopy=*/true);
+      CurInit = CopyObject(S, Step->Type, Entity, CurInit);
       break;
 
     case SK_UserConversion: {
@@ -8489,8 +8280,6 @@ ExprResult InitializationSequence::Perform(Sema &S,
       bool UseTemporary = Entity.getType()->isReferenceType();
       assert(Args.size() == 1 && "expected a single argument for list init");
       InitListExpr *InitList = cast<InitListExpr>(Args[0]);
-      S.Diag(InitList->getExprLoc(), diag::warn_cxx98_compat_ctor_list_init)
-        << InitList->getSourceRange();
       SmallVector<Expr *, 8> ExpandedInits;
       MultiExprArg Arg = S.getInitsWithEmbedExpanded(InitList, ExpandedInits);
       CurInit = PerformConstructorInitialization(S, UseTemporary ? TempEntity :
@@ -8731,10 +8520,6 @@ ExprResult InitializationSequence::Perform(Sema &S,
       break;
 
     case SK_StdInitializerList: {
-      S.Diag(CurInit.get()->getExprLoc(),
-             diag::warn_cxx98_compat_initializer_list_init)
-        << CurInit.get()->getSourceRange();
-
       // Materialize the temporary into memory.
       MaterializeTemporaryExpr *MTE = S.CreateMaterializeTemporaryExpr(
           CurInit.get()->getType(), CurInit.get(),
@@ -9023,7 +8808,7 @@ static void diagnoseListInit(Sema &S, const InitializedEntity &Entity,
   QualType DestType = Entity.getType();
 
   QualType E;
-  if (S.getLangOpts().CPlusPlus11 && S.isStdInitializerList(DestType, &E)) {
+  if (S.getLangOpts().CPlusPlus && S.isStdInitializerList(DestType, &E)) {
     QualType ArrayType = S.Context.getConstantArrayType(
         E.withConst(),
         llvm::APInt(S.Context.getTypeSize(S.Context.getSizeType()),
@@ -9805,10 +9590,6 @@ void InitializationSequence::dump(raw_ostream &OS) const {
       OS << "final copy in class direct-initialization";
       break;
 
-    case SK_ExtraneousCopyToTemporary:
-      OS << "extraneous C++03 copy to temporary";
-      break;
-
     case SK_UserConversion:
       OS << "user-defined conversion via " << *S->Function.Function;
       break;
@@ -9986,7 +9767,7 @@ static void DiagnoseNarrowingInInitList(Sema &S,
                       unsigned ConstRefDiagID, unsigned WarnDiagID) {
     unsigned DiagID;
     auto &L = S.getLangOpts();
-    if (L.CPlusPlus11 && !L.HLSL &&
+    if (L.CPlusPlus && !L.HLSL &&
         (!L.MicrosoftExt || L.isCompatibleWithMSVC(LangOptions::MSVC2015)))
       DiagID = IsConstRef ? ConstRefDiagID : DefaultDiagID;
     else

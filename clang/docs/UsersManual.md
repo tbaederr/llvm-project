@@ -32,8 +32,8 @@ specific section:
   TC2, TC3), C11, C17, C23, and C2y.
 - {ref}`Objective-C Language <objc>`: ObjC 1, ObjC 2, ObjC 2.1, plus
   variants depending on base language.
-- {ref}`C++ Language <cxx>`: C++98, C++03, C++11, C++14, C++17, C++20, C++23,
-  C++26, and C++29.
+- {ref}`C++ Language <cxx>`: C++11, C++14, C++17, C++20, C++23, C++26, and
+  C++29.
 - {ref}`Objective C++ Language <objcxx>`
 - {ref}`OpenCL Kernel Language <opencl>`: OpenCL C 1.0, 1.1, 1.2, 2.0, 3.0,
   and C++ for OpenCL 1.0 and 2021.
@@ -740,43 +740,6 @@ void foo() {
 C++ [basic.lookup.classref] requires this to be an error, but,
 because it's hard to work around, Clang downgrades it to a warning
 as an extension.
-:::
-
-:::{option} -Wbind-to-temporary-copy
-
-Warn about an unusable copy constructor when binding a reference to a
-temporary.
-
-This option enables warnings about binding a
-reference to a temporary when the temporary doesn't have a usable
-copy constructor. For example:
-
-```cpp
-struct NonCopyable {
-  NonCopyable();
-private:
-  NonCopyable(const NonCopyable&);
-};
-void foo(const NonCopyable&);
-void bar() {
-  foo(NonCopyable());  // Disallowed in C++98; allowed in C++11.
-}
-```
-
-```cpp
-struct NonCopyable2 {
-  NonCopyable2();
-  NonCopyable2(NonCopyable2&);
-};
-void foo(const NonCopyable2&);
-void bar() {
-  foo(NonCopyable2());  // Disallowed in C++98; allowed in C++11.
-}
-```
-
-Note that if `NonCopyable2::NonCopyable2()` has a default argument
-whose instantiation produces a compile error, that error will still
-be a hard error in C++98 mode even if this warning is turned off.
 :::
 
 ### Options to Control Clang Crash Diagnostics
@@ -4466,9 +4429,8 @@ set to a version earlier than 19, it also enables `-fno-threadsafe-statics`.
 
 ## C++ Language Features
 
-clang fully implements all of standard C++98 except for exported
-templates (which were removed in C++11), all of standard C++11,
-C++14, and C++17, and most of C++20 and C++23.
+clang fully implements all of standard C++11, C++14, and C++17, and most
+of C++20 and C++23. C++98 and C++03 are not supported.
 
 See the [C++ support in Clang](https://clang.llvm.org/cxx_status.html) page
 for detailed information on C++ feature support across Clang versions.

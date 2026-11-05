@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++03 %s -verify                -Wno-c++23-extensions -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c++14-extensions -Wno-c++11-extensions
 // RUN: %clang_cc1 -std=c++11 %s -verify=expected,cxx11 -Wno-c++23-extensions -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c++14-extensions
 // RUN: %clang_cc1 -std=c++14 %s -verify                -Wno-c++23-extensions -Wno-c++20-extensions -Wno-c++17-extensions
 // RUN: %clang_cc1 -std=c++17 %s -verify                -Wno-c++23-extensions -Wno-c++20-extensions
@@ -8,33 +7,21 @@
 auto LL0 = [] {};
 auto LL1 = []() {};
 auto LL2 = []() mutable {};
-#if __cplusplus >= 201103L
 auto LL3 = []() constexpr {}; // cxx11-error {{return type 'void' is not a literal type}}
-#endif
 
-#if __cplusplus >= 201103L
 auto L0 = [] constexpr {}; // cxx11-error {{return type 'void' is not a literal type}}
-#endif
 auto L1 = [] mutable {};
-#if __cplusplus >= 201103L
 auto L2 = [] noexcept {};
 auto L3 = [] constexpr mutable {}; // cxx11-error {{return type 'void' is not a literal type}}
 auto L4 = [] mutable constexpr {}; // cxx11-error {{return type 'void' is not a literal type}}
 auto L5 = [] constexpr mutable noexcept {}; // cxx11-error {{return type 'void' is not a literal type}}
-#endif
 auto L6 = [s = 1] mutable {};
-#if __cplusplus >= 201103L
 auto L7 = [s = 1] constexpr mutable noexcept {}; // cxx11-error {{return type 'void' is not a literal type}}
-#endif
 auto L8 = [] -> bool { return true; };
-#if __cplusplus >= 201103L
 template <typename> struct PR176256 {};
 PR176256<void> token = [] -> decltype(token) { return {}; }();
-#endif
 auto L9 = []<typename T> { return true; };
-#if __cplusplus >= 201103L
 auto L10 = []<typename T> noexcept { return true; };
-#endif
 auto L11 = []<typename T> -> bool { return true; };
 #if __cplusplus >= 202002L
 auto L12 = [] consteval {};
@@ -44,7 +31,6 @@ auto L15 = []<auto> requires true noexcept {};
 #endif
 auto L16 = [] [[maybe_unused]]{};
 
-#if __cplusplus >= 201103L
 auto XL0 = [] mutable constexpr mutable {};    // expected-error{{cannot appear multiple times}} cxx11-error {{return type 'void' is not a literal type}}
 auto XL1 = [] constexpr mutable constexpr {};  // expected-error{{cannot appear multiple times}} cxx11-error {{return type 'void' is not a literal type}}
 auto XL2 = []) constexpr mutable constexpr {}; // expected-error{{expected body of lambda expression}}
@@ -55,7 +41,6 @@ auto XL3 = []( constexpr mutable constexpr {}; // expected-error{{invalid storag
                                                // expected-note{{to match this '('}} \
                                                // expected-error{{expected body}} \
                                                // expected-warning{{duplicate 'constexpr'}}
-#endif
 
 // http://llvm.org/PR49736
 auto XL4 = [] requires true {}; // expected-error{{expected body}}
@@ -69,9 +54,7 @@ auto XL8 = []() static mutable {}; // expected-error {{cannot be both mutable an
 #if __cplusplus >= 202002L
 auto XL9 = []() static consteval {};
 #endif
-#if __cplusplus >= 201103L
 auto XL10 = []() static constexpr {}; // cxx11-error {{return type 'void' is not a literal type}}
-#endif
 
 auto XL11 = [] static {};
 auto XL12 = []() static {};

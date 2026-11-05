@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-14,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-14,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx17
@@ -17,7 +16,6 @@ namespace std {
 }
 
 namespace cwg2303 { // cwg2303: 12
-#if __cplusplus >= 201103L
 template <typename... T>
 struct A;
 template <>
@@ -54,7 +52,6 @@ void g() {
     struct cwg2303::F -> B -> A<int, int>
     struct cwg2303::F -> E -> A<int, int>}} */
 }
-#endif
 } // namespace cwg2303
 
 namespace cwg2304 { // cwg2304: 2.8
@@ -69,7 +66,6 @@ void fn1(Q &data_vectors) {
 } // namespace cwg2304
 
 namespace cwg2310 { // cwg2310: partial
-#if __cplusplus >= 201103L
 template<typename A, typename B>
 struct check_derived_from {
   static A a;
@@ -98,7 +94,6 @@ struct Z : W,
   check_derived_from<Z, W> cdf;
 #endif
 };
-#endif
 } // namespace cwg2310
 
 // cwg2331: na
@@ -194,7 +189,6 @@ auto j = std::initializer_list<InitListCtor>{ i };
 } // namespace cwg2311
 
 namespace cwg2338 { // cwg2338: 12
-#if __cplusplus >= 201103L
 namespace B {
 enum E : bool { Zero, One };
 static_assert((int)(E)2 == 1, "");
@@ -203,7 +197,6 @@ namespace D {
 enum class E : bool { Zero, One };
 static_assert((int)(E)2 == 1, "");
 } // namespace D
-#endif
 } // namespace cwg2338
 
 namespace cwg2346 { // cwg2346: 11
@@ -214,7 +207,6 @@ namespace cwg2346 { // cwg2346: 11
 } // namespace cwg2346
 
 namespace cwg2351 { // cwg2351: 20
-#if __cplusplus >= 201103L
   static_assert((void{}, true), "");
 
   void f() {
@@ -242,12 +234,6 @@ namespace cwg2351 { // cwg2351: 20
 
   static_assert((void({}), true), "");
   // since-cxx11-error@-1 {{cannot initialize non-class type 'void' with a parenthesized initializer list}}
-#else
-  int I = (void{}, 0);
-  // cxx98-error@-1 {{expected ')'}}
-  //   cxx98-note@-2 {{to match this '('}}
-  // cxx98-error@-3 {{expected expression}}
-#endif
 } // namespace cwg2351
 
 namespace cwg2352 { // cwg2352: 10
@@ -274,29 +260,22 @@ namespace cwg2352 { // cwg2352: 10
 
   // FIXME: We order these as a speculative defect resolution.
   void f(const int * const * const &r);
-#if __cplusplus >= 201103L
   constexpr
-#endif
   int *const *const &f(int * const * const &r) { return r; }
 
   // No temporary is created here.
   int *const *const &check_f = f(p);
-#if __cplusplus >= 201103L
   static_assert(&p == &check_f, "");
-#endif
 } // namespace cwg2352
 
 namespace cwg2354 { // cwg2354: 15
-#if __cplusplus >= 201103L
 enum alignas(64) A {};
 // since-cxx11-error@-1 {{'alignas' attribute cannot be applied to an enumeration}}
 enum struct alignas(64) B {};
 // since-cxx11-error@-1 {{'alignas' attribute cannot be applied to an enumeration}}
-#endif
 } // namespace cwg2354
 
 namespace cwg2356 { // cwg2356: 4
-#if __cplusplus >= 201103L
 struct A {
   A();
   A(A &&);                        // #1
@@ -317,7 +296,6 @@ extern B b1;
 B b2 = static_cast<B&&>(b1);      // calls #3: #1, #2, and #4 are not viable
 struct C { operator B&&(); };
 B b3 = C();                       // calls #3
-#endif
 } // namespace cwg2356
 
 namespace cwg2358 { // cwg2358: 16
@@ -334,7 +312,6 @@ namespace cwg2358 { // cwg2358: 16
 // CWG2363 was closed as NAD, but its resolution does affirm that
 // a friend declaration cannot have an opaque-enumm-specifier.
 namespace cwg2363 { // cwg2363: 19
-#if __cplusplus >= 201103L
 enum class E0;
 enum E1 : int;
 
@@ -362,7 +339,6 @@ struct A {
   // since-cxx11-error@-2 {{elaborated enum specifier cannot be declared as a friend}}
   //   since-cxx11-note@-3 {{remove 'enum class' to befriend an enum}}
 };
-#endif
 } // namespace cwg2363
 
 namespace cwg2369 { // cwg2369: partial
@@ -529,12 +505,10 @@ namespace cwg2396 { // cwg2396: no
 } // namespace cwg2396
 
 namespace cwg2397 { // cwg2397: 17
-#if __cplusplus >= 201103L
   void foo() {
     int a[5];
 
     auto (&b)[5] = a;
     auto (*c)[5] = &a;
   }
-#endif
 } // namespace cwg2397

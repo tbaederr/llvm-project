@@ -1,4 +1,3 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=debug.ExprInspection -verify -std=c++98 -Wno-deprecated %s
 // RUN: %clang_analyze_cc1 -analyzer-checker=debug.ExprInspection -verify -std=c++11 -Wno-deprecated %s
 // RUN: %clang_analyze_cc1 -analyzer-checker=debug.ExprInspection -verify -std=c++14 -Wno-deprecated %s
 

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11,cxx11
 // RUN: %clang_cc1 -std=c++14 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11
@@ -6,10 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11,since-cxx20,since-cxx23
 // RUN: %clang_cc1 -std=c++2c -fexceptions -fcxx-exceptions -pedantic-errors %s -verify-directives -verify=expected,since-cxx11,since-cxx20,since-cxx23
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace std {
 #if __cplusplus >= 202002L
@@ -27,9 +22,7 @@ namespace std {
   typedef int int32_t;
   typedef unsigned uint32_t;
   typedef long long int64_t;
-  // cxx98-error@-1 {{'long long' is a C++11 extension}}
   typedef unsigned long long uint64_t;
-  // cxx98-error@-1 {{'long long' is a C++11 extension}}
   static_assert(sizeof(int16_t) == 2 && sizeof(int32_t) == 4 && sizeof(int64_t) == 8, "Some tests rely on these sizes");
 
   template<typename T> T declval();
@@ -78,7 +71,6 @@ static_assert(three_way_comparable<CDependent<long long>>);
 static_assert(bf_three_way_comparable<CDependent<long long>>);
 #endif
 
-#if __cplusplus >= 201103L
 template<typename T, int N>
 struct D {
   T i : N;
@@ -129,7 +121,6 @@ struct E {
   // since-cxx11-error@-1 {{non-constant-expression cannot be narrowed from type 'int' to 'unsigned int' in initializer list}}
   //   since-cxx11-note@-2 {{insert an explicit cast to silence this issue}}
 };
-#endif
 } // namespace cwg2627
 
 namespace cwg2628 { // cwg2628: 20
@@ -228,14 +219,12 @@ int y = cwg2640_a\N{LOTUS});
 // cwg2642: na
 
 namespace cwg2644 { // cwg2644: 8
-#if __cplusplus >= 201103L
 auto z = [a = 42](int a) {
 // cxx11-error@-1 {{initialized lambda captures are a C++14 extension}}
 // since-cxx11-error@-2 {{a lambda parameter cannot shadow an explicitly captured entity}}
 //   since-cxx11-note@-3 {{variable 'a' is explicitly captured here}}
      return 1;
 };
-#endif
 } // namespace cwg2644
 
 namespace cwg2650 { // cwg2650: 17

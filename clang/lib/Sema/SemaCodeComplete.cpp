@@ -1927,17 +1927,15 @@ static void AddTypeSpecifierResults(const LangOptions &LangOpts,
     Builder.AddPlaceholderChunk("name");
     Results.AddResult(Result(Builder.TakeString()));
 
-    if (LangOpts.CPlusPlus11) {
-      Results.AddResult(Result("auto", CCP_Type));
-      Results.AddResult(Result("char16_t", CCP_Type));
-      Results.AddResult(Result("char32_t", CCP_Type));
+    Results.AddResult(Result("auto", CCP_Type));
+    Results.AddResult(Result("char16_t", CCP_Type));
+    Results.AddResult(Result("char32_t", CCP_Type));
 
-      Builder.AddTypedTextChunk("decltype");
-      Builder.AddChunk(CodeCompletionString::CK_LeftParen);
-      Builder.AddPlaceholderChunk("expression");
-      Builder.AddChunk(CodeCompletionString::CK_RightParen);
-      Results.AddResult(Result(Builder.TakeString()));
-    }
+    Builder.AddTypedTextChunk("decltype");
+    Builder.AddChunk(CodeCompletionString::CK_LeftParen);
+    Builder.AddPlaceholderChunk("expression");
+    Builder.AddChunk(CodeCompletionString::CK_RightParen);
+    Results.AddResult(Result(Builder.TakeString()));
 
     if (LangOpts.Char8 || LangOpts.CPlusPlus20)
       Results.AddResult(Result("char8_t", CCP_Type));
@@ -1975,11 +1973,11 @@ AddStorageSpecifiers(SemaCodeCompletion::ParserCompletionContext CCC,
   typedef CodeCompletionResult Result;
   // Note: we don't suggest either "auto" or "register", because both
   // are pointless as storage specifiers. Elsewhere, we suggest "auto"
-  // in C++0x as a type specifier.
+  // in C++ as a type specifier.
   Results.AddResult(Result("extern"));
   Results.AddResult(Result("static"));
 
-  if (LangOpts.CPlusPlus11) {
+  if (LangOpts.CPlusPlus) {
     CodeCompletionAllocator &Allocator = Results.getAllocator();
     CodeCompletionBuilder Builder(Allocator, Results.getCodeCompletionTUInfo());
 
@@ -2176,7 +2174,7 @@ static void addThisCompletion(Sema &S, ResultBuilder &Results) {
 static void AddStaticAssertResult(CodeCompletionBuilder &Builder,
                                   ResultBuilder &Results,
                                   const LangOptions &LangOpts) {
-  if (!LangOpts.CPlusPlus11)
+  if (!LangOpts.CPlusPlus)
     return;
 
   Builder.AddTypedTextChunk("static_assert");
@@ -2380,8 +2378,7 @@ AddOrdinaryNameResults(SemaCodeCompletion::ParserCompletionContext CCC,
       Builder.AddChunk(CodeCompletionString::CK_SemiColon);
       Results.AddResult(Result(Builder.TakeString()));
 
-      if (SemaRef.getLangOpts().CPlusPlus11)
-        AddUsingAliasResult(Builder, Results);
+      AddUsingAliasResult(Builder, Results);
 
       // using typename qualifier::name (only in a dependent context)
       if (SemaRef.CurContext->isDependentContext()) {
@@ -2473,7 +2470,7 @@ AddOrdinaryNameResults(SemaCodeCompletion::ParserCompletionContext CCC,
   case SemaCodeCompletion::PCC_RecoveryInFunction:
   case SemaCodeCompletion::PCC_TopLevelOrExpression:
   case SemaCodeCompletion::PCC_Statement: {
-    if (SemaRef.getLangOpts().CPlusPlus11)
+    if (SemaRef.getLangOpts().CPlusPlus)
       AddUsingAliasResult(Builder, Results);
 
     AddTypedefResult(Results);
@@ -2612,7 +2609,7 @@ AddOrdinaryNameResults(SemaCodeCompletion::ParserCompletionContext CCC,
       Builder.AddChunk(CodeCompletionString::CK_RightBrace);
       Results.AddResult(Result(Builder.TakeString()));
 
-      if (SemaRef.getLangOpts().CPlusPlus11 || SemaRef.getLangOpts().ObjC) {
+      if (SemaRef.getLangOpts().CPlusPlus || SemaRef.getLangOpts().ObjC) {
         // for ( range_declaration (:|in) range_expression ) { statements }
         Builder.AddTypedTextChunk("for");
         Builder.AddChunk(CodeCompletionString::CK_HorizontalSpace);
@@ -2692,7 +2689,7 @@ AddOrdinaryNameResults(SemaCodeCompletion::ParserCompletionContext CCC,
         Results.AddResult(Result(Builder.TakeString()));
       }
       // For pointers, suggest 'return nullptr' in C++.
-      if (SemaRef.getLangOpts().CPlusPlus11 &&
+      if (SemaRef.getLangOpts().CPlusPlus &&
           (ReturnType->isPointerType() || ReturnType->isMemberPointerType())) {
         Builder.AddTypedTextChunk("return nullptr");
         Builder.AddChunk(CodeCompletionString::CK_SemiColon);
@@ -2871,36 +2868,34 @@ AddOrdinaryNameResults(SemaCodeCompletion::ParserCompletionContext CCC,
 
       // FIXME: Rethrow?
 
-      if (SemaRef.getLangOpts().CPlusPlus11) {
-        // nullptr
-        Builder.AddResultTypeChunk("std::nullptr_t");
-        Builder.AddTypedTextChunk("nullptr");
-        Results.AddResult(Result(Builder.TakeString()));
+      // nullptr
+      Builder.AddResultTypeChunk("std::nullptr_t");
+      Builder.AddTypedTextChunk("nullptr");
+      Results.AddResult(Result(Builder.TakeString()));
 
-        // alignof
-        Builder.AddResultTypeChunk("size_t");
-        Builder.AddTypedTextChunk("alignof");
-        Builder.AddChunk(CodeCompletionString::CK_LeftParen);
-        Builder.AddPlaceholderChunk("type");
-        Builder.AddChunk(CodeCompletionString::CK_RightParen);
-        Results.AddResult(Result(Builder.TakeString()));
+      // alignof
+      Builder.AddResultTypeChunk("size_t");
+      Builder.AddTypedTextChunk("alignof");
+      Builder.AddChunk(CodeCompletionString::CK_LeftParen);
+      Builder.AddPlaceholderChunk("type");
+      Builder.AddChunk(CodeCompletionString::CK_RightParen);
+      Results.AddResult(Result(Builder.TakeString()));
 
-        // noexcept
-        Builder.AddResultTypeChunk("bool");
-        Builder.AddTypedTextChunk("noexcept");
-        Builder.AddChunk(CodeCompletionString::CK_LeftParen);
-        Builder.AddPlaceholderChunk("expression");
-        Builder.AddChunk(CodeCompletionString::CK_RightParen);
-        Results.AddResult(Result(Builder.TakeString()));
+      // noexcept
+      Builder.AddResultTypeChunk("bool");
+      Builder.AddTypedTextChunk("noexcept");
+      Builder.AddChunk(CodeCompletionString::CK_LeftParen);
+      Builder.AddPlaceholderChunk("expression");
+      Builder.AddChunk(CodeCompletionString::CK_RightParen);
+      Results.AddResult(Result(Builder.TakeString()));
 
-        // sizeof... expression
-        Builder.AddResultTypeChunk("size_t");
-        Builder.AddTypedTextChunk("sizeof...");
-        Builder.AddChunk(CodeCompletionString::CK_LeftParen);
-        Builder.AddPlaceholderChunk("parameter-pack");
-        Builder.AddChunk(CodeCompletionString::CK_RightParen);
-        Results.AddResult(Result(Builder.TakeString()));
-      }
+      // sizeof... expression
+      Builder.AddResultTypeChunk("size_t");
+      Builder.AddTypedTextChunk("sizeof...");
+      Builder.AddChunk(CodeCompletionString::CK_LeftParen);
+      Builder.AddPlaceholderChunk("parameter-pack");
+      Builder.AddChunk(CodeCompletionString::CK_RightParen);
+      Results.AddResult(Result(Builder.TakeString()));
 
       if (SemaRef.getLangOpts().CPlusPlus20) {
         // co_await expression
@@ -4588,7 +4583,7 @@ static void AddPrettyFunctionResults(const LangOptions &LangOpts,
 
   Results.AddResult(Result("__PRETTY_FUNCTION__", CCP_Constant));
   Results.AddResult(Result("__FUNCTION__", CCP_Constant));
-  if (LangOpts.C99 || LangOpts.CPlusPlus11)
+  if (LangOpts.C99 || LangOpts.CPlusPlus)
     Results.AddResult(Result("__func__", CCP_Constant));
   Results.ExitScope();
 }
@@ -4938,9 +4933,8 @@ void SemaCodeCompletion::CodeCompleteDeclSpec(Scope *S, DeclSpec &DS,
     Results.AddResult(Result("restrict"));
 
   if (getLangOpts().CPlusPlus) {
-    if (getLangOpts().CPlusPlus11 &&
-        (DS.getTypeSpecType() == DeclSpec::TST_class ||
-         DS.getTypeSpecType() == DeclSpec::TST_struct))
+    if (DS.getTypeSpecType() == DeclSpec::TST_class ||
+        DS.getTypeSpecType() == DeclSpec::TST_struct)
       Results.AddResult("final");
 
     if (AllowNonIdentifiers) {
@@ -5313,7 +5307,7 @@ void SemaCodeCompletion::CodeCompleteExpression(
                     PreferredTypeIsPointer);
 
   // Complete a lambda expression when preferred type is a function.
-  if (!Data.PreferredType.isNull() && getLangOpts().CPlusPlus11) {
+  if (!Data.PreferredType.isNull() && getLangOpts().CPlusPlus) {
     if (const FunctionProtoType *F =
             TryDeconstructFunctionLike(Data.PreferredType))
       AddLambdaCompletion(Results, F->getParamTypes(), getLangOpts());
@@ -6310,7 +6304,7 @@ void SemaCodeCompletion::CodeCompleteFunctionQualifiers(
                         CodeCompletionContext::CCC_TypeQualifiers);
   Results.EnterNewScope();
   AddTypeQualifierResults(DS, Results, getLangOpts());
-  if (getLangOpts().CPlusPlus11) {
+  if (getLangOpts().CPlusPlus) {
     Results.AddResult("noexcept");
     if (D.getContext() == DeclaratorContext::Member && !D.isCtorOrDtor() &&
         !D.isStaticMember()) {
@@ -7550,7 +7544,7 @@ void SemaCodeCompletion::CodeCompleteLambdaIntroducer(Scope *S,
 }
 
 void SemaCodeCompletion::CodeCompleteAfterFunctionEquals(Declarator &D) {
-  if (!getLangOpts().CPlusPlus11)
+  if (!getLangOpts().CPlusPlus)
     return;
   ResultBuilder Results(SemaRef, CodeCompleter->getAllocator(),
                         CodeCompleter->getCodeCompletionTUInfo(),
@@ -8465,7 +8459,7 @@ void SemaCodeCompletion::CodeCompleteObjCMessageReceiver(Scope *S) {
       SemaRef, CodeCompleter->getAllocator(),
       CodeCompleter->getCodeCompletionTUInfo(),
       CodeCompletionContext::CCC_ObjCMessageReceiver,
-      getLangOpts().CPlusPlus11
+      getLangOpts().CPlusPlus
           ? &ResultBuilder::IsObjCMessageReceiverOrLambdaCapture
           : &ResultBuilder::IsObjCMessageReceiver);
 
@@ -8485,7 +8479,7 @@ void SemaCodeCompletion::CodeCompleteObjCMessageReceiver(Scope *S) {
         AddSuperSendCompletion(SemaRef, /*NeedSuperKeyword=*/true, {}, Results);
       }
 
-  if (getLangOpts().CPlusPlus11)
+  if (getLangOpts().CPlusPlus)
     addThisCompletion(SemaRef, Results);
 
   Results.ExitScope();

@@ -25,7 +25,7 @@ public:
       : ClangTidyCheck(Name, Context) {}
 
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11 && LangOpts.CXXExceptions;
+    return LangOpts.CPlusPlus && LangOpts.CXXExceptions;
   }
   void check(const ast_matchers::MatchFinder::MatchResult &Result) final;
   std::optional<TraversalKind> getCheckTraversalKind() const override {

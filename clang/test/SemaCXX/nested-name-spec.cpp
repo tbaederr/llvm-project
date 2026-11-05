@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -std=c++98 -verify=expected,cxx98,cxx98-11 -fblocks %s
 // RUN: %clang_cc1 -fsyntax-only -std=c++11 -verify=expected,since-cxx11,cxx98-11 -fblocks %s
 // RUN: %clang_cc1 -fsyntax-only -std=c++14 -verify=expected,since-cxx11 -fblocks %s
 // RUN: %clang_cc1 -fsyntax-only -std=c++17 -verify=expected,since-cxx11 -fblocks %s
@@ -127,7 +126,7 @@ namespace E {
     };
 
     int f() {
-      return E::X; // cxx98-warning{{use of enumeration in a nested name specifier is a C++11 extension}}
+      return E::X;
     }
   }
 }
@@ -444,21 +443,18 @@ namespace PR16951 {
     };
   }
 
-  int x1 = ns::an_enumeration::ENUMERATOR; // cxx98-warning{{use of enumeration in a nested name specifier is a C++11 extension}}
+  int x1 = ns::an_enumeration::ENUMERATOR;
 
-  int x2 = ns::an_enumeration::ENUMERATOR::vvv; // cxx98-warning{{use of enumeration in a nested name specifier is a C++11 extension}} \
-                                                // expected-error{{'ENUMERATOR' is not a class, namespace, or enumeration}} \
+  int x2 = ns::an_enumeration::ENUMERATOR::vvv; // expected-error{{'ENUMERATOR' is not a class, namespace, or enumeration}} \
 
-  int x3 = ns::an_enumeration::X; // cxx98-warning {{use of enumeration in a nested name specifier is a C++11 extension}} \
-                                  // expected-error{{no member named 'X'}}
+  int x3 = ns::an_enumeration::X; // expected-error{{no member named 'X'}}
 
   enum enumerator_2 {
     ENUMERATOR_2
   };
 
-  int x4 = enumerator_2::ENUMERATOR_2; // cxx98-warning{{use of enumeration in a nested name specifier is a C++11 extension}}
-  int x5 = enumerator_2::X2; // cxx98-warning{{use of enumeration in a nested name specifier is a C++11 extension}} \
-                             // expected-error{{no member named 'X2' in 'PR16951::enumerator_2'}} \
+  int x4 = enumerator_2::ENUMERATOR_2;
+  int x5 = enumerator_2::X2; // expected-error{{no member named 'X2' in 'PR16951::enumerator_2'}} \
                              // expected-error{{cannot initialize a variable of type 'int' with an lvalue of type 'int (*)()'}}
 
 }
@@ -511,7 +507,7 @@ namespace ForwardDeclared {
 }
 
 namespace GH63254 {
-template <typename...> struct V {}; // cxx98-warning {{variadic templates are a C++11 extension}}
+template <typename...> struct V {};
 struct S : V<> {
   using S::V; // expected-error {{using declaration refers to its own class}}
   V<> v; // no crash

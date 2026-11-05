@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 %s -triple=x86_64-pc-linuxs -emit-llvm -std=c++98 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK98 %s
 // RUN: %clang_cc1 %s -triple=x86_64-pc-linuxs -emit-llvm -std=c++11 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK11 %s
 // RUN: %clang_cc1 %s -triple=x86_64-pc-linuxs -emit-llvm -std=c++20 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK20 %s
 
@@ -13,7 +12,6 @@
 // CHECK: @_ZZ2h2vE1i = linkonce_odr global i32 0, comdat, align 4
 // CHECK: @_ZGVZ2h2vE1i = linkonce_odr global i64 0, comdat, align 8{{$}}
 // CHECK: @_ZZN5test1L6getvarEiE3var = internal constant [4 x i32] [i32 1, i32 0, i32 2, i32 4], align 16
-// CHECK98: @_ZZN5test414useStaticLocalEvE3obj = linkonce_odr global %"struct.test4::HasVTable" zeroinitializer, comdat, align 8
 // CHECK11: @_ZZN5test414useStaticLocalEvE3obj = linkonce_odr global %"struct.test4::HasVTable" { ptr getelementptr inbounds inrange(-16, 8) (i8, ptr @_ZTVN5test49HasVTableE, i64 16) }, comdat, align 8
 
 struct A {

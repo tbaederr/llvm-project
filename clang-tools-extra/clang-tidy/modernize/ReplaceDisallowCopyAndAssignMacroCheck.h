@@ -41,7 +41,7 @@ public:
   ReplaceDisallowCopyAndAssignMacroCheck(StringRef Name,
                                          ClangTidyContext *Context);
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
                            Preprocessor *ModuleExpanderPP) override;

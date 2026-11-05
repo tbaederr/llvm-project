@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 template <typename T> struct S {
@@ -50,9 +49,6 @@ namespace AliasTagDef {
   template<typename T>
   T f() {
     using S = struct { // expected-warning {{add a tag name}} expected-note {{}}
-#if __cplusplus <= 199711L
-    // expected-warning@-2 {{alias declarations are a C++11 extension}}
-#endif
       T g() { // expected-note {{}}
         return T();
       }

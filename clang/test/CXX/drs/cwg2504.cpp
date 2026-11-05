@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK
 // RUN: %clang_cc1 -std=c++11 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
 // RUN: %clang_cc1 -std=c++14 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
 // RUN: %clang_cc1 -std=c++17 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
@@ -7,7 +6,6 @@
 // RUN: %clang_cc1 -std=c++2c %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
 
 namespace cwg2504 { // cwg2504: no
-#if __cplusplus >= 201103L
 struct V { V() = default; V(int); };
 struct Q { Q(); };
 struct A : virtual V, Q {
@@ -20,7 +18,6 @@ struct B : A {
 };
 struct C : B {};
 void foo() { C c; } // bar is not invoked, because the V subobject is not initialized as part of B
-#endif
 } // namespace cwg2504
 
 // FIXME: As specified in the comment above (which comes from an example in the Standard),

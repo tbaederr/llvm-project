@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
@@ -6,10 +5,8 @@
 // RUN: %clang_cc1 -std=c++23 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 
-// cxx98-no-diagnostics
 
 namespace cwg1736 { // cwg1736: 3.9
-#if __cplusplus >= 201103L
 struct S {
   template <class T> S(T t) {
     struct L : S {
@@ -24,5 +21,4 @@ struct S {
 };
 struct Q { typedef int type; } q;
 S s(q); // #cwg1736-s
-#endif
 } // namespace cwg1736

@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-linux-gnu -fenable-matrix -fclang-abi-compat=3.0 %s -emit-llvm -o - -Wno-c++11-extensions \
-// RUN:     | FileCheck --check-prefixes=CHECK,PRE39,PRE5,PRE12,PRE15 %s
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-linux-gnu -fenable-matrix -fclang-abi-compat=3.0 %s -emit-llvm -o - \
 // RUN:     | FileCheck --check-prefixes=CHECK,PRE39,PRE5,PRE12,PRE15 %s
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-linux-gnu -fenable-matrix -fclang-abi-compat=3.8 %s -emit-llvm -o - \
@@ -18,8 +16,6 @@
 // RUN:     | FileCheck --check-prefixes=CHECK,V39,V5,V12,V12-CXX17,V12-CXX20,PRE13-CXX20,PRE15 %s
 // RUN: %clang_cc1 -std=c++20 -triple x86_64-linux-gnu -fenable-matrix -fclang-abi-compat=14 %s -emit-llvm -o - \
 // RUN:     | FileCheck --check-prefixes=CHECK,V39,V5,V12,V12-CXX17,V12-CXX20,V13-CXX20,PRE15 %s
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-linux-gnu -fenable-matrix -fclang-abi-compat=latest %s -emit-llvm -o - -Wno-c++11-extensions \
-// RUN:     | FileCheck --check-prefixes=CHECK,V39,V5,V12,V15 %s
 // RUN: %clang_cc1 -std=c++20 -triple x86_64-linux-gnu -fenable-matrix -fclang-abi-compat=latest %s -emit-llvm -o - \
 // RUN:     | FileCheck --check-prefixes=CHECK,V39,V5,V12,V12-CXX17,V12-CXX20,V13-CXX20,V15 %s
 

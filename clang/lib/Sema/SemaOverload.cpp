@@ -4491,7 +4491,7 @@ compareConversionFunctions(Sema &S, FunctionDecl *Function1,
   //   respectively, always prefer the conversion to a function pointer,
   //   because the function pointer is more lightweight and is more likely
   //   to keep code working.
-  if (S.getLangOpts().ObjC && S.getLangOpts().CPlusPlus11) {
+  if (S.getLangOpts().ObjC && S.getLangOpts().CPlusPlus) {
     bool Block1 = Conv1->getConversionType()->isBlockPointerType();
     bool Block2 = Conv2->getConversionType()->isBlockPointerType();
     if (Block1 != Block2)
@@ -4574,15 +4574,13 @@ CompareImplicitConversionSequences(Sema &S, SourceLocation Loc,
   // void f(char*);  // #2
   // void g() { int &r = f("foo"); }
   //
-  // In C++03, we pick #2 as the best viable function.
-  // In C++11, we pick #1 as the best viable function, because ellipsis
-  // conversion is better than string-literal to char* conversion (since there
-  // is no such conversion in C++11). If there was no #1 at all or #1 couldn't
-  // convert arguments, #2 would be the best viable function in C++11.
-  // If the best viable function has this conversion, a warning will be issued
-  // in C++03, or an ExtWarn (+SFINAE failure) will be issued in C++11.
+  // We pick #1 as the best viable function, because ellipsis conversion is
+  // better than string-literal to char* conversion (since there is no such
+  // conversion in C++11). If there was no #1 at all or #1 couldn't convert
+  // arguments, #2 would be the best viable function. If the best viable
+  // function has this conversion, an ExtWarn (+SFINAE failure) will be issued.
 
-  if (S.getLangOpts().CPlusPlus11 && !S.getLangOpts().WritableStrings &&
+  if (S.getLangOpts().CPlusPlus && !S.getLangOpts().WritableStrings &&
       hasDeprecatedStringLiteralToCharPtrConversion(ICS1) !=
           hasDeprecatedStringLiteralToCharPtrConversion(ICS2) &&
       // Ill-formedness must not differ
@@ -5677,13 +5675,8 @@ TryReferenceInit(Sema &S, Expr *Init, QualType DeclType,
        (InitCategory.isPRValue() &&
           (T2->isRecordType() || T2->isArrayType())) ||
        (InitCategory.isLValue() && T2->isFunctionType()))) {
-    // In C++11, this is always a direct binding. In C++98/03, it's a direct
-    // binding unless we're binding to a class prvalue.
-    // Note: Although xvalues wouldn't normally show up in C++98/03 code, we
-    // allow the use of rvalue references in C++98/03 for the benefit of
-    // standard library implementors; therefore, we need the xvalue check here.
-    SetAsReferenceBinding(/*BindsDirectly=*/S.getLangOpts().CPlusPlus11 ||
-                          !(InitCategory.isPRValue() || T2->isRecordType()));
+    // In C++11, this is always a direct binding.
+    SetAsReferenceBinding(/*BindsDirectly=*/true);
     return ICS;
   }
 
@@ -6578,11 +6571,8 @@ static ExprResult BuildConvertedConstantExpression(Sema &S, Expr *From,
                                                    QualType T, CCEKind CCE,
                                                    NamedDecl *Dest,
                                                    APValue &PreNarrowingValue) {
-  [[maybe_unused]] bool isCCEAllowedPreCXX11 =
-      (CCE == CCEKind::TempArgStrict || CCE == CCEKind::ExplicitBool ||
-       CCE == CCEKind::PackIndex);
-  assert((S.getLangOpts().CPlusPlus11 || isCCEAllowedPreCXX11) &&
-         "converted constant expression outside C++11 or TTP matching");
+  assert(S.getLangOpts().CPlusPlus &&
+         "converted constant expression outside C++");
 
   if (checkPlaceholderForOverload(S, From))
     return ExprError();
@@ -10578,17 +10568,15 @@ public:
         S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
       }
 
-      if (S.getLangOpts().CPlusPlus11) {
-        for (QualType EnumTy : CandidateTypes[ArgIdx].enumeration_types()) {
-          if (!EnumTy->castAsCanonical<EnumType>()->getDecl()->isScoped())
-            continue;
+      for (QualType EnumTy : CandidateTypes[ArgIdx].enumeration_types()) {
+        if (!EnumTy->castAsCanonical<EnumType>()->getDecl()->isScoped())
+          continue;
 
-          if (!AddedTypes.insert(S.Context.getCanonicalType(EnumTy)).second)
-            continue;
+        if (!AddedTypes.insert(S.Context.getCanonicalType(EnumTy)).second)
+          continue;
 
-          QualType ParamTypes[2] = {EnumTy, EnumTy};
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
-        }
+        QualType ParamTypes[2] = {EnumTy, EnumTy};
+        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
       }
     }
   }
@@ -11195,8 +11183,8 @@ bool clang::isBetterOverloadCandidate(
              ICS.Standard.Second == ICK_Incompatible_Pointer_Conversion;
 
     // The only ill-formed conversion we allow in C++ is the string literal to
-    // char* conversion, which is only considered ill-formed after C++11.
-    return S.getLangOpts().CPlusPlus11 && !S.getLangOpts().WritableStrings &&
+    // char* conversion, which is considered ill-formed since C++11.
+    return !S.getLangOpts().WritableStrings &&
            hasDeprecatedStringLiteralToCharPtrConversion(ICS);
   };
 

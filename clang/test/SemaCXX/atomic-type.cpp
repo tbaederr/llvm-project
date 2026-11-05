@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -verify -pedantic %s -std=c++98
 // RUN: %clang_cc1 -verify -pedantic %s -std=c++11
 
 template<typename T> struct atomic {
@@ -74,14 +73,12 @@ namespace copy_init {
 
   _Atomic(X) e1(0); // expected-error {{cannot initialize}} \
                     // expected-warning {{'_Atomic' is a C11 extension}}
-#if __cplusplus >= 201103L
   _Atomic(X) e2{0}; // expected-error {{illegal initializer}} \
                     // expected-warning {{'_Atomic' is a C11 extension}}
   _Atomic(X) a{X(0)}; // expected-warning {{'_Atomic' is a C11 extension}}
   // FIXME: This does not seem like the right answer.
   _Atomic(int) e3{0}; // expected-error {{illegal initializer}} \
                       // expected-warning {{'_Atomic' is a C11 extension}}
-#endif
 
   struct Y {
     _Atomic(X) a; // expected-warning {{'_Atomic' is a C11 extension}}

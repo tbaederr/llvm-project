@@ -5168,8 +5168,8 @@ Value *ScalarExprEmitter::EmitShl(const BinOpInfo &Ops) {
       if (SanitizeUnsignedBase || CGF.getLangOpts().CPlusPlus) {
         // In C99, we are not permitted to shift a 1 bit into the sign bit.
         // Under C++11's rules, shifting a 1 bit into the sign bit is
-        // OK, but shifting a 1 bit out of it is not. (C89 and C++03 don't
-        // define signed left shifts, so we use the C99 and C++11 rules there).
+        // OK, but shifting a 1 bit out of it is not. (C89 doesn't define
+        // signed left shifts, so we use the C99 rules there).
         // Unsigned shifts can always shift into the top bit.
         llvm::Value *One = llvm::ConstantInt::get(BitsShiftedOff->getType(), 1);
         BitsShiftedOff = Builder.CreateLShr(BitsShiftedOff, One);

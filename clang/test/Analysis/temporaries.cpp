@@ -1,11 +1,6 @@
 // RUN: %clang_analyze_cc1 -w -analyzer-checker=core,cplusplus\
 // RUN:     -analyzer-checker debug.ExprInspection -Wno-non-pod-varargs\
 // RUN:     -analyzer-config eagerly-assume=false -verify %s\
-// RUN:     -std=c++03 -analyzer-config cfg-temporary-dtors=false
-
-// RUN: %clang_analyze_cc1 -w -analyzer-checker=core,cplusplus\
-// RUN:     -analyzer-checker debug.ExprInspection -Wno-non-pod-varargs\
-// RUN:     -analyzer-config eagerly-assume=false -verify %s\
 // RUN:     -std=c++11 -analyzer-config cfg-temporary-dtors=false
 
 // RUN: %clang_analyze_cc1 -w -analyzer-checker=core,cplusplus\
@@ -123,13 +118,11 @@ namespace compound_literals {
     clang_analyzer_eval(((POD){1, 42}).y == 42); // expected-warning{{TRUE}}
     clang_analyzer_eval(((HasDtor){1, 42}).y == 42); // expected-warning{{TRUE}}
 
-#if __cplusplus >= 201103L
     clang_analyzer_eval(((HasCtor){1, 42}).y == 42); // expected-warning{{TRUE}}
 
     // FIXME: should be TRUE, but we don't inline the constructors of
     // temporaries because we can't model their destructors yet.
     clang_analyzer_eval(((HasCtorDtor){1, 42}).y == 42); // expected-warning{{UNKNOWN}}
-#endif
   }
 }
 
@@ -465,7 +458,6 @@ namespace destructors {
     clang_analyzer_warnIfReached();  // no-warning
   }
 
-#if __cplusplus >= 201103L
   struct CtorWithNoReturnDtor2 {
     CtorWithNoReturnDtor2() = default;
 
@@ -478,7 +470,6 @@ namespace destructors {
   CtorWithNoReturnDtor2 returnNoReturnDtor() {
     return {1}; // no-crash
   }
-#endif
 
 #endif // TEMPORARY_DTORS
 }
@@ -628,7 +619,6 @@ D returnTemporaryWithCopyConstructionWithVariableAndNonTrivialCopy() {
   return D(returnTemporaryWithVariableAndNonTrivialCopy());
 }
 
-#if __cplusplus >= 201103L
 C returnTemporaryWithBraces() { return {1, 2}; }
 C returnTemporaryWithAnotherFunctionWithBraces() {
   return returnTemporaryWithBraces();
@@ -636,7 +626,6 @@ C returnTemporaryWithAnotherFunctionWithBraces() {
 C returnTemporaryWithCopyConstructionWithBraces() {
   return C(returnTemporaryWithBraces());
 }
-#endif // C++11
 
 void test() {
   C c1 = returnTemporaryWithVariable();
@@ -663,7 +652,6 @@ void test() {
   clang_analyzer_eval(c5.getX() == 1); // expected-warning{{TRUE}}
   clang_analyzer_eval(c5.getY() == 2); // expected-warning{{TRUE}}
 
-#if __cplusplus >= 201103L
 
   C c7 = returnTemporaryWithBraces();
   clang_analyzer_eval(c7.getX() == 1); // expected-warning{{TRUE}}
@@ -677,7 +665,6 @@ void test() {
   clang_analyzer_eval(c9.getX() == 1); // expected-warning{{TRUE}}
   clang_analyzer_eval(c9.getY() == 2); // expected-warning{{TRUE}}
 
-#endif // C++11
 
   D d1 = returnTemporaryWithVariableAndNonTrivialCopy();
   clang_analyzer_eval(d1.getX() == 1); // expected-warning{{TRUE}}
@@ -924,7 +911,6 @@ void test(int coin) {
 }
 } // namespace dont_forget_destructor_around_logical_op
 
-#if __cplusplus >= 201103L
 namespace temporary_list_crash {
 class C {
 public:
@@ -936,7 +922,6 @@ void test() {
   std::initializer_list<C>{C(), C()}; // no-crash
 }
 } // namespace temporary_list_crash
-#endif // C++11
 
 namespace implicit_constructor_conversion {
 struct S {
@@ -1111,7 +1096,6 @@ void foo() {
 } // namespace operator_implicit_argument
 
 
-#if __cplusplus >= 201103L
 namespace argument_lazy_bindings {
 int glob;
 
@@ -1135,7 +1119,6 @@ void bar() {
   clang_analyzer_eval(glob == 4); // expected-warning{{TRUE}}
 }
 } // namespace argument_lazy_bindings
-#endif
 
 namespace operator_argument_cleanup {
 struct S {
@@ -1224,7 +1207,6 @@ S bar3(int coin) {
 }
 } // namespace return_from_top_frame
 
-#if __cplusplus >= 201103L
 namespace arguments_of_operators {
 struct S {
   S() {}
@@ -1238,4 +1220,3 @@ void test() {
   clang_analyzer_eval(x == 1); // expected-warning{{TRUE}}
 }
 } // namespace arguments_of_operators
-#endif // __cplusplus >= 201103L

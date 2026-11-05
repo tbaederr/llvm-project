@@ -3272,7 +3272,7 @@ static void diagnoseMissingConstinit(Sema &S, const VarDecl *InitDecl,
   if (S.getLangOpts().CPlusPlus20)
     SuitableSpelling = std::string(
         S.PP.getLastMacroWithSpelling(InsertLoc, {tok::kw_constinit}));
-  if (SuitableSpelling.empty() && S.getLangOpts().CPlusPlus11)
+  if (SuitableSpelling.empty() && S.getLangOpts().CPlusPlus)
     SuitableSpelling = std::string(S.PP.getLastMacroWithSpelling(
         InsertLoc, {tok::l_square, tok::l_square,
                     S.PP.getIdentifierInfo("clang"), tok::coloncolon,
@@ -3285,7 +3285,7 @@ static void diagnoseMissingConstinit(Sema &S, const VarDecl *InitDecl,
                     tok::r_paren, tok::r_paren}));
   if (SuitableSpelling.empty() && S.getLangOpts().CPlusPlus20)
     SuitableSpelling = "constinit";
-  if (SuitableSpelling.empty() && S.getLangOpts().CPlusPlus11)
+  if (SuitableSpelling.empty() && S.getLangOpts().CPlusPlus)
     SuitableSpelling = "[[clang::require_constant_initialization]]";
   if (SuitableSpelling.empty())
     SuitableSpelling = "__attribute__((require_constant_initialization))";
@@ -5888,14 +5888,6 @@ Decl *Sema::BuildAnonymousStructOrUnion(Scope *S, DeclSpec &DS,
             << Record->isUnion() << (FD->getAccess() == AS_protected);
           Invalid = true;
         }
-
-        // C++ [class.union]p1
-        //   An object of a class with a non-trivial constructor, a non-trivial
-        //   copy constructor, a non-trivial destructor, or a non-trivial copy
-        //   assignment operator cannot be a member of a union, nor can an
-        //   array of such objects.
-        if (CheckNontrivialField(FD))
-          Invalid = true;
       } else if (Mem->isImplicit()) {
         // Any implicit members are fine.
       } else if (isa<TagDecl>(Mem) && Mem->getDeclContext() != Record) {
@@ -7916,7 +7908,7 @@ NamedDecl *Sema::ActOnVariableDeclarator(
     SC = SC_None;
   }
 
-  if (getLangOpts().CPlusPlus11 && SCSpec == DeclSpec::SCS_register &&
+  if (getLangOpts().CPlusPlus && SCSpec == DeclSpec::SCS_register &&
       !D.getAsmLabel() && !getSourceManager().isInSystemMacro(
                               D.getDeclSpec().getStorageClassSpecLoc())) {
     // In C++11, the 'register' storage class specifier is deprecated.
@@ -8079,12 +8071,6 @@ NamedDecl *Sema::ActOnVariableDeclarator(
                  diag::err_static_data_member_not_allowed_in_anon_struct)
                 << Name << AnonStruct->getTagKind();
             Invalid = true;
-          } else if (RD->isUnion()) {
-            // C++98 [class.union]p1: If a union contains a static data member,
-            // the program is ill-formed. C++11 drops this restriction.
-            DiagCompat(D.getIdentifierLoc(),
-                       diag_compat::static_data_member_in_union)
-                << Name;
           }
         }
       } else if (IsVariableTemplate || IsPartialSpecialization) {
@@ -9791,8 +9777,7 @@ static FunctionDecl *CreateNewFunctionDecl(Sema &SemaRef, Declarator &D,
       // If the destructor needs an implicit exception specification, set it
       // now. FIXME: It'd be nice to be able to create the right type to start
       // with, but the type needs to reference the destructor declaration.
-      if (SemaRef.getLangOpts().CPlusPlus11)
-        SemaRef.AdjustDestructorExceptionSpec(NewDD);
+      SemaRef.AdjustDestructorExceptionSpec(NewDD);
 
       IsVirtualOkay = true;
       return NewDD;
@@ -10712,8 +10697,7 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
     //   A deallocation function with no exception-specification is treated
     //   as if it were specified with noexcept(true).
     const FunctionProtoType *FPT = R->getAs<FunctionProtoType>();
-    if (Name.isAnyOperatorDelete() && getLangOpts().CPlusPlus11 && FPT &&
-        !FPT->hasExceptionSpec())
+    if (Name.isAnyOperatorDelete() && FPT && !FPT->hasExceptionSpec())
       NewFD->setType(Context.getFunctionType(
           FPT->getReturnType(), FPT->getParamTypes(),
           FPT->getExtProtoInfo().withExceptionSpec(EST_BasicNoexcept)));
@@ -14538,35 +14522,24 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
 
     // We allow integer constant expressions in all cases.
     } else if (DclT->isIntegralOrEnumerationType()) {
-      if (getLangOpts().CPlusPlus11 && DclT.isVolatileQualified())
+      if (DclT.isVolatileQualified())
         // In C++11, a non-constexpr const static data member with an
         // in-class initializer cannot be volatile.
         Diag(VDecl->getLocation(), diag::err_in_class_initializer_volatile);
 
     // We allow foldable floating-point constants as an extension.
     } else if (DclT->isFloatingType()) { // also permits complex, which is ok
-      // In C++98, this is a GNU extension. In C++11, it is not, but we support
-      // it anyway and provide a fixit to add the 'constexpr'.
-      if (getLangOpts().CPlusPlus11) {
-        Diag(VDecl->getLocation(),
-             diag::ext_in_class_initializer_float_type_cxx11)
-            << DclT << Init->getSourceRange();
-        Diag(VDecl->getBeginLoc(),
-             diag::note_in_class_initializer_float_type_cxx11)
-            << FixItHint::CreateInsertion(VDecl->getBeginLoc(), "constexpr ");
-      } else {
-        Diag(VDecl->getLocation(), diag::ext_in_class_initializer_float_type)
+      // This is not valid C++11, but we support it anyway and provide a fixit
+      // to add the 'constexpr'.
+      Diag(VDecl->getLocation(),
+           diag::ext_in_class_initializer_float_type_cxx11)
           << DclT << Init->getSourceRange();
-
-        if (!Init->isValueDependent() && !Init->isEvaluatable(Context)) {
-          Diag(Init->getExprLoc(), diag::err_in_class_initializer_non_constant)
-            << Init->getSourceRange();
-          VDecl->setInvalidDecl();
-        }
-      }
+      Diag(VDecl->getBeginLoc(),
+           diag::note_in_class_initializer_float_type_cxx11)
+          << FixItHint::CreateInsertion(VDecl->getBeginLoc(), "constexpr ");
 
     // Suggest adding 'constexpr' in C++11 for literal types.
-    } else if (getLangOpts().CPlusPlus11 && DclT->isLiteralType(Context)) {
+    } else if (DclT->isLiteralType(Context)) {
       Diag(VDecl->getLocation(), diag::err_in_class_initializer_literal_type)
           << DclT << Init->getSourceRange()
           << FixItHint::CreateInsertion(VDecl->getBeginLoc(), "constexpr ");
@@ -14965,9 +14938,7 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
     if (getLangOpts().CPlusPlus && Var->hasLocalStorage()) {
       if (const auto *CXXRecord =
               Context.getBaseElementType(Type)->getAsCXXRecordDecl()) {
-        // Mark the function (if we're in one) for further checking even if the
-        // looser rules of C++11 do not require such checks, so that we can
-        // diagnose incompatibilities with C++98.
+        // Mark the function (if we're in one) for further checking.
         if (!CXXRecord->isPOD())
           setFunctionHasBranchProtectedScope();
       }
@@ -15225,7 +15196,7 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
       //   The type of an object with thread storage duration shall not
       //   have a non-trivial destructor.
       Diag(var->getLocation(), diag::err_thread_nontrivial_dtor);
-      if (getLangOpts().CPlusPlus11)
+      if (getLangOpts().CPlusPlus)
         Diag(var->getLocation(), diag::note_use_thread_local);
     } else if (getLangOpts().CPlusPlus && var->hasInit()) {
       if (!checkConstInit()) {
@@ -15235,8 +15206,7 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
         // FIXME: Need strict checking here.
         Diag(CacheCulprit->getExprLoc(), diag::err_thread_dynamic_init)
           << CacheCulprit->getSourceRange();
-        if (getLangOpts().CPlusPlus11)
-          Diag(var->getLocation(), diag::note_use_thread_local);
+        Diag(var->getLocation(), diag::note_use_thread_local);
       }
     }
   }
@@ -15316,41 +15286,9 @@ void Sema::CheckCompleteVariableDeclaration(VarDecl *var) {
     // do this lazily, because the result might depend on things that change
     // later, such as which constexpr functions happen to be defined.
     SmallVector<PartialDiagnosticAt, 8> Notes;
-    if (!getLangOpts().CPlusPlus11 && !getLangOpts().C23) {
-      // Prior to C++11, in contexts where a constant initializer is required,
-      // the set of valid constant initializers is described by syntactic rules
-      // in [expr.const]p2-6.
-      // FIXME: Stricter checking for these rules would be useful for constinit /
-      // -Wglobal-constructors.
-      HasConstInit = checkConstInit();
-
-      // Compute and cache the constant value, and remember that we have a
-      // constant initializer.
-      if (HasConstInit) {
-        if (var->isStaticDataMember() && !var->isInline() &&
-            var->getLexicalDeclContext()->isRecord() &&
-            type->isIntegralOrEnumerationType()) {
-          // In C++98, in-class initialization for a static data member must
-          // be an integer constant expression.
-          if (!Init->isIntegerConstantExpr(Context)) {
-            Diag(Init->getExprLoc(),
-                 diag::ext_in_class_initializer_non_constant)
-                << Init->getSourceRange();
-          }
-        }
-        EvalProxy SProxy(*this);
-        (void)var->checkForConstantInitialization(Notes, SProxy);
-        Notes.clear();
-      } else if (CacheCulprit) {
-        Notes.emplace_back(CacheCulprit->getExprLoc(),
-                           PDiag(diag::note_invalid_subexpr_in_const_expr));
-        Notes.back().second << CacheCulprit->getSourceRange();
-      }
-    } else {
-      // Evaluate the initializer to see if it's a constant initializer.
-      EvalProxy SProxy(*this);
-      HasConstInit = var->checkForConstantInitialization(Notes, SProxy);
-    }
+    // Evaluate the initializer to see if it's a constant initializer.
+    EvalProxy SProxy(*this);
+    HasConstInit = var->checkForConstantInitialization(Notes, SProxy);
 
     if (HasConstInit) {
       // FIXME: Consider replacing the initializer with a ConstantExpr.
@@ -15953,13 +15891,12 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D,
     SC = SC_Register;
     // In C++11, the 'register' storage class specifier is deprecated.
     // In C++17, it is not allowed, but we tolerate it as an extension.
-    if (getLangOpts().CPlusPlus11) {
+    if (getLangOpts().CPlusPlus) {
       Diag(DS.getStorageClassSpecLoc(), getLangOpts().CPlusPlus17
                                             ? diag::ext_register_storage_class
                                             : diag::warn_deprecated_register)
           << FixItHint::CreateRemoval(DS.getStorageClassSpecLoc());
-    } else if (!getLangOpts().CPlusPlus &&
-               DS.getTypeSpecType() == DeclSpec::TST_void &&
+    } else if (DS.getTypeSpecType() == DeclSpec::TST_void &&
                D.getNumTypeObjects() == 0) {
       Diag(DS.getStorageClassSpecLoc(),
            diag::err_invalid_storage_class_in_func_decl)
@@ -19811,18 +19748,6 @@ FieldDecl *Sema::CheckFieldDecl(DeclarationName Name, QualType T,
 
   if (!InvalidDecl && getLangOpts().CPlusPlus) {
     if (Record->isUnion()) {
-      if (const auto *RD = EltTy->getAsCXXRecordDecl();
-          RD && (RD->isBeingDefined() || RD->isCompleteDefinition())) {
-
-        // C++ [class.union]p1: An object of a class with a non-trivial
-        // constructor, a non-trivial copy constructor, a non-trivial
-        // destructor, or a non-trivial copy assignment operator
-        // cannot be a member of a union, nor can an array of such
-        // objects.
-        if (CheckNontrivialField(NewFD))
-          NewFD->setInvalidDecl();
-      }
-
       // C++ [class.union]p1: If a union contains a member of reference type,
       // the program is ill-formed, except when compiling with MSVC extensions
       // enabled.
@@ -19871,65 +19796,6 @@ FieldDecl *Sema::CheckFieldDecl(DeclarationName Name, QualType T,
 
   NewFD->setAccess(AS);
   return NewFD;
-}
-
-bool Sema::CheckNontrivialField(FieldDecl *FD) {
-  assert(FD);
-  assert(getLangOpts().CPlusPlus && "valid check only for C++");
-
-  if (FD->isInvalidDecl() || FD->getType()->isDependentType())
-    return false;
-
-  QualType EltTy = Context.getBaseElementType(FD->getType());
-  if (const auto *RDecl = EltTy->getAsCXXRecordDecl();
-      RDecl && (RDecl->isBeingDefined() || RDecl->isCompleteDefinition())) {
-    // We check for copy constructors before constructors
-    // because otherwise we'll never get complaints about
-    // copy constructors.
-
-    CXXSpecialMemberKind member = CXXSpecialMemberKind::Invalid;
-    // We're required to check for any non-trivial constructors. Since the
-    // implicit default constructor is suppressed if there are any
-    // user-declared constructors, we just need to check that there is a
-    // trivial default constructor and a trivial copy constructor. (We don't
-    // worry about move constructors here, since this is a C++98 check.)
-    if (RDecl->hasNonTrivialCopyConstructor())
-      member = CXXSpecialMemberKind::CopyConstructor;
-    else if (!RDecl->hasTrivialDefaultConstructor())
-      member = CXXSpecialMemberKind::DefaultConstructor;
-    else if (RDecl->hasNonTrivialCopyAssignment())
-      member = CXXSpecialMemberKind::CopyAssignment;
-    else if (RDecl->hasNonTrivialDestructor())
-      member = CXXSpecialMemberKind::Destructor;
-
-    if (member != CXXSpecialMemberKind::Invalid) {
-      if (!getLangOpts().CPlusPlus11 && getLangOpts().ObjCAutoRefCount &&
-          RDecl->hasObjectMember()) {
-        // Objective-C++ ARC: it is an error to have a non-trivial field of
-        // a union. However, system headers in Objective-C programs
-        // occasionally have Objective-C lifetime objects within unions,
-        // and rather than cause the program to fail, we make those
-        // members unavailable.
-        SourceLocation Loc = FD->getLocation();
-        if (getSourceManager().isInSystemHeader(Loc)) {
-          if (!FD->hasAttr<UnavailableAttr>())
-            FD->addAttr(UnavailableAttr::CreateImplicit(
-                Context, "", UnavailableAttr::IR_ARCFieldWithOwnership, Loc));
-          return false;
-        }
-      }
-
-      Diag(FD->getLocation(),
-           getLangOpts().CPlusPlus11
-               ? diag::warn_cxx98_compat_nontrivial_union_or_anon_struct_member
-               : diag::err_illegal_union_or_anon_struct_member)
-          << FD->getParent()->isUnion() << FD->getDeclName() << member;
-      DiagnoseNontrivial(RDecl, member);
-      return !getLangOpts().CPlusPlus11;
-    }
-  }
-
-  return false;
 }
 
 void Sema::ActOnLastBitfield(SourceLocation DeclLoc,
@@ -20776,7 +20642,7 @@ EnumConstantDecl *Sema::CheckEnumConstant(EnumDecl *Enum,
     else {
       // FIXME: We don't allow folding in C++11 mode for an enum with a fixed
       // underlying type, but do allow it in all other contexts.
-      if (getLangOpts().CPlusPlus11 && Enum->isFixed()) {
+      if (getLangOpts().CPlusPlus && Enum->isFixed()) {
         // C++11 [dcl.enum]p5: If the underlying type is fixed, [...] the
         // constant-expression in the enumerator-definition shall be a converted
         // constant expression of the underlying type.

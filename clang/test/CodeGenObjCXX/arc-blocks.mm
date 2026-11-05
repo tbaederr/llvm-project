@@ -1,7 +1,7 @@
-// RUN: %clang_cc1 -std=gnu++98 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -fexceptions -fobjc-arc-exceptions -o - %s | FileCheck -check-prefix CHECK %s
-// RUN: %clang_cc1 -std=gnu++98 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -fexceptions -fobjc-arc-exceptions -O1 -o - %s | FileCheck -check-prefix CHECK-O1 %s
-// RUN: %clang_cc1 -std=gnu++98 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -o - %s | FileCheck -check-prefix CHECK-NOEXCP %s
-// RUN: %clang_cc1 -std=gnu++98 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -fexceptions -fobjc-arc-exceptions -fobjc-avoid-heapify-local-blocks -o - %s | FileCheck -check-prefix CHECK-NOHEAP %s
+// RUN: %clang_cc1 -std=gnu++11 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -fexceptions -fobjc-arc-exceptions -o - %s | FileCheck -check-prefix CHECK %s
+// RUN: %clang_cc1 -std=gnu++11 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -fexceptions -fobjc-arc-exceptions -O1 -o - %s | FileCheck -check-prefix CHECK-O1 %s
+// RUN: %clang_cc1 -std=gnu++11 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -o - %s | FileCheck -check-prefix CHECK-NOEXCP %s
+// RUN: %clang_cc1 -std=gnu++11 -triple x86_64-apple-darwin10 -emit-llvm -fobjc-runtime-has-weak -fblocks -fobjc-arc -fexceptions -fobjc-arc-exceptions -fobjc-avoid-heapify-local-blocks -o - %s | FileCheck -check-prefix CHECK-NOHEAP %s
 
 // CHECK: [[A:.*]] = type { i64, [10 x ptr] }
 // CHECK: %[[STRUCT_TEST1_S0:.*]] = type { i32 }
@@ -40,7 +40,7 @@ namespace test0 {
   // CHECK: [[T1:%.*]] = getelementptr inbounds nuw [[BYREF_A]], ptr {{.*}}, i32 0, i32 7
   // CHECK-NEXT: load
   // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds nuw [[BYREF_A]], ptr {{.*}}, i32 0, i32 7
-  // CHECK-NEXT: call void @_ZN5test01AC1ERKS0_(ptr {{[^,]*}} [[T1]], ptr noundef nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) [[T3]])
+  // CHECK-NEXT: call void @_ZN5test01AC1EOS0_(ptr {{[^,]*}} [[T1]], ptr noundef nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) [[T3]])
   // CHECK-NEXT: ret void
 
   // CHECK:    define internal void [[DISPOSE_HELPER]](
@@ -173,7 +173,7 @@ struct TrivialInternal {
 struct S0 {
   S0();
   S0(const S0 &);
-  ~S0();
+  ~S0() noexcept(false);
   int f0;
 };
 

@@ -37,8 +37,6 @@ TEST(LangOptsTest, CppStdLang) {
   LangOptions opts;
   EXPECT_FALSE(opts.getCPlusPlusLangStd());
   opts.CPlusPlus = 1;
-  EXPECT_EQ(opts.getCPlusPlusLangStd(), 199711);
-  opts.CPlusPlus11 = 1;
   EXPECT_EQ(opts.getCPlusPlusLangStd(), 201103);
   opts.CPlusPlus14 = 1;
   EXPECT_EQ(opts.getCPlusPlusLangStd(), 201402);

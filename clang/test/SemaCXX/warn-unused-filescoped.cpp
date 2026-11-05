@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -Wunused -Wunused-template -Wunused-member-function -Wno-unused-local-typedefs \
-// RUN:            -Wno-c++11-extensions -Wno-c++14-extensions -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wunused -Wunused-template -Wunused-member-function -Wno-unused-local-typedefs -std=c++14 %s
 
 #ifdef HEADER
@@ -34,10 +32,8 @@ namespace test7
 };
 
 namespace pr19713 {
-#if __cplusplus >= 201103L
   static constexpr int constexpr1() { return 1; }
   constexpr int constexpr2() { return 2; }
-#endif
 }
 
 #else
@@ -221,19 +217,15 @@ static void completeRedeclChainForTemplateSpecialization() {} // expected-warnin
 }
 
 namespace test10 {
-#if __cplusplus >= 201103L
 // FIXME: Warn on template definitions with no instantiations?
 template<class T>
 constexpr T pi = T(3.14);
-#endif
 }
 
 namespace pr19713 {
-#if __cplusplus >= 201103L
   // FIXME: We should warn on both of these.
 static constexpr int constexpr3() { return 1; } // expected-warning {{unused function 'constexpr3'}}
 constexpr int constexpr4() { return 2; }
-#endif
 }
 
 #endif

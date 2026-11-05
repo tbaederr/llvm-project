@@ -908,7 +908,7 @@ struct EvaluatedStmt {
   LLVM_PREFERRED_TYPE(bool)
   unsigned HasConstantDestruction : 1;
 
-  /// In C++98, whether the initializer is an ICE. This affects whether the
+  /// In OpenCL C, whether the initializer is an ICE. This affects whether the
   /// variable is usable in constant expressions.
   LLVM_PREFERRED_TYPE(bool)
   unsigned HasICEInit : 1;
@@ -1475,8 +1475,8 @@ public:
   bool hasConstantInitialization() const;
 
   /// Determine whether the initializer of this variable is an integer constant
-  /// expression. For use in C++98, where this affects whether the variable is
-  /// usable in constant expressions.
+  /// expression. For use in OpenCL C, where this affects whether the variable
+  /// is usable in constant expressions.
   bool hasICEInitializer(const ASTContext &Context) const;
 
   /// Evaluate the initializer of this variable to determine whether it's a

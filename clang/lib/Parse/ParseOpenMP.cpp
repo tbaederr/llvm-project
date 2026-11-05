@@ -387,10 +387,8 @@ void Parser::ParseOpenMPReductionInitializerForDecl(VarDecl *OmpPrivParm) {
       Actions.AddInitializerToDecl(OmpPrivParm, Initializer.get(),
                                    /*DirectInit=*/true);
     }
-  } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
+  } else if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
     // Parse C++0x braced-init-list.
-    Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
-
     ExprResult Init(ParseBraceInitializer());
 
     if (Init.isInvalid()) {

@@ -6,7 +6,6 @@
 // RUN: %clang_cc1 -fsyntax-only -Wnewline-eof -verify %s
 // RUN: %clang_cc1 -fsyntax-only -pedantic -verify=good %s
 // RUN: %clang_cc1 -fsyntax-only -std=c89 -pedantic -Wno-comment -verify=good %s
-// RUN: %clang_cc1 -fsyntax-only -x c++ -std=c++03 -pedantic -verify=good %s
 // RUN: %clang_cc1 -fsyntax-only -x c++ -std=c++11 -Wnewline-eof -verify %s
 // RUN: %clang_cc1 -fsyntax-only -x c++ -std=c++11 -Werror -pedantic %s
 // RUN: %clang_cc1 -fsyntax-only -Wnewline-eof %s 2>&1 | FileCheck %s

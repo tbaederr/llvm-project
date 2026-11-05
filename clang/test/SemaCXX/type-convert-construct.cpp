@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s 
-// RUN: %clang_cc1 -fsyntax-only -verify -std=gnu++98 %s 
 // RUN: %clang_cc1 -fsyntax-only -verify -std=gnu++11 %s 
 
 void f() {
@@ -11,32 +10,20 @@ void f() {
   fn_ty(); // expected-error {{cannot create object of function type 'fn_ty'}}
   fn_ty(0); // expected-error {{functional-style cast from 'int' to 'fn_ty'}}
   fn_ty(0, 0); // expected-error {{cannot create object of function type 'fn_ty'}}
-#if __cplusplus >= 201103L
   fn_ty{}; // expected-error {{cannot create object of function type 'fn_ty'}}
   fn_ty{0}; // expected-error {{cannot create object of function type 'fn_ty'}}
   fn_ty{0, 0}; // expected-error {{cannot create object of function type 'fn_ty'}}
   fn_ty({}); // expected-error {{cannot create object of function type 'fn_ty'}}
-#endif
   int v4 = int();
   int v5 = int; // expected-error {{expected '(' for function-style cast or type construction}}
   typedef int T;
   int *p;
   bool v6 = T(0) == p;
-#if __cplusplus >= 201103L
-  // expected-error@-2 {{comparison between pointer and integer ('T' (aka 'int') and 'int *')}}
-#endif
+  // expected-error@-1 {{comparison between pointer and integer ('T' (aka 'int') and 'int *')}}
   char *str;
   str = "a string";
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{conversion from string literal to 'char *' is deprecated}}
-#else
-  // expected-warning@-4 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
-#endif
+  // expected-warning@-1 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
   wchar_t *wstr;
   wstr = L"a wide string";
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{conversion from string literal to 'wchar_t *' is deprecated}}
-#else
-  // expected-warning@-4 {{ISO C++11 does not allow conversion from string literal to 'wchar_t *'}}
-#endif
+  // expected-warning@-1 {{ISO C++11 does not allow conversion from string literal to 'wchar_t *'}}
 }

@@ -340,7 +340,6 @@ std::string noteMessage(const Diag &Main, const DiagBase &Note,
 
 void setTags(clangd::Diag &D) {
   static const auto *DeprecatedDiags = new llvm::DenseSet<unsigned>{
-      diag::warn_access_decl_deprecated,
       diag::warn_atl_uuid_deprecated,
       diag::warn_deprecated,
       diag::warn_deprecated_altivec_src_compat,

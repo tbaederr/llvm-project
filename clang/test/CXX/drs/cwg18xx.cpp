@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-23,cxx98-14,cxx11-17,since-cxx11,cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-23,since-cxx14,cxx98-14,cxx11-17,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-23,since-cxx14,since-cxx17,cxx11-17,since-cxx11,since-cxx14,cxx17
@@ -6,10 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx23,cxx11-23,since-cxx14,since-cxx17,since-cxx20,since-cxx23,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx14,since-cxx17,since-cxx20,since-cxx23,since-cxx11,since-cxx14
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace cwg1800 { // cwg1800: 2.9
 struct A { union { int n; }; };
@@ -29,18 +24,15 @@ S<i> V; // #cwg1801-S-i
 } // namespace cwg1801
 
 namespace cwg1802 { // cwg1802: 3.1
-#if __cplusplus >= 201103L
 // Using a Wikipedia example of surrogate pair:
 // https://en.wikipedia.org/wiki/UTF-16#Examples
 constexpr char16_t a[3] = u"\U00010437";
 static_assert(a[0] == 0xD801, "");
 static_assert(a[1] == 0xDC37, "");
 static_assert(a[2] == 0x0, "");
-#endif
 } // namespace cwg1802
 
 namespace cwg1803 { // cwg1803: 2.9
-#if __cplusplus >= 201103L
 struct A {
   enum E : int;
   enum E : int {};
@@ -49,7 +41,6 @@ struct A {
   enum struct ES;
   enum struct ES {};
 };
-#endif
 } // namespace cwg1803
 
 namespace cwg1804 { // cwg1804: 2.7
@@ -168,12 +159,10 @@ void A<double, U>::C<V>::f4() {
 
 namespace cwg1812 { // cwg1812: no
                    // NB: dup 1710
-#if __cplusplus >= 201103L
 template <typename T> struct A {
   using B = typename T::C<int>;
   // since-cxx11-error@-1 {{use 'template' keyword to treat 'C' as a dependent template name}}
 };
-#endif
 } // namespace cwg1812
 
 namespace cwg1813 { // cwg1813: 7
@@ -199,11 +188,9 @@ namespace cwg1813 { // cwg1813: 7
 }
 
 namespace cwg1814 { // cwg1814: 3.1
-#if __cplusplus >= 201103L
   void test() {
     auto lam = [](int x = 42) { return x; };
   }
-#endif
 } // namespace cwg1814
 
 namespace cwg1815 { // cwg1815: 20
@@ -271,13 +258,11 @@ void d2() {
   // expected-error@-2 {{typedef declarator cannot be qualified}}
 }
 
-#if __cplusplus >= 201103L
 auto e = [] {
   typedef int cwg1820::A;
   // since-cxx11-error@-1 {{definition or redeclaration of 'A' not allowed inside a function}}
   // since-cxx11-error@-2 {{typedef declarator cannot be qualified}}
 };
-#endif
 } // namespace cwg1820
 
 namespace cwg1821 { // cwg1821: 2.9
@@ -297,12 +282,10 @@ struct A {
 } // namespace cwg1821
 
 namespace cwg1822 { // cwg1822: 3.1
-#if __cplusplus >= 201103L
   double a;
   auto x = [] (int a) {
     static_assert(__is_same(decltype(a), int), "should be resolved to lambda parameter");
   };
-#endif
 } // namespace cwg1822
 
 namespace cwg1824 { // cwg1824: 2.7
@@ -317,7 +300,6 @@ struct S {
 } // namespace cwg1824
 
 namespace cwg1825 { // cwg1825: sup P4004R1
-#if __cplusplus >= 201103L
 template <class... T> int f(T *...); // #cwg1825-variadic
 template <class T> int f(const T &); // #cwg1825-nonvariadic
 int g() {
@@ -326,7 +308,6 @@ int g() {
   //   since-cxx11-note@#cwg1825-variadic {{candidate function [with T = <int>]}}
   //   since-cxx11-note@#cwg1825-nonvariadic {{candidate function [with T = int *]}}
 }
-#endif
 } // namespace cwg1825
 
 namespace cwg1832 { // cwg1832: 3.0
@@ -336,16 +317,13 @@ enum E { // #cwg1832-E
   //   expected-note@#cwg1832-E {{definition of 'cwg1832::E' is not complete until the closing '}'}}
 };
 
-#if __cplusplus >= 201103L
 enum E2: decltype(static_cast<E2>(0), 0) {};
 // since-cxx11-error@-1 {{unknown type name 'E2'}}
 enum class E3: decltype(static_cast<E3>(0), 0) {};
 // since-cxx11-error@-1 {{unknown type name 'E3'}}
-#endif
 } // namespace cwg1832
 
 namespace cwg1837 { // cwg1837: 3.3
-#if __cplusplus >= 201103L
   template <typename T>
   struct Fish { static const bool value = true; };
 
@@ -385,7 +363,6 @@ namespace cwg1837 { // cwg1837: 3.3
       };
     };
   };
-#endif
 } // namespace cwg1837
 
 namespace cwg1862 { // cwg1862: 24
@@ -481,18 +458,15 @@ int A<int>::i() { (void)c.private_int; }
 } // namespace cwg1862
 
 namespace cwg1870 { // cwg1870: 2.7
-#if __cplusplus >= 201103L
 struct S {
   // FIXME: why C++11 has its own diagnostic message?
   template<class T> operator auto() { return 42; }
   // cxx11-error@-1 {{'auto' not allowed in conversion function type}}
   // since-cxx14-error@-2 {{'auto' not allowed in declaration of conversion function template}}
 };
-#endif
 } // namespace cwg1870
 
 namespace cwg1872 { // cwg1872: 9
-#if __cplusplus >= 201103L
   template<typename T> struct A : T {
     constexpr int f() const { return 0; }
   };
@@ -518,7 +492,6 @@ namespace cwg1872 { // cwg1872: 9
   // cxx11-23-error@-1 {{constexpr variable 'z' must be initialized by a constant expression}}
   //   cxx11-20-note@-2 {{non-literal type 'A<Z>' cannot be used in a constant expression}}
   //   cxx23-note@-3 {{cannot construct object of type 'A<cwg1872::Z>' with virtual base class in a constant expression}}
-#endif
 } // namespace cwg1872
 
 namespace cwg1878 { // cwg1878: 18
@@ -586,7 +559,6 @@ struct A {
 } // namespace ex1
 
 namespace ex2 {
-#if __cplusplus >= 201103L
 struct Bar {
   struct Baz { // #cwg1890-Baz
     int a = 0;
@@ -595,12 +567,10 @@ struct Bar {
   // since-cxx11-error@-1 {{static assertion failed due to requirement '__is_constructible(cwg1890::ex2::Bar::Baz)':}}
   //   since-cxx11-note@#cwg1890-Baz {{'Baz' defined here}}
 };
-#endif
 } // namespace ex2
 } // namespace cwg1890
 
 void cwg1891() { // cwg1891: 4
-#if __cplusplus >= 201103L
   int n;
   auto a = []{}; // #cwg1891-a
   auto b = [=]{ return n; }; // #cwg1891-b
@@ -634,7 +604,6 @@ void cwg1891() { // cwg1891: 4
   b = static_cast<B&&>(b);
   // since-cxx11-error-re@-1 {{{{object of type '\(lambda at .+\)' cannot be assigned because its copy assignment operator is implicitly deleted}}}}
   //   since-cxx11-note@#cwg1891-b {{lambda expression begins here}}
-#endif
 } // void cwg1891()
 
 namespace cwg1894 { // cwg1894: 3.8
@@ -735,7 +704,6 @@ struct B : A {
 void l() {}
 void l(...) {}
 
-#if __cplusplus >= 201103L
 template <typename T>
 void m(T) {}
 template <typename... Ts>
@@ -745,5 +713,4 @@ template <typename T, typename U>
 void m2(T, U) {}
 template <typename... Ts, typename U>
 void m2(Ts..., U) {}
-#endif
 } // namespace cwg1898

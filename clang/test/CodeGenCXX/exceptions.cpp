@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -emit-llvm -std=c++98 -o - -fcxx-exceptions -fexceptions | FileCheck -check-prefix=CHECK -check-prefix=CHECK98 %s
 // RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -emit-llvm -std=c++11 -o - -fcxx-exceptions -fexceptions | FileCheck --check-prefixes=CHECK,CHECK11,THROWEND11 %s
 // RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -emit-llvm -std=c++11 -o - -fcxx-exceptions -fexceptions -fassume-nothrow-exception-dtor | FileCheck --check-prefixes=CHECK,CHECK11,NOTHROWEND11 %s
 
@@ -66,7 +65,6 @@ namespace test1 {
     // CHECK-NEXT: invoke void @_ZN5test11AC1Ei(ptr {{[^,]*}} [[NEW]], i32 [[T2]])
     // CHECK:      store i1 false, ptr [[ACTIVE]]
 
-    // CHECK98-NEXT: invoke void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
     // CHECK11-NEXT: call void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
 
     // CHECK:      ret ptr [[NEW]]
@@ -77,10 +75,6 @@ namespace test1 {
   }
 
   //   Terminate landing pads should call __cxa_begin_catch first.
-  // CHECK98:      define linkonce_odr hidden void @__clang_call_terminate(ptr %0) [[NI_NR_NUW:#[0-9]+]] comdat
-  // CHECK98-NEXT:   [[T0:%.*]] = call ptr @__cxa_begin_catch(ptr %0) [[NUW:#[0-9]+]]
-  // CHECK98-NEXT:   call void @_ZSt9terminatev() [[NR_NUW:#[0-9]+]]
-  // CHECK98-NEXT:   unreachable
 
   A *d() {
     // CHECK:    define{{( dso_local)?}} ptr @_ZN5test11dEv()
@@ -92,7 +86,6 @@ namespace test1 {
     // CHECK:      invoke void @_ZN5test11AC1Ei(ptr {{[^,]*}} [[NEW]], i32 [[T1]])
     // CHECK:      store i1 false, ptr [[ACTIVE]]
 
-    // CHECK98-NEXT: invoke void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
     // CHECK11-NEXT: call void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
 
     // CHECK:      ret ptr [[NEW]]
@@ -114,10 +107,8 @@ namespace test1 {
     // CHECK:      invoke void @_ZN5test11AC1Eii(ptr {{[^,]*}} [[NEW]], i32 [[T1]], i32 [[T3]])
     // CHECK:      store i1 false, ptr [[ACTIVE]]
 
-    // CHECK98-NEXT: invoke void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T2]])
     // CHECK11-NEXT: call void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T2]])
 
-    // CHECK98:      invoke void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
     // CHECK11:      call void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
 
     // CHECK:      ret ptr [[NEW]]
@@ -150,10 +141,8 @@ namespace test1 {
     // CHECK:      invoke void @_ZN5test15makeBEv(ptr dead_on_unwind writable sret([[B:%.*]]) align 4 [[T2:%.*]])
     // CHECK:      [[RET:%.*]] = load ptr, ptr [[X]], align 8
 
-    // CHECK98:      invoke void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T2]])
     // CHECK11:      call void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T2]])
 
-    // CHECK98:      invoke void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
     // CHECK11:      call void @_ZN5test11BD1Ev(ptr {{[^,]*}} [[T0]])
 
     // CHECK:      ret ptr [[RET]]
@@ -179,10 +168,8 @@ namespace test2 {
     // CHECK-NEXT: invoke void @_ZN5test21AC1Ei(ptr {{[^,]*}} [[NEW]], i32 5)
     // CHECK:      ret ptr [[NEW]]
 
-    // CHECK98:      invoke void @_ZN5test21AdlEPvm(ptr [[NEW]], i64 8)
     // CHECK11:      call void @_ZN5test21AdlEPvm(ptr [[NEW]], i64 8)
 
-    // CHECK98:      call void @__clang_call_terminate(ptr {{%.*}}) [[NR_NUW]]
     return new A(5);
   }
 }
@@ -207,10 +194,8 @@ namespace test3 {
     // CHECK-NEXT: invoke void @_ZN5test31AC1Ei(ptr {{[^,]*}} [[NEW]], i32 5)
     // CHECK:      ret ptr [[NEW]]
 
-    // CHECK98:      invoke void @_ZN5test31AdlEPvS1_d(ptr [[NEW]], ptr [[FOO]], double [[BAR]])
     // CHECK11:      call void @_ZN5test31AdlEPvS1_d(ptr [[NEW]], ptr [[FOO]], double [[BAR]])
 
-    // CHECK98:      call void @__clang_call_terminate(ptr {{%.*}}) [[NR_NUW]]
     return new(foo(),bar()) A(5);
   }
 
@@ -251,7 +236,6 @@ namespace test3 {
     // CHECK:      [[V0:%.*]] = load ptr, ptr [[SAVED0]]
     // CHECK-NEXT: [[V1:%.*]] = load ptr, ptr [[SAVED1]]
 
-    // CHECK98-NEXT: invoke void @_ZN5test31AdlEPvS1_d(ptr [[V0]], ptr [[V1]], double [[CONST]])
     // CHECK11-NEXT: call void @_ZN5test31AdlEPvS1_d(ptr [[V0]], ptr [[V1]], double [[CONST]])
   }
 }
@@ -299,11 +283,8 @@ namespace test5 {
   // CHECK-NEXT: invoke void @_ZN5test51TC1Ev(ptr {{[^,]*}} [[T]])
   // CHECK:      invoke void @_ZN5test51AC1ERKS0_RKNS_1TE(ptr {{[^,]*}} [[A:%.*]], ptr nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) [[ADJ]], ptr nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) [[T]])
 
-  // CHECK98:      invoke void @_ZN5test51TD1Ev(ptr {{[^,]*}} [[T]])
   // CHECK11:      call void @_ZN5test51TD1Ev(ptr {{[^,]*}} [[T]])
 
-  // CHECK98:      call ptr @__cxa_begin_catch(ptr [[EXN]]) [[NUW]]
-  // CHECK98-NEXT: invoke void @_ZN5test51AD1Ev(ptr {{[^,]*}} [[A:%.*]])
 
   // CHECK:      call void @__cxa_end_catch()
   void test() {
@@ -398,14 +379,12 @@ namespace test7 {
     // CHECK-NEXT: load i1, ptr [[INNER_A]]
     // CHECK-NEXT: br i1
 
-    // CHECK98:    invoke void @_ZN5test71AD1Ev(
     // CHECK11:    call void @_ZN5test71AD1Ev(
 
     // Destroy the outer A object.
     // CHECK:      load i1, ptr [[OUTER_A]]
     // CHECK-NEXT: br i1
 
-    // CHECK98:    invoke void @_ZN5test71AD1Ev(
     // CHECK11:    call void @_ZN5test71AD1Ev(
 
     return new B(A(), new B(A(), 0));
@@ -478,8 +457,6 @@ namespace test10 {
   // CHECK-NEXT: icmp ne
   // CHECK-NEXT: br i1
 
-  // CHECK98:      call void @__cxa_end_catch()
-  // CHECK98-NEXT: br label
   // THROWEND11:        invoke void @__cxa_end_catch()
   // THROWEND11-NEXT:   to label %invoke.cont[[#]] unwind label %terminate.lpad
   // NOTHROWEND11:      call void @__cxa_end_catch()
@@ -534,7 +511,6 @@ namespace test11 {
   // CHECK:      [[AFTER:%.*]] = phi ptr [ [[CUR]], {{%.*}} ], [ [[ELT:%.*]], {{%.*}} ]
   // CHECK-NEXT: [[ELT]] = getelementptr inbounds [[A:%.*]], ptr [[AFTER]], i64 -1
 
-  // CHECK98-NEXT: invoke void @_ZN6test111AD1Ev(ptr {{[^,]*}} [[ELT]])
   // CHECK11-NEXT: call void @_ZN6test111AD1Ev(ptr {{[^,]*}} [[ELT]])
 
   // CHECK:      [[DONE:%.*]] = icmp eq ptr [[ELT]], [[ARRAYBEGIN]]
@@ -550,7 +526,6 @@ namespace test11 {
   // CHECK:      [[AFTER:%.*]] = phi ptr [ [[ARRAYEND]], {{%.*}} ], [ [[ELT:%.*]], {{%.*}} ]
   // CHECK-NEXT: [[ELT]] = getelementptr inbounds [[A]], ptr [[AFTER]], i64 -1
 
-  // CHECK98-NEXT: invoke void @_ZN6test111AD1Ev(ptr {{[^,]*}} [[ELT]])
   // CHECK11-NEXT: call void @_ZN6test111AD1Ev(ptr {{[^,]*}} [[ELT]])
 
   // CHECK:      [[DONE:%.*]] = icmp eq ptr [[ELT]], [[ARRAYBEGIN]]
@@ -559,7 +534,6 @@ namespace test11 {
   // CHECK:      br label
   //   Finally, the cleanup for single.
 
-  // CHECK98:      invoke void @_ZN6test111AD1Ev(ptr {{[^,]*}} [[THIS]])
   // CHECK11:      call void @_ZN6test111AD1Ev(ptr {{[^,]*}} [[THIS]])
 
   // CHECK:      br label
@@ -581,7 +555,6 @@ namespace test12 {
   // CHECK-NEXT:  invoke void @_ZN6test121AC1Ev(ptr {{[^,]*}} [[PTR]])
   // CHECK:       ret ptr [[PTR]]
 
-  // CHECK98:       invoke void @_ZN6test121AdlEPvS1_(ptr [[PTR]], ptr [[PTR]])
   // CHECK11:       call void @_ZN6test121AdlEPvS1_(ptr [[PTR]], ptr [[PTR]])
 }
 
@@ -622,4 +595,3 @@ void test(int c) {
 
 }
 
-// CHECK98: attributes [[NI_NR_NUW]] = { noinline noreturn nounwind {{.*}} }

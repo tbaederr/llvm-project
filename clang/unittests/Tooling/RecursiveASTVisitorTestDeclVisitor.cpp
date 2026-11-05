@@ -43,13 +43,13 @@ public:
 // copy assignment operator and implicit copy constructor.
 TEST(RecursiveASTVisitor, VisitsParmVarDeclForImplicitCode) {
   ParmVarDeclVisitorForImplicitCode Visitor;
-  // Match parameter variable name of implicit copy assignment operator and
-  // implicit copy constructor.
+  // Match parameter variable name of implicit copy/move assignment operators
+  // and implicit copy/move constructors.
   // This parameter name does not have a valid IdentifierInfo, and shares
   // same SourceLocation with its class declaration, so we match an empty name
   // with the class' source location.
-  Visitor.ExpectMatch("", 1, 7);
-  Visitor.ExpectMatch("", 3, 7);
+  Visitor.ExpectMatch("", 1, 7, 2);
+  Visitor.ExpectMatch("", 3, 7, 2);
   EXPECT_TRUE(Visitor.runOver(
     "class X {};\n"
     "void foo(X a, X b) {a = b;}\n"

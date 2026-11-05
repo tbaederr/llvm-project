@@ -1,7 +1,7 @@
 // RUN: %clang_cc1 %s -fsyntax-only -std=c99 -verify
 // RUN: %clang_cc1 %s -fsyntax-only -std=c11 -Wc99-compat -verify
-// RUN: %clang_cc1 %s -fsyntax-only -x c++ -std=c++03 -Wc++11-compat -verify
-// RUN: %clang_cc1 %s -fsyntax-only -x c++ -std=c++11 -Wc++98-compat -verify
+// RUN: %clang_cc1 %s -fsyntax-only -x c++ -std=c++11 -verify
+
 
 // Note: This file contains Unicode characters; please do not remove them!
 

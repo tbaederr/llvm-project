@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 %s -triple=x86_64-apple-darwin10 -fcxx-exceptions -fexceptions -emit-llvm -std=c++98 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK98 %s
 // RUN: %clang_cc1 %s -triple=x86_64-apple-darwin10 -fcxx-exceptions -fexceptions -emit-llvm -std=c++11 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK11 %s
 
 // Reduced from a crash on boost::interprocess's node_allocator_test.cpp.
@@ -25,7 +24,6 @@ namespace test0 {
     // CHECK:      invoke void @_ZN5test01VC1ERKNS_1AE(ptr {{[^,]*}} [[NEW]], ptr noundef nonnull align {{[0-9]+}} dereferenceable({{[0-9]+}}) [[TMP]])
     // CHECK:      store i1 false, ptr [[CLEANUPACTIVE]]
 
-    // CHECK98-NEXT: invoke void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[TMP]])
     // CHECK11-NEXT: call void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[TMP]])
     A y;
     try {

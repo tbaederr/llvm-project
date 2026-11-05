@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // C++03 [namespace.udecl]p4:
@@ -220,9 +219,7 @@ namespace test5 {
     B &operator=(const B&);
   };
   struct B : A {
-#if __cplusplus >= 201103L
     using A::A;
-#endif
     using A::operator=;
   };
   void test(B b) {

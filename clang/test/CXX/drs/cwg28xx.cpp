@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98 %s
 // RUN: %clang_cc1 -std=c++11 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11-23 %s
 // RUN: %clang_cc1 -std=c++14 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11-23 %s
 // RUN: %clang_cc1 -std=c++17 -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11-23 %s
@@ -30,7 +29,6 @@ void f() {
 int main() {} // required for cwg2811
 
 namespace cwg2811 { // cwg2811: 3.5
-#if __cplusplus >= 201103L
 void f() {
   (void)[&] {
     using T = decltype(main);
@@ -47,7 +45,6 @@ int main();
 
 using U = decltype(main);
 using U2 = decltype(&main);
-#endif
 } // namespace cwg2811
 
 namespace cwg2813 { // cwg2813: 20
@@ -68,7 +65,6 @@ void f() {
 } // namespace cwg2813
 
 namespace cwg2819 { // cwg2819: 19 c++26
-#if __cplusplus >= 201103L
   // CWG 2024-04-19: This issue is not a DR.
   constexpr void* p = nullptr;
   constexpr int* q = static_cast<int*>(p); // #cwg2819-q
@@ -78,11 +74,9 @@ namespace cwg2819 { // cwg2819: 19 c++26
   // cxx11-23-error@-1 {{static assertion expression is not an integral constant expression}}
   //   cxx11-23-note@-2 {{initializer of 'q' is not a constant expression}}
   //   cxx11-23-note@#cwg2819-q {{declared here}}
-#endif
 } // namespace cwg2819
 
 namespace cwg2823 { // cwg2823: no
-#if __cplusplus >= 201103L
   constexpr int *p = 0;
   constexpr int *q1 = &*p;
   // expected-error@-1 {{constexpr variable 'q1' must be initialized by a constant expression}}
@@ -96,7 +90,6 @@ namespace cwg2823 { // cwg2823: no
   constexpr int *s1 = &*(r + 32);
   // FIXME: invalid: dereferencing a past-the-end pointer.
   constexpr int *s2 = &r[32];
-#endif
 }
 
 namespace cwg2847 { // cwg2847: 19 review 2024-03-01
@@ -163,13 +156,11 @@ void f(A* a, D<int>* d) {
   //   expected-note@#cwg2857-adl_only {{'N::adl_only' declared here}}
 }
 
-#if __cplusplus >= 201103L
 template <typename>
 struct D : N::B {
   // FIXME: ADL shouldn't associate it's base B and N since D is not complete here
   decltype(adl_only((A*) nullptr, (D*) nullptr)) f;
 };
-#endif
 } // namespace cwg2857
 
 namespace cwg2858 { // cwg2858: 19
@@ -221,7 +212,6 @@ namespace cwg2882 { // cwg2882: 2.7
 struct C {
   operator void() = delete;
   // expected-warning@-1 {{conversion function converting 'cwg2882::C' to 'void' will never be used}}
-  // cxx98-error@-2 {{deleted function definitions are a C++11 extension}}
 };
 
 void f(C c) {
@@ -230,14 +220,12 @@ void f(C c) {
 } // namespace cwg2882
 
 namespace cwg2883 { // cwg2883: no
-#if __cplusplus >= 201103L
 void f() {
   int x;
   (void)[&] {
     return x;
   };
 }
-#endif
 #if __cplusplus >= 202002L
 struct A {
   A() = default;
@@ -269,12 +257,10 @@ static_assert(!__is_trivially_constructible(B));
 } // namespace cwg2885
 
 namespace cwg2886 { // cwg2886: 9
-#if __cplusplus >= 201103L
 struct C {
   C() = default;
   ~C() noexcept(false) = default;
 };
 
 static_assert(noexcept(C()), "");
-#endif
 } // namespace cwg2886

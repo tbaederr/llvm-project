@@ -384,7 +384,6 @@ static void test_x86_avx_abi_codegen_fns(MyASTConsumer *my) {
 TEST(CodeGenExternalTest, CodeGenExternalTest) {
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TestCompiler Compiler(LO);
   auto CustomASTConsumer = std::make_unique<MyASTConsumer>(
       std::move(Compiler.CG), test_generic_codegen_fns);
@@ -399,7 +398,6 @@ TEST(CodeGenExternalTest, CodeGenExternalTest) {
 TEST(CodeGenExternalTest, X86AVXABIQuery) {
   clang::LangOptions LO;
   LO.CPlusPlus = 1;
-  LO.CPlusPlus11 = 1;
   TestCompiler Compiler(LO, clang::CodeGenOptions(),
                         "x86_64-unknown-linux-gnu");
   auto CustomASTConsumer = std::make_unique<MyASTConsumer>(

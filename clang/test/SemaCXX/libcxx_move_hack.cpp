@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only %s -std=c++98 -verify
+// RUN: %clang_cc1 -fsyntax-only %s -std=c++11 -verify
 // expected-no-diagnostics
 
 // This is a test for a hack in Clang that works around an issue with libc++

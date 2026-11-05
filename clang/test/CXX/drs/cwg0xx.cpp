@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -triple %itanium_abi_triple -verify-directives -verify=expected,cxx98,cxx98-14
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -triple %itanium_abi_triple -verify-directives -verify=expected,since-cxx11,cxx98-14,cxx11-14
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -triple %itanium_abi_triple -verify-directives -verify=expected,since-cxx11,cxx98-14,cxx11-14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -triple %itanium_abi_triple -verify-directives -verify=expected,since-cxx11,since-cxx17
@@ -6,10 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 %s -fexceptions -fcxx-exceptions -pedantic-errors -triple %itanium_abi_triple -verify-directives -verify=expected,since-cxx11,since-cxx17
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -triple %itanium_abi_triple -verify-directives -verify=expected,since-cxx11,since-cxx17
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace cwg1 { // cwg1: no
   namespace X { extern "C" void cwg1_f(int a = 1); }
@@ -368,8 +363,6 @@ namespace cwg26 { // cwg26: 2.7
     B(const B &, B = B());
     // cxx98-14-error@-1 {{recursive evaluation of default argument}}
     //   cxx98-14-note@-2 {{default argument used here}}
-    // cxx98-error@-3 {{recursive evaluation of default argument}}
-    //   cxx98-note@-4 {{default argument used here}}
   };
   struct C {
     static C &f();
@@ -451,11 +444,8 @@ namespace cwg30 { // cwg30: sup 468 c++11
   } a, *p = &a;
   // FIXME: It's not clear whether CWG468 applies to C++98 too.
   int x = A::template f<0>();
-  // cxx98-error@-1 {{use of 'template' keyword outside of a template is a C++11 extension}}
   int y = a.template f<0>();
-  // cxx98-error@-1 {{use of 'template' keyword outside of a template is a C++11 extension}}
   int z = p->template f<0>();
-  // cxx98-error@-1 {{use of 'template' keyword outside of a template is a C++11 extension}}
 } // namespace cwg30
 
 namespace cwg31 { // cwg31: 2.8
@@ -484,7 +474,6 @@ namespace cwg33 { // cwg33: 9
 
   template<typename T> void t(X::S);
   template<typename T, typename U = void> void u(X::S);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   void templ() { f(t<int>); f(u<int>); }
 
   // Even though v<int> cannot select the first overload, ADL considers it
@@ -709,14 +698,12 @@ namespace cwg39 { // cwg39: no
     //   expected-note@#cwg39-A-n {{member found by ambiguous name lookup}}
 
     // expected-error@#cwg39-sizeof {{unknown type name 'n'}}
-#if __cplusplus >= 201103L
     decltype(D::n) n;
     /* since-cxx11-error@-1
     {{non-static member 'n' found in multiple base-class subobjects of type 'A':
     struct cwg39::PR5916::D -> B -> A
     struct cwg39::PR5916::D -> C -> A}} */
     //   since-cxx11-note@#cwg39-A-n {{member found by ambiguous name lookup}}
-#endif
   }
 } // namespace cwg39
 
@@ -793,14 +780,10 @@ namespace cwg49 { // cwg49: 2.8
   int *const p = &k; // #cwg49-p
   A<&k> a;
   A<p> b; // #cwg49-b
-  // cxx98-error@#cwg49-b {{non-type template argument referring to object 'p' with internal linkage is a C++11 extension}}
-  //   cxx98-note@#cwg49-p {{non-type template argument refers to object here}}
   // cxx98-14-error@#cwg49-b {{non-type template argument for template parameter of pointer type 'int *' must have its address taken}}
   //   cxx98-14-note@#cwg49-A {{template parameter is declared here}}
   int *q = &k; // #cwg49-q
   A<q> c; // #cwg49-c
-  // cxx98-error@#cwg49-c {{non-type template argument for template parameter of pointer type 'int *' must have its address taken}}
-  //   cxx98-note@#cwg49-A {{template parameter is declared here}}
   // cxx11-14-error@#cwg49-c {{non-type template argument of type 'int *' is not a constant expression}}
   //   cxx11-14-note@#cwg49-c {{read of non-constexpr variable 'q' is not allowed in a constant expression}}
   //   cxx11-14-note@#cwg49-q {{declared here}}
@@ -926,13 +909,11 @@ namespace cwg56 { // cwg56: 2.7
 
 namespace cwg58 { // cwg58: 3.1
   // FIXME: Ideally, we should have a CodeGen test for this.
-#if __cplusplus >= 201103L
   enum E1 { E1_0 = 0, E1_1 = 1 };
   enum E2 { E2_0 = 0, E2_m1 = -1 };
   struct X { E1 e1 : 1; E2 e2 : 1; };
   static_assert(X{E1_1, E2_m1}.e1 == 1, "");
   static_assert(X{E1_1, E2_m1}.e2 == -1, "");
-#endif
 } // namespace cwg58
 
 namespace cwg59 { // cwg59: 2.7
@@ -1035,42 +1016,21 @@ namespace cwg62 { // cwg62: 2.9
   };
 
   X<NoNameForLinkagePtr> x2;
-  // cxx98-error@-1 {{template argument uses unnamed type}}
-  //   cxx98-note@#cwg62-unnamed {{unnamed type used in template argument was declared here}}
   X<const NoNameForLinkagePtr> x3;
-  // cxx98-error@-1 {{template argument uses unnamed type}}
-  //   cxx98-note@#cwg62-unnamed {{unnamed type used in template argument was declared here}}
   NoNameForLinkagePtr p1 = get<NoNameForLinkagePtr>();
-  // cxx98-error@-1 {{template argument uses unnamed type}}
-  //   cxx98-note@-2 {{while substituting explicitly-specified template arguments into function template 'get'}}
-  //   cxx98-note@#cwg62-unnamed {{unnamed type used in template argument was declared here}}
   NoNameForLinkagePtr p2 = get<const NoNameForLinkagePtr>();
-  // cxx98-error@-1 {{template argument uses unnamed type}}
-  //   cxx98-note@-2 {{while substituting explicitly-specified template arguments into function template 'get'}}
-  //   cxx98-note@#cwg62-unnamed {{unnamed type used in template argument was declared here}}
   int n1 = take(noNameForLinkagePtr);
-  // cxx98-error@-1 {{template argument uses unnamed type}}
-  //   cxx98-note@-2 {{while substituting deduced template arguments into function template 'take' [with T = NoNameForLinkagePtr]}}
-  //   cxx98-note@#cwg62-unnamed {{unnamed type used in template argument was declared here}}
 
   X<Danger> x4;
 
   void f() {
     struct NoLinkage {};
     X<NoLinkage> a;
-    // cxx98-error@-1 {{template argument uses local type 'NoLinkage'}}
     X<const NoLinkage> b;
-    // cxx98-error@-1 {{template argument uses local type 'NoLinkage'}}
     get<NoLinkage>();
-    // cxx98-error@-1 {{template argument uses local type 'NoLinkage'}}
-    //   cxx98-note@-2 {{while substituting explicitly-specified template arguments into function template 'get'}}
     get<const NoLinkage>();
-    // cxx98-error@-1 {{template argument uses local type 'NoLinkage'}}
-    //   cxx98-note@-2 {{while substituting explicitly-specified template arguments into function template 'get'}}
     X<void (*)(NoLinkage A::*)> c;
-    // cxx98-error@-1 {{template argument uses local type 'NoLinkage'}}
     X<int NoLinkage::*> d;
-    // cxx98-error@-1 {{template argument uses local type 'NoLinkage'}}
   }
 } // namespace cwg62
 
@@ -1115,18 +1075,15 @@ namespace cwg68 { // cwg68: 2.8
   template<typename T> struct X {};
   struct ::cwg68::X<int> x1;
   struct ::cwg68::template X<int> x2;
-  // cxx98-error@-1 {{use of 'template' keyword outside of a template is a C++11 extension}}
   struct Y {
     friend struct X<int>;
     friend struct ::cwg68::X<char>;
     friend struct ::cwg68::template X<double>;
-    // cxx98-error@-1 {{use of 'template' keyword outside of a template is a C++11 extension}}
   };
   template<typename>
   struct Z {
     friend struct ::cwg68::template X<double>;
     friend typename ::cwg68::X<double>;
-    // cxx98-error@-1 {{unelaborated friend declaration is a C++11 extension; specify 'struct' to befriend 'typename ::cwg68::X<double>'}}
   };
 } // namespace cwg68
 
@@ -1135,12 +1092,9 @@ namespace cwg69 { // cwg69: 9
   // FIXME: Should we warn here?
   inline void g() { f<int>(); }
   extern template void f<char>();
-  // cxx98-error@-1 {{extern templates are a C++11 extension}}
-  // expected-error@-2 {{explicit instantiation declaration of 'f' with internal linkage}}
+  // expected-error@-1 {{explicit instantiation declaration of 'f' with internal linkage}}
   template<void(*)()> struct Q {};
   Q<&f<int> > q;
-  // cxx98-error@-1 {{non-type template argument referring to function 'f<int>' with internal linkage is a C++11 extension}}
-  //   cxx98-note@#cwg69-f {{non-type template argument refers to function here}}
 } // namespace cwg69
 
 namespace cwg70 { // cwg70: 2.7
@@ -1154,12 +1108,10 @@ namespace cwg70 { // cwg70: 2.7
 // cwg72: dup 69
 
 namespace cwg73 { // cwg73: sup 1652
-#if __cplusplus >= 201103L
   int a, b;
   static_assert(&a + 1 != &b, "");
   // since-cxx11-error@-1 {{static assertion expression is not an integral constant expression}}
   //   since-cxx11-note@-2 {{comparison against pointer '&a + 1' that points past the end of a complete object has unspecified value}}
-#endif
 } // namespace cwg73
 
 namespace cwg74 { // cwg74: 2.7
@@ -1258,7 +1210,6 @@ namespace cwg85 { // cwg85: 3.4
     // expected-error@-1 {{class member cannot be redeclared}}
     //   expected-note@#cwg85-U-def {{previous declaration is here}}
 
-#if __cplusplus >= 201103L
     enum E1 : int;
     enum E1 : int { e1 }; // #cwg85-E1-def
     enum E1 : int;
@@ -1270,7 +1221,6 @@ namespace cwg85 { // cwg85: 3.4
     enum class E2;
     // since-cxx11-error@-1 {{class member cannot be redeclared}}
     //   since-cxx11-note@#cwg85-E2-def {{previous declaration is here}}
-#endif
   };
 
   template <typename T>

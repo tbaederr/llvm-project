@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 %std_cxx98- %s -I%S -triple=x86_64-apple-darwin10 -emit-llvm -Wno-dynamic-exception-spec -o - | FileCheck %s -check-prefixes=CHECK,CHECK-BOTH
-// RUN: %clang_cc1 %std_cxx98- %s -I%S -triple=x86_64-apple-darwin10 -emit-llvm -Wno-dynamic-exception-spec -fvisibility=hidden -o - | FileCheck %s --check-prefixes=CHECK-WITH-HIDDEN,CHECK-BOTH
+// RUN: %clang_cc1 %std_cxx11- %s -I%S -triple=x86_64-apple-darwin10 -emit-llvm -Wno-dynamic-exception-spec -o - | FileCheck %s -check-prefixes=CHECK,CHECK-BOTH
+// RUN: %clang_cc1 %std_cxx11- %s -I%S -triple=x86_64-apple-darwin10 -emit-llvm -Wno-dynamic-exception-spec -fvisibility=hidden -o - | FileCheck %s --check-prefixes=CHECK-WITH-HIDDEN,CHECK-BOTH
 
 #include <typeinfo>
 

@@ -13106,8 +13106,7 @@ QualType ASTContext::GetBuiltinType(unsigned Id,
   EPI.ExtInfo = EI;
   EPI.Variadic = Variadic;
   if (getLangOpts().CPlusPlus && BuiltinInfo.isNoThrow(Id))
-    EPI.ExceptionSpec.Type =
-        getLangOpts().CPlusPlus11 ? EST_BasicNoexcept : EST_DynamicNone;
+    EPI.ExceptionSpec.Type = EST_BasicNoexcept;
 
   return getFunctionType(ResType, ArgTypes, EPI);
 }

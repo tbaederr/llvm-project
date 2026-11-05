@@ -163,9 +163,7 @@ static std::string getLangDescription(const LangOptions &LO) {
     return "C++17";
   if (LO.CPlusPlus14)
     return "C++14";
-  if (LO.CPlusPlus11)
-    return "C++11";
-  return "C++98";
+  return "C++11";
 }
 
 char IndexError::ID;
@@ -374,8 +372,7 @@ llvm::Expected<const T *> CrossTranslationUnitContext::getCrossTUDefinitionImpl(
   // This class template would create ODR errors during merging the two units,
   // since in one translation unit the class template has a base class, however
   // in the other unit it has none.
-  if (LangTo.CPlusPlus11 != LangFrom.CPlusPlus11 ||
-      LangTo.CPlusPlus14 != LangFrom.CPlusPlus14 ||
+  if (LangTo.CPlusPlus14 != LangFrom.CPlusPlus14 ||
       LangTo.CPlusPlus17 != LangFrom.CPlusPlus17 ||
       LangTo.CPlusPlus20 != LangFrom.CPlusPlus20) {
     ++NumLangDialectMismatch;

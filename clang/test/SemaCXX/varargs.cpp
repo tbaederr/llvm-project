@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -std=c++03 -Wno-c++11-extensions -triple i386-pc-unknown -verify %s
+// RUN: %clang_cc1 -std=c++11 -triple i386-pc-unknown -verify %s
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-apple-darwin9 -verify %s
 
 __builtin_va_list ap;
@@ -57,7 +57,6 @@ void promotable(int a, ...) {
   (void)__builtin_va_arg(ap, bool); // expected-warning {{second argument to 'va_arg' is of promotable type 'bool'; this va_arg has undefined behavior because arguments will be promoted to 'int'}}
 }
 
-#if __cplusplus >= 201103L
 // We used to have bugs identifying the correct enclosing function scope in a
 // lambda.
 
@@ -86,4 +85,3 @@ void record_member_init(int a, ...) {
     int b = (__builtin_va_start(ap, a), 0);
   };
 }
-#endif

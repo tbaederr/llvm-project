@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,c -pedantic %s
-// RUN: %clang_cc1 -x c++ -std=c++98 -fsyntax-only -verify=expected,cpp %s
 // RUN: %clang_cc1 -x c++ -std=c++11 -fsyntax-only -verify=expected,cpp %s
 
 enum shiftof {

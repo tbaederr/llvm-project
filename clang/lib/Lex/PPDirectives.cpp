@@ -204,7 +204,7 @@ static MacroDiag shouldWarnOnMacroDef(Preprocessor &PP, IdentifierInfo *II) {
     return isFeatureTestMacro(Text) ? MD_NoWarn : MD_ReservedMacro;
   if (II->isKeyword(Lang))
     return MD_KeywordDef;
-  if (Lang.CPlusPlus11 && (Text == "override" || Text == "final"))
+  if (Lang.CPlusPlus && (Text == "override" || Text == "final"))
     return MD_KeywordDef;
   if (isReservedCXXAttributeName(PP, II))
     return MD_ReservedAttributeIdentifier;
@@ -1630,12 +1630,10 @@ void Preprocessor::HandleLineDirective() {
   // Enforce C99 6.10.4p3: "The digit sequence shall not specify ... a
   // number greater than 2147483647".  C90 requires that the line # be <= 32767.
   unsigned LineLimit = 32768U;
-  if (LangOpts.C99 || LangOpts.CPlusPlus11)
+  if (LangOpts.C99 || LangOpts.CPlusPlus)
     LineLimit = 2147483648U;
   if (LineNo >= LineLimit)
     Diag(DigitTok, diag::ext_pp_line_too_big) << LineLimit;
-  else if (LangOpts.CPlusPlus11 && LineNo >= 32768U)
-    Diag(DigitTok, diag::warn_cxx98_compat_pp_line_too_big);
 
   int FilenameID = -1;
   Token StrTok;
@@ -2942,10 +2940,8 @@ bool Preprocessor::ReadMacroParameterList(MacroInfo *MI, Token &Tok) {
       Diag(Tok, diag::err_pp_expected_ident_in_arg_list);
       return true;
     case tok::ellipsis:  // #define X(... -> C99 varargs
-      if (!LangOpts.C99)
-        Diag(Tok, LangOpts.CPlusPlus11 ?
-             diag::warn_cxx98_compat_variadic_macro :
-             diag::ext_variadic_macro);
+      if (!LangOpts.C99 && !LangOpts.CPlusPlus)
+        Diag(Tok, diag::ext_variadic_macro);
 
       // OpenCL v1.2 s6.9.e: variadic macros are not supported.
       if (LangOpts.OpenCL && !LangOpts.OpenCLCPlusPlus) {
@@ -3119,7 +3115,7 @@ MacroInfo *Preprocessor::ReadOptionalMacroParameterListAndBody(
 
     // Read the first token after the arg list for down below.
     LexUnexpandedToken(Tok);
-  } else if (LangOpts.C99 || LangOpts.CPlusPlus11) {
+  } else if (LangOpts.C99 || LangOpts.CPlusPlus) {
     // C99 requires whitespace between the macro definition and the body.  Emit
     // a diagnostic for something like "#define X+".
     Diag(Tok, diag::ext_c99_whitespace_required_after_macro_name);

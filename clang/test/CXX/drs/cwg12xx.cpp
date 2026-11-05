@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,since-cxx14,since-cxx11
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx17,since-cxx14,since-cxx11
@@ -9,7 +8,6 @@
 // cwg1200: na
 
 namespace cwg1213 { // cwg1213: 7
-#if __cplusplus >= 201103L
   using T = int[3];
   int &&r = T{}[1];
 
@@ -29,11 +27,9 @@ namespace cwg1213 { // cwg1213: 7
   typedef int EV4Int __attribute__((__ext_vector_type__(4)));
   using U = decltype(V4Int()[0]);
   using U = decltype(EV4Int()[0]);
-#endif
 } // namespace cwg1213
 
 namespace cwg1223 { // cwg1223: 17
-#if __cplusplus >= 201103L
 struct M;
 template <typename T>
 struct V;
@@ -83,11 +79,9 @@ void g() {
     sizeof(auto () -> C[1]);
     // since-cxx11-error@-1 {{function cannot return array type 'C[1]' (aka 'struct BB[1]')}}
 }
-#endif
 } // namespace cwg1223
 
 namespace cwg1227 { // cwg1227: 3.0
-#if __cplusplus >= 201103L
 template <class T> struct A { using X = typename T::X; };
 // since-cxx11-error@-1 {{type 'int' cannot be used prior to '::' because it has no members}}
 //   since-cxx11-note@#cwg1227-g {{in instantiation of template class 'cwg1227::A<int>' requested here}}
@@ -101,7 +95,6 @@ void h() {
   f<int>(0); // OK, substituting return type causes deduction to fail
   g<int>(0); // #cwg1227-g-int
 }
-#endif
 } // namespace cwg1227
 
 namespace cwg1250 { // cwg1250: 3.9
@@ -117,14 +110,12 @@ struct Derived : Base {
 } // namespace cwg1250
 
 namespace cwg1265 { // cwg1265: 5
-#if __cplusplus >= 201103L
   auto a = 0, b() -> int;
   // since-cxx11-error@-1 {{declaration with trailing return type must be the only declaration in its group}}
   auto b() -> int, d = 0;
   // since-cxx11-error@-1 {{declaration with trailing return type must be the only declaration in its group}}
   auto e() -> int, f() -> int;
   // since-cxx11-error@-1 {{declaration with trailing return type must be the only declaration in its group}}
-#endif
 
 #if __cplusplus >= 201402L
   auto g(), h = 0;
@@ -146,9 +137,7 @@ namespace cwg1295 { // cwg1295: 4
   X x = {1};
 
   unsigned const &r1 = static_cast<X &&>(x).bitfield;
-  // cxx98-error@-1 {{rvalue references are a C++11 extension}}
   unsigned const &r2 = static_cast<unsigned &&>(x.bitfield);
-  // cxx98-error@-1 {{rvalue references are a C++11 extension}}
 
   template<unsigned &r> struct Y {}; // #cwg1295-Y
   Y<x.bitfield> y; // #cwg1295-y
@@ -158,9 +147,7 @@ namespace cwg1295 { // cwg1295: 4
   //   since-cxx17-note@#cwg1295-Y {{template parameter is declared here}}
 
 
-#if __cplusplus >= 201103L
   const unsigned other = 0;
   using T = decltype(true ? other : x.bitfield);
   using T = unsigned;
-#endif
 } // namespace cwg1295

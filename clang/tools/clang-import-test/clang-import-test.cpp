@@ -180,7 +180,6 @@ std::unique_ptr<CompilerInstance> BuildCompilerInstance() {
     assert(Id != TY_INVALID);
     if (isCXX(Id)) {
       Inv->getLangOpts().CPlusPlus = true;
-      Inv->getLangOpts().CPlusPlus11 = true;
       Inv->getHeaderSearchOpts().UseLibcxx = true;
     }
     if (isObjC(Id)) {

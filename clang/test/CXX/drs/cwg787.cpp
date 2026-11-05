@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify

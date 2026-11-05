@@ -630,7 +630,7 @@ class MarshallingInfoVisibility<KeyPathAndMacro kpm, code default>
 
 // Key paths that are constant during parsing of options with the same key path prefix.
 defvar cplusplus = LangOpts<"CPlusPlus">;
-defvar cpp11 = LangOpts<"CPlusPlus11">;
+defvar cpp11 = LangOpts<"CPlusPlus">;
 defvar cpp14 = LangOpts<"CPlusPlus14">;
 defvar cpp17 = LangOpts<"CPlusPlus17">;
 defvar cpp20 = LangOpts<"CPlusPlus20">;

@@ -1,8 +1,8 @@
 // RUN: %clang_cc1 %s -fsyntax-only -std=c99 -verify
 // RUN: %clang_cc1 %s -fsyntax-only -std=c2x -Wc99-compat -verify
 // RUN: %clang_cc1 %s -fsyntax-only -std=c11 -Wc99-compat -verify
-// RUN: %clang_cc1 %s -fsyntax-only -x c++ -std=c++03 -Wc++11-compat -verify
-// RUN: %clang_cc1 %s -fsyntax-only -x c++ -std=c++11 -Wc++98-compat -verify
+// RUN: %clang_cc1 %s -fsyntax-only -x c++ -std=c++11 -verify
+
 
 // Identifier characters
 extern char a\u01F6; // C11, C++11
@@ -41,17 +41,10 @@ extern char \u0D61; // C99, C11, C++03, C++11
 // expected-error@10 {{character '΄' U+0384 not allowed in an identifier}}
 // expected-error@12 {{character U+FFFF not allowed in an identifier}}
 // expected-error@18 {{expected unqualified-id}}
-# if __cplusplus >= 201103L
 // C++11
 // expected-error@19 {{expected unqualified-id}}
 // expected-error@33 {{invalid universal character}}
 
-# else
-// C++03
-// expected-error@19 {{expected unqualified-id}}
-// expected-warning@33 {{universal character name refers to a surrogate character}}
-
-# endif
 #else
 # if __STDC_VERSION__ >= 202311L
 // C23

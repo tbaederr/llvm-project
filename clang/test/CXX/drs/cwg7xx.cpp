@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98,cxx98-14,cxx98-11
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-11,since-cxx11
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,since-cxx14,since-cxx11,cxx14
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx17,since-cxx14,since-cxx11
@@ -6,10 +5,6 @@
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++23 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx17,since-cxx14,since-cxx11
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx17,since-cxx14,since-cxx11
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace cwg705 { // cwg705: 2.7
   namespace N {
@@ -58,7 +53,6 @@ namespace cwg712 { // cwg712: partial
     };
   }
 
-#if __cplusplus >= 201103L
   void g() {
     struct A { int n; };
     constexpr A a = {0};  // #cwg712-g-a
@@ -76,7 +70,6 @@ namespace cwg712 { // cwg712: partial
       }
     };
   }
-#endif
 } // namespace cwg712
 
 namespace cwg713 { // cwg713: 3.0
@@ -93,10 +86,8 @@ static_assert(!is_const<void()const>::value, "");
 static_assert(!is_const<void()const volatile>::value, "");
 static_assert(!is_volatile<void()volatile>::value, "");
 static_assert(!is_volatile<void()const volatile>::value, "");
-#if __cplusplus >= 201103L
 static_assert(!is_const<void()const&>::value, "");
 static_assert(!is_volatile<void()volatile&>::value, "");
-#endif
 } // namespace cwg713
 
 // cwg722 is in cwg722.cpp
@@ -239,7 +230,6 @@ namespace cwg727 { // cwg727: partial
   };
 
   namespace mixed_inner_outer_specialization {
-#if __cplusplus >= 201103L
     template<int> struct A {
       template<int> constexpr int f() const { return 1; }
       template<> constexpr int f<0>() const { return 2; }
@@ -250,7 +240,6 @@ namespace cwg727 { // cwg727: partial
     static_assert(A<1>().f<0>() == 2, "");
     static_assert(A<0>().f<1>() == 3, "");
     static_assert(A<0>().f<0>() == 4, "");
-#endif
 
 #if __cplusplus >= 201402L
     template<int> struct B {
@@ -354,7 +343,6 @@ template <> void A::f<int>() {}
 } // namespace cwg730
 
 namespace cwg743 { // cwg743: 3.1
-#if __cplusplus >= 201103L
 struct S {
   using T = int;
 };
@@ -363,11 +351,9 @@ decltype(S())::T i;
 
 template <typename T>
 using foo = typename decltype(T())::I;
-#endif
 } // namespace cwg743
 
 namespace cwg777 { // cwg777: 3.7
-#if __cplusplus >= 201103L
 template <typename... T>
 void f(int i = 0, T ...args) {}
 void ff() { f(); }
@@ -377,7 +363,6 @@ void g(int i = 0, T ...args, T ...args2) {}
 
 template <typename... T>
 void h(int i = 0, T ...args, int j = 1) {}
-#endif
 } // namespace cwg777
 
 namespace cwg794 { // cwg794: 2.7

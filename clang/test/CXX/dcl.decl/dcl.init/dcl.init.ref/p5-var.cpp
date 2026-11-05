@@ -1,12 +1,9 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 struct Base { };
 struct Derived : Base { }; // expected-note{{candidate constructor (the implicit copy constructor) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 {{candidate constructor (the implicit move constructor) not viable}}
 struct Unrelated { };
 struct Derived2 : Base { };
 struct Diamond : Derived, Derived2 { };

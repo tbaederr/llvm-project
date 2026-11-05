@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fsyntax-only -verify=expected,precxx17 %std_cxx98-14 %s
+// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fsyntax-only -verify=expected,precxx17 %std_cxx11-14 %s
 // RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fsyntax-only -verify %std_cxx17- %s
 
 struct A; // expected-note 4 {{forward declaration of 'A'}}
@@ -143,28 +143,16 @@ namespace Decay {
 
   template<typename T> struct C {
     void f() throw (T);
-#if __cplusplus <= 199711L
-    // expected-error@-2 {{pointer to incomplete type 'Decay::E' is not allowed in exception specification}}
-#endif
   };
   struct D {
     C<D[10]> c;
   };
   struct E;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{forward declaration of 'Decay::E'}}
-#endif
 
   C<E[10]> e;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{in instantiation of template class 'Decay::C<Decay::E[10]>' requested here}}
-#endif
 }
 
 void rval_ref() throw (int &&); // expected-error {{rvalue reference type 'int &&' is not allowed in exception specification}}
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{rvalue references are a C++11 extension}}
-#endif
 #endif
 
 namespace HandlerInversion {

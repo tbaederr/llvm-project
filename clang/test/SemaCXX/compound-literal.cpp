@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -std=c++03 -verify -ast-dump %s > %t-03
-// RUN: FileCheck --input-file=%t-03 %s
 // RUN: %clang_cc1 -std=c++11 -verify -ast-dump %s > %t-11
 // RUN: FileCheck --input-file=%t-11 %s
 // RUN: FileCheck --input-file=%t-11 %s --check-prefix=CHECK-CXX11
@@ -62,7 +60,6 @@ namespace brace_initializers {
     // CHECK-NEXT: IntegerLiteral {{.*}} 1{{$}}
     // CHECK-NEXT: IntegerLiteral {{.*}} 2{{$}}
 
-#if __cplusplus >= 201103L
     (void)(HasCtor){1, 2};
     // CHECK-CXX11-NOT: CXXBindTemporaryExpr {{.*}} 'HasCtor'
     // CHECK-CXX11-NOT: ConstantExpr {{.*}} 'HasCtor'
@@ -78,7 +75,6 @@ namespace brace_initializers {
     // CHECK-CXX11-NEXT: CXXTemporaryObjectExpr {{.*}} 'HasCtorDtor'
     // CHECK-CXX11-NEXT: IntegerLiteral {{.*}} 1{{$}}
     // CHECK-CXX11-NEXT: IntegerLiteral {{.*}} 2{{$}}
-#endif
   }
 
   struct PrivateDtor {
@@ -102,7 +98,6 @@ template<unsigned> struct Value { };
 template<typename T>
 int &check_narrowed(Value<sizeof((T){1.1})>);
 
-#if __cplusplus >= 201103L
 // Compound literals in global lambdas have automatic storage duration
 // and are not subject to the constant-initialization rules.
 int computed_with_lambda = [] {
@@ -110,7 +105,6 @@ int computed_with_lambda = [] {
   int result = ((int[]) { x, x + 2, x + 4, x + 6 })[0];
   return result;
 }();
-#endif
 
 namespace DynamicFileScopeLiteral {
 // This covers the case where we have a file-scope compound literal with a
@@ -122,9 +116,7 @@ struct Foo : Empty { // expected-note 0+ {{candidate constructor}}
   int y;
 };
 int f();
-#if __cplusplus < 201103L
-// expected-error@+6 {{non-aggregate type 'Foo' cannot be initialized with an initializer list}}
-#elif __cplusplus < 201703L
+#if __cplusplus < 201703L
 // expected-error@+4 {{no matching constructor}}
 #else
 // expected-error@+2 {{initializer element is not a compile-time constant}}
@@ -132,13 +124,11 @@ int f();
 Foo o = (Foo){ {}, 1, f() };
 }
 
-#if __cplusplus >= 201103L
 namespace GH147949 {
   // Make sure we handle transparent InitListExprs correctly.
   struct S { int x : 3; };
   const S* x = (const S[]){S{S{3}}};
 }
-#endif
 
 namespace GH212106 {
   // Elements of a file-scope compound literal carry their evaluated value.
@@ -150,7 +140,6 @@ namespace GH212106 {
   // CHECK-NEXT: value: Int 0
   // CHECK-NEXT: CallExpr {{.*}} 'int'
 
-#if __cplusplus >= 201103L
   // A class with a constructor is initialized by one expression.
   struct C { constexpr C(int v) : v(v) {} int v; };
   C c = (C){__builtin_constant_p(z.x)};
@@ -159,5 +148,4 @@ namespace GH212106 {
   // CHECK-CXX11-NEXT: value: Struct
   // CHECK-CXX11-NEXT: field: Int 0
   // CHECK-CXX11-NEXT: CXXTemporaryObjectExpr
-#endif
 }

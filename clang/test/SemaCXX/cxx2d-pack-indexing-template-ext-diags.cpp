@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -std=c++2d -verify=cxx29 -fsyntax-only -Wpre-c++2d-compat %s
 // RUN: %clang_cc1 -std=c++11 -verify=ext -fsyntax-only -Wc++2d-extensions %s
-// RUN: %clang_cc1 -std=c++98 -verify=ext -fsyntax-only -Wc++2d-extensions -Wno-c++11-extensions %s
 
 template <class T> struct A {};
 template <class T> struct B {};

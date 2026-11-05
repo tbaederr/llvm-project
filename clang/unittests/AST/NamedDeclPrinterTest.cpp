@@ -90,9 +90,9 @@ PrintedNamedDeclMatches(StringRef Code, const std::vector<std::string> &Args,
 }
 
 ::testing::AssertionResult
-PrintedNamedDeclCXX98Matches(StringRef Code, StringRef DeclName,
+PrintedNamedDeclCXX11Matches(StringRef Code, StringRef DeclName,
                              StringRef ExpectedPrinted) {
-  std::vector<std::string> Args(1, "-std=c++98");
+  std::vector<std::string> Args(1, "-std=c++11");
   return PrintedNamedDeclMatches(Code, Args,
                                  /*SuppressUnwrittenScope*/ false,
                                  namedDecl(hasName(DeclName)).bind("id"),
@@ -133,7 +133,7 @@ PrintedNestedNameSpecifierMatches(StringRef Code, StringRef DeclName,
 } // unnamed namespace
 
 TEST(NamedDeclPrinter, TestNamespace1) {
-  ASSERT_TRUE(PrintedNamedDeclCXX98Matches(
+  ASSERT_TRUE(PrintedNamedDeclCXX11Matches(
     "namespace { int A; }",
     "A",
     "(anonymous namespace)::A"));

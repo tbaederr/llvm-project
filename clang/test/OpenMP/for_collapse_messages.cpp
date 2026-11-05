@@ -1,15 +1,11 @@
 // RUN: %clang_cc1 -verify=expected,omp45 -fopenmp -fopenmp-version=45 %s -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,omp45 -fopenmp -fopenmp-version=45 -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp45 -fopenmp -fopenmp-version=45 -std=c++11 %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp50 -fopenmp %s -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,omp50 -fopenmp -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp50 -fopenmp -std=c++11 %s -Wuninitialized
 
 // RUN: %clang_cc1 -verify=expected,omp45 -fopenmp-simd -fopenmp-version=45 %s -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,omp45 -fopenmp-simd -fopenmp-version=45 -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp45 -fopenmp-simd -fopenmp-version=45 -std=c++11 %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp50 -fopenmp-simd %s -Wuninitialized
-// RUN: %clang_cc1 -verify=expected,omp50 -fopenmp-simd -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify=expected,omp50 -fopenmp-simd -std=c++11 %s -Wuninitialized
 
 // expected-note@* 0+{{declared here}}
@@ -51,11 +47,7 @@ T tmain(T argc, S **argv) {
   for (int i = ST; i < N; i++) argv[0][i] = argv[0][i] - argv[0][i-ST];
   #pragma omp for collapse (0xFFFFFFFFFFFFFFFF) // expected-error {{argument to 'collapse' clause requires a value that can be represented by a 64-bit}}
   for (int i = ST; i < N; i++) argv[0][i] = argv[0][i] - argv[0][i-ST];
-#if __cplusplus <= 199711L
-  // expected-error@+4 2 {{integral constant expression}} expected-note@+4 0+{{constant expression}}
-#else
-  // expected-error@+2 2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
-#endif
+  // expected-error@+1 2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
   #pragma omp for collapse (argv[1]=2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = ST; i < N; i++) argv[0][i] = argv[0][i] - argv[0][i-ST];
   #pragma omp for collapse (1)
@@ -88,11 +80,7 @@ int main(int argc, char **argv) {
   for (int i = 4; i < 12; i++) argv[0][i] = argv[0][i] - argv[0][i-4];
   #pragma omp for collapse (S1) // expected-error {{'S1' does not refer to a value}}
   for (int i = 4; i < 12; i++) argv[0][i] = argv[0][i] - argv[0][i-4];
-#if __cplusplus <= 199711L
-  // expected-error@+4 {{integral constant expression}} expected-note@+4 0+{{constant expression}}
-#else
-  // expected-error@+2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
-#endif
+  // expected-error@+1 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
   #pragma omp for collapse (argv[1]=2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = 4; i < 12; i++) argv[0][i] = argv[0][i] - argv[0][i-4];
   // expected-error@+3 {{statement after '#pragma omp for' must be a for loop}}

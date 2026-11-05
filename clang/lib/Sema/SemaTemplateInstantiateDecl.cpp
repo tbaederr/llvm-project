@@ -5809,8 +5809,7 @@ TemplateDeclInstantiator::InitFunctionInstantiation(FunctionDecl *New,
     // exception specification.
     // DR1484: Local classes and their members are instantiated along with the
     // containing function.
-    if (SemaRef.getLangOpts().CPlusPlus11 &&
-        EPI.ExceptionSpec.Type != EST_None &&
+    if (EPI.ExceptionSpec.Type != EST_None &&
         EPI.ExceptionSpec.Type != EST_DynamicNone &&
         EPI.ExceptionSpec.Type != EST_BasicNoexcept &&
         !Tmpl->isInLocalScopeForInstantiation()) {
@@ -5860,7 +5859,7 @@ TemplateDeclInstantiator::InitMethodInstantiation(CXXMethodDecl *New,
   if (InitFunctionInstantiation(New, Tmpl))
     return true;
 
-  if (isa<CXXDestructorDecl>(New) && SemaRef.getLangOpts().CPlusPlus11)
+  if (isa<CXXDestructorDecl>(New))
     SemaRef.AdjustDestructorExceptionSpec(cast<CXXDestructorDecl>(New));
 
   New->setAccess(Tmpl->getAccess());
@@ -6008,9 +6007,8 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
                diag::note_unreachable_template_decl);
         } else {
           Diag(PatternDecl->getLocation(), diag::note_forward_template_decl);
-          if (getLangOpts().CPlusPlus11)
-            Diag(PointOfInstantiation, diag::note_inst_declaration_hint)
-                << Function;
+          Diag(PointOfInstantiation, diag::note_inst_declaration_hint)
+              << Function;
         }
       }
     }
@@ -6756,8 +6754,7 @@ void Sema::InstantiateVariableDefinition(SourceLocation PointOfInstantiation,
         Diag(PointOfInstantiation, diag::warn_var_template_missing)
           << Var;
         Diag(PatternDecl->getLocation(), diag::note_forward_template_decl);
-        if (getLangOpts().CPlusPlus11)
-          Diag(PointOfInstantiation, diag::note_inst_declaration_hint) << Var;
+        Diag(PointOfInstantiation, diag::note_inst_declaration_hint) << Var;
       }
       return;
     }

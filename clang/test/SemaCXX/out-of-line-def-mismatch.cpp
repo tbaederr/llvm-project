@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -std=c++98 -verify %s
+// RUN: %clang_cc1 -fsyntax-only -std=c++11 -verify %s
 
 namespace N2 {
   struct S1;

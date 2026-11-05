@@ -2404,7 +2404,7 @@ TEST(Member, MatchesMemberAllocationFunction) {
   EXPECT_TRUE(matchesConditionally(
       "namespace std { typedef typeof(sizeof(int)) size_t; }"
       "class X { void *operator new(std::size_t); };",
-      cxxMethodDecl(ofClass(hasName("X"))), true, {"-std=gnu++03"}));
+      cxxMethodDecl(ofClass(hasName("X"))), true, {"-std=gnu++11"}));
 
   EXPECT_TRUE(matches("class X { void operator delete(void*); };",
                       cxxMethodDecl(ofClass(hasName("X")))));
@@ -2413,7 +2413,7 @@ TEST(Member, MatchesMemberAllocationFunction) {
   EXPECT_TRUE(matchesConditionally(
       "namespace std { typedef typeof(sizeof(int)) size_t; }"
       "class X { void operator delete[](void*, std::size_t); };",
-      cxxMethodDecl(ofClass(hasName("X"))), true, {"-std=gnu++03"}));
+      cxxMethodDecl(ofClass(hasName("X"))), true, {"-std=gnu++11"}));
 }
 
 TEST(HasDestinationType, MatchesSimpleCase) {

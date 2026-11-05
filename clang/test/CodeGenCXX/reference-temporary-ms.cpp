@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %std_cxx98-14 -emit-llvm %s -o - -triple=i386-pc-win32 -fms-extensions | FileCheck %s --check-prefixes=CHECK,PRE17
+// RUN: %clang_cc1 %std_cxx11-14 -emit-llvm %s -o - -triple=i386-pc-win32 -fms-extensions | FileCheck %s --check-prefixes=CHECK,PRE17
 // RUN: %clang_cc1 %std_cxx17- -emit-llvm %s -o - -triple=i386-pc-win32 -fms-extensions | FileCheck %s --check-prefixes=CHECK,CXX17
 
 const int __declspec(dllexport) &Exported = 42;

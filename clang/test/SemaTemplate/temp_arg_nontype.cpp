@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -fsyntax-only -std=c++98 -Wconversion -verify %s
-template<int N> struct A; // expected-note 5{{template parameter is declared here}}
+// RUN: %clang_cc1 -fsyntax-only -std=c++11 -Wconversion -verify %s
+template<int N> struct A; // expected-note 4{{template parameter is declared here}}
 
 A<0> *a0;
 
@@ -7,24 +7,23 @@ A<int()> *a1; // expected-error{{template argument for non-type template paramet
 
 A<int> *a2; // expected-error{{template argument for non-type template parameter must be an expression}}
 
-A<1 >> 2> *a3; // expected-warning{{use of right-shift operator ('>>') in template argument will require parentheses in C++11}}
-
 // C++ [temp.arg.nontype]p5:
 A<A> *a4; // expected-error{{must be an expression}}
 
 enum E { Enumerator = 17 };
 A<E> *a5; // expected-error{{template argument for non-type template parameter must be an expression}}
-template<E Value> struct A1; // expected-note{{template parameter is declared here}}
+template<E Value> struct A1;
 A1<Enumerator> *a6; // okay
-A1<17> *a7; // expected-error{{non-type template argument of type 'int' cannot be converted to a value of type 'E'}}
+A1<17> *a7; // expected-error{{value of type 'int' is not implicitly convertible to 'E'}}
 
 const long LongValue = 12345678;
 A<LongValue> *a8;
 const short ShortValue = 17;
 A<ShortValue> *a9;
 
-int f(int);
-A<f(17)> *a10; // expected-error{{non-type template argument of type 'int' is not an integral constant expression}}
+int f(int); // expected-note{{declared here}}
+A<f(17)> *a10; // expected-error{{non-type template argument is not a constant expression}} \
+               // expected-note{{non-constexpr function 'f' cannot be used in a constant expression}}
 
 class X {
 public:
@@ -32,7 +31,8 @@ public:
   X(int, int);
   operator int() const;
 };
-A<X(17, 42)> *a11; // expected-error{{non-type template argument of type 'X' must have an integral or enumeration type}}
+A<X(17, 42)> *a11; // expected-error{{non-type template argument is not a constant expression}} \
+                   // expected-note{{non-literal type 'X' cannot be used in a constant expression}}
 
 float f(float);
 
@@ -90,28 +90,31 @@ template<int Z::*pm> struct A7c;
 A7<&Z::int_member> *a18_1;
 A7c<&Z::int_member> *a18_2;
 A7<&Z::float_member> *a18_3; // expected-error{{non-type template argument of type 'float Z::*' cannot be converted to a value of type 'int Z::*'}}
-A7c<(&Z::int_member)> *a18_4; // expected-warning{{parentheses around address non-type template argument are a C++11 extension}}
+A7c<(&Z::int_member)> *a18_4;
 A7c<&Z::union_member> *a18_5;
 
-template<unsigned char C> struct Overflow; // expected-note{{template parameter is declared here}}
+template<unsigned char C> struct Overflow;
 
 Overflow<5> *overflow1; // okay
 Overflow<255> *overflow2; // okay
-Overflow<256> *overflow3; // expected-warning{{non-type template argument value '256' truncated to '0' for template parameter of type 'unsigned char'}}
+Overflow<256> *overflow3; // expected-error{{non-type template argument evaluates to 256, which cannot be narrowed to type 'unsigned char'}}
 
 
-template<unsigned> struct Signedness; // expected-note{{template parameter is declared here}}
+template<unsigned> struct Signedness;
 Signedness<10> *signedness1; // okay
-Signedness<-10> *signedness2; // expected-warning{{non-type template argument with value '-10' converted to '4294967286' for unsigned template parameter of type 'unsigned int'}}
+Signedness<-10> *signedness2; // expected-error{{non-type template argument evaluates to -10, which cannot be narrowed to type 'unsigned int'}} \
+                                     // expected-warning{{implicit conversion changes signedness: 'int' to 'unsigned int'}}
 
-template<signed char C> struct SignedOverflow; // expected-note 3 {{template parameter is declared here}}
+template<signed char C> struct SignedOverflow;
 SignedOverflow<1> *signedoverflow1;
 SignedOverflow<-1> *signedoverflow2;
 SignedOverflow<-128> *signedoverflow3;
-SignedOverflow<-129> *signedoverflow4; // expected-warning{{non-type template argument value '-129' truncated to '127' for template parameter of type 'signed char'}}
+SignedOverflow<-129> *signedoverflow4; // expected-error{{non-type template argument evaluates to -129, which cannot be narrowed to type 'signed char'}}
 SignedOverflow<127> *signedoverflow5;
-SignedOverflow<128> *signedoverflow6; // expected-warning{{non-type template argument value '128' truncated to '-128' for template parameter of type 'signed char'}}
-SignedOverflow<(unsigned char)128> *signedoverflow7; // expected-warning{{non-type template argument value '128' truncated to '-128' for template parameter of type 'signed char'}}
+SignedOverflow<128> *signedoverflow6; // expected-error{{non-type template argument evaluates to 128, which cannot be narrowed to type 'signed char'}} \
+                                      // expected-warning{{implicit conversion from 'int' to 'signed char' changes value from 128 to -128}}
+SignedOverflow<(unsigned char)128> *signedoverflow7; // expected-error{{non-type template argument evaluates to 128, which cannot be narrowed to type 'signed char'}} \
+                                                     // expected-warning{{implicit conversion changes signedness: 'unsigned char' to 'signed char'}}
 
 // Check canonicalization of template arguments.
 template<int (*)(int, int)> struct FuncPtr0;
@@ -173,7 +176,9 @@ namespace pr6249 {
 }
 
 namespace PR6723 {
-  template<unsigned char C> void f(int (&a)[C]); // expected-note 4{{candidate template ignored: substitution failure [with C = '\x00']}}
+  template<unsigned char C> void f(int (&a)[C]); // expected-note 2{{candidate template ignored: substitution failure [with C = '\x00']}} \
+                                                 // expected-note {{candidate template ignored: substitution failure: non-type template argument evaluates to 512, which cannot be narrowed to type 'unsigned char'}} \
+                                                 // expected-note {{candidate template ignored: non-type template argument evaluates to 512, which cannot be narrowed to type 'unsigned char' for template parameter 'C'}}
   void g() {
     int arr512[512];
     f(arr512); // expected-error{{no matching function for call}}
@@ -203,8 +208,7 @@ namespace EntityReferenced {
 }
 
 namespace PR6964 {
-  template <typename ,int, int = 9223372036854775807L > // expected-warning {{non-type template argument value '9223372036854775807' truncated to '-1' for template parameter of type 'int'}} \
-  // expected-note {{template parameter is declared here}}
+  template <typename ,int, int = 9223372036854775807L > // expected-error {{non-type template argument evaluates to 9223372036854775807, which cannot be narrowed to type 'int'}}
   struct as_nview { };
 
   template <typename Sequence, int I0>
@@ -252,9 +256,8 @@ namespace test8 {
 }
 
 namespace PR8372 {
-  template <int I> void foo() { } // expected-note{{template parameter is declared here}}
-  void bar() { foo <0x80000000> (); } // expected-warning{{non-type template argument value '2147483648' truncated to '-2147483648' for template parameter of type 'int'}}
-  // expected-note@-1 {{while substituting explicitly-specified template arguments}}
+  template <int I> void foo() { } // expected-note{{candidate template ignored: non-type template argument evaluates to 2147483648, which cannot be narrowed to type 'int' for template parameter 'I'}}
+  void bar() { foo <0x80000000> (); } // expected-error{{no matching function for call to 'foo'}}
 }
 
 namespace PR9227 {
@@ -431,8 +434,8 @@ namespace partial_order_references {
 }
 
 namespace dependent_nested_partial_specialization {
-  template<typename> using X = int; // expected-warning {{C++11}}
-  template<typename T> using Y = T*; // expected-warning {{C++11}}
+  template<typename> using X = int;
+  template<typename T> using Y = T*;
   int n;
 
   template<template<typename> class X> struct A {

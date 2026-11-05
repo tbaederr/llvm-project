@@ -1,5 +1,5 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s readability-trivial-switch %t
-// RUN: %check_clang_tidy -std=c++98-or-later -check-suffixes=,MACROS %s \
+// RUN: %check_clang_tidy -std=c++11-or-later %s readability-trivial-switch %t
+// RUN: %check_clang_tidy -std=c++11-or-later -check-suffixes=,MACROS %s \
 // RUN:   readability-trivial-switch %t -- \
 // RUN:   -config="{CheckOptions: {readability-trivial-switch.IgnoreMacros: false}}"
 

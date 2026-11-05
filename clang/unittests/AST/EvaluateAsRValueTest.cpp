@@ -83,7 +83,7 @@ TEST(EvaluateAsRValue, FailsGracefullyForUnknownTypes) {
   // This is a regression test; the AST library used to trigger assertion
   // failures because it assumed that the type of initializers was always
   // known (which is true only after template instantiation).
-  std::string ModesToTest[] = {"-std=c++03", "-std=c++11", "-std=c++1y"};
+  std::string ModesToTest[] = {"-std=c++11", "-std=c++1y"};
   for (std::string const &Mode : ModesToTest) {
     std::vector<std::string> Args(1, Mode);
     Args.push_back("-fno-delayed-template-parsing");

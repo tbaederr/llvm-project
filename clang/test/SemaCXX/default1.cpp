@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 void f(int i);
@@ -27,9 +26,7 @@ struct X {
 void j(X x = 17); // expected-note{{'::j' declared here}}
 
 struct Y { // expected-note 2{{candidate constructor (the implicit copy constructor) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 2 {{candidate constructor (the implicit move constructor) not viable}}
 
   explicit Y(int); // expected-note 2{{explicit constructor is not a candidate}}
 };
@@ -79,7 +76,6 @@ void PR20769(int = 2);
 void PR20769_b(int = 1);
 void PR20769_b() { void PR20769_b(int = 2); }
 
-#if __cplusplus >= 201103L
 template<typename T> constexpr int f1() { return 0; }
 // This is OK, but in order to see that we must instantiate f<int>, despite it
 // being in an unused default argument.
@@ -103,4 +99,3 @@ namespace PR47682 {
 }
 void PR47682::f(int) {}
 void PR47682_test() { PR47682::f(); }
-#endif

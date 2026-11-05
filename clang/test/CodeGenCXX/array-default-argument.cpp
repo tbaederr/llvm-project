@@ -1,9 +1,9 @@
 // RUN: %clang_cc1 -emit-llvm -o - %s -triple %itanium_abi_triple | FileCheck %s
-// RUN: %clang_cc1 -emit-llvm -o - %s -triple %itanium_abi_triple -std=c++98 -fexceptions -fcxx-exceptions | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EH
+// RUN: %clang_cc1 -emit-llvm -o - %s -triple %itanium_abi_triple -std=c++11 -fexceptions -fcxx-exceptions | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EH
 
 struct A {
   A();
-  ~A();
+  ~A() noexcept(false);
 };
 
 struct B {

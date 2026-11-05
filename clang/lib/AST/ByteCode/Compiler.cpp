@@ -3578,7 +3578,7 @@ bool Compiler<Emitter>::VisitMaterializeTemporaryExpr(
   SmallVector<const Expr *, 2> CommaLHSs;
   SmallVector<SubobjectAdjustment, 2> Adjustments;
   const Expr *Inner;
-  if (!Ctx.getLangOpts().CPlusPlus11)
+  if (!Ctx.getLangOpts().CPlusPlus)
     Inner =
         E->getSubExpr()->skipRValueSubobjectAdjustments(CommaLHSs, Adjustments);
   else
@@ -8575,11 +8575,6 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
     if (DiscardResult)
       return true;
 
-    if (Ctx.getLangOpts().CPlusPlus && !Ctx.getLangOpts().CPlusPlus11 &&
-        !DeclType->isIntegralOrEnumerationType()) {
-      return this->emitInvalidDeclRef(cast<DeclRefExpr>(E),
-                                      /*InitializerFailed=*/false, E);
-    }
     if (auto It = this->Params.find(PVD); It != this->Params.end()) {
       if (IsReference || !It->second.IsPtr)
         return this->emitGetParam(classifyPrim(E), It->second.Index, E);
@@ -8604,7 +8599,7 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
   // Global variables.
   if (auto GlobalIndex = P.getGlobal(D)) {
     if (IsReference) {
-      if (!Ctx.getLangOpts().CPlusPlus11)
+      if (!Ctx.getLangOpts().CPlusPlus)
         return this->emitGetGlobal(classifyPrim(E), *GlobalIndex, E);
       if (!Ctx.getLangOpts().CPlusPlus23)
         return this->emitGetGlobalUnchecked(classifyPrim(E), *GlobalIndex, E);

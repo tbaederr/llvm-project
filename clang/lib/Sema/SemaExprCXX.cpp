@@ -2306,8 +2306,6 @@ ExprResult Sema::BuildCXXNew(SourceRange Range, bool UseGlobal,
     if (result.isInvalid()) return ExprError();
     ArraySize = result.get();
   }
-  // C++98 5.3.4p6: "The expression in a direct-new-declarator shall have
-  //   integral or enumeration type with a non-negative value."
   // C++11 [expr.new]p6: The expression [...] shall be of integral or unscoped
   //   enumeration type, or a class type for which a single non-explicit
   //   conversion function to integral or unscoped enumeration type exists.
@@ -2321,11 +2319,6 @@ ExprResult Sema::BuildCXXNew(SourceRange Range, bool UseGlobal,
 
       ConvertedSize = PerformImplicitConversion(
           *ArraySize, Context.getSizeType(), AssignmentAction::Converting);
-
-      if (!ConvertedSize.isInvalid() && (*ArraySize)->getType()->isRecordType())
-        // Diagnose the compatibility of this conversion.
-        Diag(StartLoc, diag::compat_cxx11_array_size_conversion)
-          << (*ArraySize)->getType() << 0 << "'size_t'";
     } else {
       class SizeConvertDiagnoser : public ICEConvertDiagnoser {
       protected:
@@ -2339,7 +2332,7 @@ ExprResult Sema::BuildCXXNew(SourceRange Range, bool UseGlobal,
         SemaDiagnosticBuilder diagnoseNotInt(Sema &S, SourceLocation Loc,
                                              QualType T) override {
           return S.Diag(Loc, diag::err_array_size_not_integral)
-                   << S.getLangOpts().CPlusPlus11 << T;
+                 << /*CPlusPlus11=*/1 << T;
         }
 
         SemaDiagnosticBuilder diagnoseIncomplete(
@@ -2373,8 +2366,9 @@ ExprResult Sema::BuildCXXNew(SourceRange Range, bool UseGlobal,
         SemaDiagnosticBuilder diagnoseConversion(Sema &S, SourceLocation Loc,
                                                  QualType T,
                                                  QualType ConvTy) override {
-          return S.DiagCompat(Loc, diag_compat::array_size_conversion)
-                 << T << ConvTy->isEnumeralType() << ConvTy;
+          // Implicit conversion to integral type is valid since C++11.
+          return SemaDiagnosticBuilder(SemaDiagnosticBuilder::K_Nop, Loc,
+                                       /*DiagID=*/0, /*Fn=*/nullptr, S);
         }
       } SizeDiagnoser(*ArraySize);
 
@@ -3422,7 +3416,7 @@ foundCandidate:
     //   as a placement deallocation function, would have been
     //   selected as a match for the allocation function, the program
     //   is ill-formed.
-    if (getLangOpts().CPlusPlus11 && isPlacementNew &&
+    if (isPlacementNew &&
         isNonPlacementDeallocationFunction(*this, OperatorDelete)) {
       UsualDeallocFnInfo Info(*this,
                               DeclAccessPair::make(OperatorDelete, AS_public),
@@ -3498,11 +3492,6 @@ void Sema::DeclareGlobalNewDelete() {
   //   implicitly declared in global scope in each translation unit of a
   //   program
   //
-  //     C++03:
-  //     void* operator new(std::size_t) throw(std::bad_alloc);
-  //     void* operator new[](std::size_t) throw(std::bad_alloc);
-  //     void  operator delete(void*) throw();
-  //     void  operator delete[](void*) throw();
   //     C++11:
   //     void* operator new(std::size_t);
   //     void* operator new[](std::size_t);
@@ -3518,28 +3507,6 @@ void Sema::DeclareGlobalNewDelete() {
   //
   //   These implicit declarations introduce only the function names operator
   //   new, operator new[], operator delete, operator delete[].
-  //
-  // Here, we need to refer to std::bad_alloc, so we will implicitly declare
-  // "std" or "bad_alloc" as necessary to form the exception specification.
-  // However, we do not make these implicit declarations visible to name
-  // lookup.
-  if (!StdBadAlloc && !getLangOpts().CPlusPlus11) {
-    // The "std::bad_alloc" class has not yet been declared, so build it
-    // implicitly.
-    StdBadAlloc = CXXRecordDecl::Create(
-        Context, TagTypeKind::Class, getOrCreateStdNamespace(),
-        SourceLocation(), SourceLocation(),
-        &PP.getIdentifierTable().get("bad_alloc"), nullptr);
-    getStdBadAlloc()->setImplicit(true);
-
-    // The implicitly declared "std::bad_alloc" should live in global module
-    // fragment.
-    if (TheGlobalModuleFragment) {
-      getStdBadAlloc()->setModuleOwnershipKind(
-          Decl::ModuleOwnershipKind::ReachableWhenImported);
-      getStdBadAlloc()->setLocalOwningModule(TheGlobalModuleFragment);
-    }
-  }
   if (!StdAlignValT && getLangOpts().AlignedAllocation) {
     // The "std::align_val_t" enum class has not yet been declared, so build it
     // implicitly.
@@ -3645,21 +3612,13 @@ void Sema::DeclareGlobalAllocationFunction(DeclarationName Name,
   FunctionProtoType::ExtProtoInfo EPI(
       Context.getTargetInfo().getDefaultCallingConv());
 
-  QualType BadAllocType;
   bool HasBadAllocExceptionSpec = Name.isAnyOperatorNew();
   if (HasBadAllocExceptionSpec) {
-    if (!getLangOpts().CPlusPlus11) {
-      BadAllocType = Context.getCanonicalTagType(getStdBadAlloc());
-      assert(StdBadAlloc && "Must have std::bad_alloc declared");
-      EPI.ExceptionSpec.Type = EST_Dynamic;
-      EPI.ExceptionSpec.Exceptions = llvm::ArrayRef(BadAllocType);
-    }
     if (getLangOpts().NewInfallible) {
       EPI.ExceptionSpec.Type = EST_DynamicNone;
     }
   } else {
-    EPI.ExceptionSpec =
-        getLangOpts().CPlusPlus11 ? EST_BasicNoexcept : EST_DynamicNone;
+    EPI.ExceptionSpec = EST_BasicNoexcept;
   }
 
   auto CreateAllocationFunctionDecl = [&](Attr *ExtraAttr) {
@@ -5522,7 +5481,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     if (SCS.DeprecatedStringLiteralToCharPtr &&
         !getLangOpts().WritableStrings) {
       Diag(From->getBeginLoc(),
-           getLangOpts().CPlusPlus11
+           getLangOpts().CPlusPlus
                ? diag::ext_deprecated_string_literal_conversion
                : diag::warn_deprecated_string_literal_conversion)
           << ToType.getNonReferenceType();
@@ -7658,7 +7617,7 @@ ExprResult Sema::IgnoredValueConversions(Expr *E) {
     // normally, we don't need to do anything to handle it, but if it is a
     // volatile lvalue with a special form, we perform an lvalue-to-rvalue
     // conversion.
-    if (getLangOpts().CPlusPlus11 && E->isReadIfDiscardedInCPlusPlus11()) {
+    if (E->isReadIfDiscardedInCPlusPlus11()) {
       ExprResult Res = DefaultLvalueConversion(E);
       if (Res.isInvalid())
         return E;

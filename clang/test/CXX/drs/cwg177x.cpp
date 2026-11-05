@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s --check-prefixes=CHECK,CXX11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s --check-prefixes=CHECK,CXX11,CXX14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s --check-prefixes=CHECK,CXX11,CXX14
@@ -10,7 +9,6 @@
 namespace cwg1772 { // cwg1772: 14
   // __func__ in a lambda should name operator(), not the containing function.
   // CHECK: NamespaceDecl{{.+}}cwg1772
-#if __cplusplus >= 201103L
   auto x = []() { __func__; };
   // CXX11: LambdaExpr
   // CXX11: CXXRecordDecl
@@ -30,7 +28,6 @@ namespace cwg1772 { // cwg1772: 14
   // CXX11-NEXT: PredefinedExpr{{.+}} 'const char[11]' lvalue __func__
   // CXX11-NEXT: StringLiteral{{.+}} 'const char[11]' lvalue "operator()"
   }
-#endif // __cplusplus >= 201103L
 } // namespace cwg1772
 
 namespace cwg1779 { // cwg1779: 14

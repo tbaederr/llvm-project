@@ -655,7 +655,7 @@ public:
     //  - perform a synchronization operation or an atomic operation.
     //
     // Hence each function is 'mustprogress' in C++11 or later.
-    return getLangOpts().CPlusPlus11;
+    return getLangOpts().CPlusPlus;
   }
 
   // [C++26][intro.progress] (DR)

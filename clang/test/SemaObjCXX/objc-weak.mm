@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -fobjc-runtime-has-weak -fobjc-weak -fblocks -Wno-objc-root-class -std=c++98 -Wno-c++0x-extensions -verify %s
+// RUN: %clang_cc1 -fsyntax-only -fobjc-runtime-has-weak -fobjc-weak -fblocks -Wno-objc-root-class -std=c++11 -Wno-c++0x-extensions -verify %s
 
 @interface AnObject
 @property(weak) id value;
@@ -9,12 +9,12 @@ __attribute__((objc_arc_weak_reference_unavailable))
 @end
 
 struct S {
-  __weak id a; // expected-note {{because type 'S' has a member with __weak ownership}}
+  __weak id a;
 };
 
 union U {
   __weak id a;
-  S b;         // expected-error {{union member 'b' has a non-trivial copy constructor}}
+  S b;
 };
 
 void testCast(AnObject *o) {

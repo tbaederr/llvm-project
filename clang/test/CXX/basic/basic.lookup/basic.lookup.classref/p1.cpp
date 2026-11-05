@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // C++98 [basic.lookup.classref]p1:
@@ -24,15 +23,9 @@
 // From PR 7247
 template<typename T>
 struct set{};
-#if __cplusplus <= 199711L
-// expected-note@-2 {{lookup from the current scope refers here}}
-#endif
 struct Value {
   template<typename T>
   void set(T value) {}
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{lookup in the object type 'Value' refers here}}
-#endif
 
   void resolves_to_same() {
     Value v;
@@ -45,9 +38,6 @@ void resolves_to_different() {
     // The fact that the next line is a warning rather than an error is an
     // extension.
     v.set<double>(3.2);
-#if __cplusplus <= 199711L
-    // expected-warning@-2 {{lookup of 'set' in member access expression is ambiguous; using member of 'Value'}}
-#endif
   }
   {
     int set;  // Non-template.

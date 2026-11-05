@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 %s -triple=x86_64-apple-darwin10 -emit-llvm -std=c++98 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK98 %s
 // RUN: %clang_cc1 %s -triple=x86_64-apple-darwin10 -emit-llvm -std=c++11 -o - | FileCheck -check-prefix=CHECK -check-prefix=CHECK11 %s
 
 // Check that IR gen doesn't try to do an lvalue-to-rvalue conversion
@@ -38,7 +37,6 @@ namespace PR40642 {
   template <class T> struct S {
     // CHECK-LABEL: define {{.*}} @_ZN7PR406421SIiE3fooEv(
     void foo() {
-      // CHECK98-NOT: load volatile
       // CHECK11: load volatile
       if (true)
         reinterpret_cast<const volatile unsigned char *>(m_ptr)[0];

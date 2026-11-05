@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s bugprone-empty-catch %t -- \
+// RUN: %check_clang_tidy -std=c++11-or-later %s bugprone-empty-catch %t -- \
 // RUN: -config="{CheckOptions: {bugprone-empty-catch.AllowEmptyCatchForExceptions: '::SafeException;WarnException', \
 // RUN:        bugprone-empty-catch.IgnoreCatchWithKeywords: '@IGNORE;@TODO'}}" -- -fexceptions
 

@@ -1,12 +1,7 @@
-// RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++98 -verify -fsyntax-only %s -Wno-c++11-extensions -Wno-c++1y-extensions -DPRECXX11
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++11 -verify -fsyntax-only -Wno-c++1y-extensions %s
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++1y -verify -fsyntax-only %s -DCPP1Y
 
 #define CONST const
-
-#ifdef PRECXX11
-#define static_assert _Static_assert
-#endif
 
 class A {
   template<typename T> CONST T wrong;           // expected-error {{non-static data member 'wrong' cannot be declared as a template}}
@@ -15,12 +10,8 @@ class A {
   template<typename T> static CONST T right<T,int> = 5;
   template<typename T> CONST int right<int,T>;  // expected-error {{non-static data member 'right' cannot be declared as a template}}
   template<typename T> CONST float right<float,T> = 5;  // expected-error {{non-static data member 'right' cannot be declared as a template}}
-#ifdef PRECXX11
-                                                        // expected-warning@-2 {{in-class initializer for static data member of type 'const float' is a GNU extension}}
-#else
-                                                        // expected-error@-4 {{in-class initializer for static data member of type 'const float' requires 'constexpr' specifier}}
-                                                        // expected-note@-5 {{add 'constexpr'}}
-#endif
+                                                        // expected-error@-1 {{in-class initializer for static data member of type 'const float' requires 'constexpr' specifier}}
+                                                        // expected-note@-2 {{add 'constexpr'}}
   template<> CONST int right<int,int> = 7;
   template<> CONST float right<float,int>;
   template static CONST int right<int,int>;     // expected-error {{expected '<' after 'template'}}
@@ -158,7 +149,6 @@ namespace non_const_init {
   }
 }
 
-#ifndef PRECXX11
 namespace constexpred {
   class A {
     template<typename T> constexpr T wrong;           // expected-error {{non-static data member 'wrong' cannot be declared as a template}}
@@ -174,7 +164,6 @@ namespace constexpred {
     template static constexpr int right<int,int>;     // expected-error {{expected '<' after 'template'}}
   };
 }
-#endif
 
 namespace in_class_template {
 
@@ -434,7 +423,6 @@ namespace dependent_static_var_template {
 #endif
 }
 
-#ifndef PRECXX11
 namespace template_vars_in_template {
 template <int> struct TakesInt {};
 
@@ -461,4 +449,3 @@ void useit() {
   x.mf2(); // expected-note{{in instantiation of member function 'template_vars_in_template::S<int>::mf2' requested here}}
 }
 }
-#endif

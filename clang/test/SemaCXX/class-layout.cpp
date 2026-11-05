@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -triple x86_64-unknown-unknown %s -fsyntax-only -verify -std=c++98 -Wno-inaccessible-base -Wno-invalid-offsetof -Wno-c++11-extensions
 // RUN: %clang_cc1 -triple x86_64-unknown-unknown %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -Wno-invalid-offsetof
 // RUN: %clang_cc1 -triple x86_64-apple-darwin    %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -Wno-invalid-offsetof -DCLANG_ABI_COMPAT=15
 // RUN: %clang_cc1 -triple x86_64-scei-ps4        %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -Wno-invalid-offsetof -DCLANG_ABI_COMPAT=6
@@ -14,7 +13,6 @@
 // RUN: %clang_cc1 -triple s390x-none-zos %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -Wno-invalid-offsetof
 // RUN: %clang_cc1 -triple s390x-none-zos %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -Wno-invalid-offsetof -fclang-abi-compat=15 -DCLANG_ABI_COMPAT=15
 
-// RUN: %clang_cc1 -fexperimental-new-constant-interpreter -triple x86_64-unknown-unknown %s -fsyntax-only -verify -std=c++98 -Wno-inaccessible-base -Wno-c++11-extensions -Wno-invalid-offsetof
 // RUN: %clang_cc1 -fexperimental-new-constant-interpreter -triple x86_64-unknown-unknown %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -Wno-invalid-offsetof
 // RUN: %clang_cc1 -fexperimental-new-constant-interpreter -triple x86_64-apple-darwin    %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -DCLANG_ABI_COMPAT=15 -Wno-invalid-offsetof
 // RUN: %clang_cc1 -fexperimental-new-constant-interpreter -triple x86_64-scei-ps4        %s -fsyntax-only -verify -std=c++11 -Wno-inaccessible-base -DCLANG_ABI_COMPAT=6 -Wno-invalid-offsetof

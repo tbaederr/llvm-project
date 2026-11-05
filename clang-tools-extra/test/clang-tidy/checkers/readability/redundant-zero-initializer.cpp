@@ -1,4 +1,3 @@
-// RUN: %check_clang_tidy -std=c++98,c++03 %s readability-redundant-zero-initializer %t
 // RUN: %check_clang_tidy -std=c++11 -check-suffixes=,CXX11 %s readability-redundant-zero-initializer %t
 // RUN: %check_clang_tidy -std=c++14-or-later -check-suffixes=,CXX11 %s readability-redundant-zero-initializer %t
 

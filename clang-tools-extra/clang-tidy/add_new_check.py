@@ -649,8 +649,7 @@ def main() -> None:
         "objc++": "mm",
     }
     cpp_language_to_requirements = {
-        "c++98": "CPlusPlus",
-        "c++11": "CPlusPlus11",
+        "c++11": "CPlusPlus",
         "c++14": "CPlusPlus14",
         "c++17": "CPlusPlus17",
         "c++20": "CPlusPlus20",

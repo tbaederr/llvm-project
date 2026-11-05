@@ -359,7 +359,7 @@ static bool lval(InterpState &S, const ASTContext &Ctx, const Pointer &Ptr,
   bool IsSubObj = !Ptr.isRoot() || (Ptr.inArray() && !Ptr.isArrayRoot());
 
   if (!isGlobalLValue(Ptr)) {
-    if (S.getLangOpts().CPlusPlus11) {
+    if (S.getLangOpts().CPlusPlus) {
       S.FFDiag(Info, diag::note_constexpr_non_global, 1)
           << IsReferenceType << IsSubObj << !!BaseVD << BaseVD;
       const VarDecl *VarD = dyn_cast_if_present<VarDecl>(BaseVD);

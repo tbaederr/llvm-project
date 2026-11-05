@@ -4815,11 +4815,7 @@ NestedNameSpecifierLoc TreeTransform<Derived>::TransformNestedNameSpecifierLoc(
         TL = TLB.getTypeLocInContext(SemaRef.Context, T);
       }
 
-      if (T->isDependentType() || T->isRecordType() ||
-          (SemaRef.getLangOpts().CPlusPlus11 && T->isEnumeralType())) {
-        if (T->isEnumeralType())
-          SemaRef.Diag(TL.getBeginLoc(),
-                       diag::warn_cxx98_compat_enum_nested_name_spec);
+      if (T->isDependentType() || T->isRecordType() || T->isEnumeralType()) {
         SS.Make(SemaRef.Context, TL, Q.getLocalEndLoc());
         break;
       }

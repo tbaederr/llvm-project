@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-17,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx14-17,cxx11-17,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx14-17,cxx11-17,since-cxx11,since-cxx14
@@ -6,7 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx20
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx20
 
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx11-17,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx14-17,cxx11-17,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -fexperimental-new-constant-interpreter -verify-directives -verify=expected,cxx14-17,cxx11-17,since-cxx11,since-cxx14
@@ -63,7 +61,6 @@ namespace cwg1417 { // cwg1417: 3.5
 }
 
 namespace cwg1423 { // cwg1423: 11
-#if __cplusplus >= 201103L
   bool b1 = nullptr;
   // since-cxx11-error@-1 {{cannot initialize a variable of type 'bool' with an rvalue of type 'std::nullptr_t'}}
   bool b2(nullptr);
@@ -72,13 +69,11 @@ namespace cwg1423 { // cwg1423: 11
   // since-cxx11-error@-1 {{cannot initialize a variable of type 'bool' with an rvalue of type 'std::nullptr_t'}}
   bool b4{nullptr};
   // since-cxx11-warning@-1 {{implicit conversion of nullptr constant to 'bool'}}
-#endif
 } // namespace 1423
 
 // cwg1425: na abi
 
 namespace cwg1432 { // cwg1432: 16 open 2022-11-11
-#if __cplusplus >= 201103L
   namespace class_template_partial_spec {
     template<typename T> T declval();
 
@@ -107,7 +102,6 @@ namespace cwg1432 { // cwg1432: 16 open 2022-11-11
       f(A<0>());
     }
   } // namespace function_template
-#endif
 } // namespace cwg1432
 
 namespace cwg1439 { // cwg1439: 2.7
@@ -161,7 +155,6 @@ struct A {
 } // namespace cwg1443
 
 namespace cwg1458 { // cwg1458: 3.1
-#if __cplusplus >= 201103L
 struct A;
 
 void f() {
@@ -176,11 +169,9 @@ void f() {
 struct A {
   int operator&();
 };
-#endif
 } // namespace cwg1458
 
 namespace cwg1460 { // cwg1460: 3.5
-#if __cplusplus >= 201103L
   namespace DRExample {
     union A {
       union {};
@@ -432,10 +423,8 @@ namespace cwg1460 { // cwg1460: 3.5
     constexpr D d {};
     static_assert(d.a == 0, "");
   }
-#endif
 } // namespace cwg1460
 
-#if __cplusplus >= 201103L
 namespace std {
   typedef decltype(sizeof(int)) size_t;
 
@@ -465,10 +454,8 @@ namespace std {
     const _E* end()   const {return __begin_ + __size_;}
   };
 } // namespace std
-#endif
 
 namespace cwg1467 {  // cwg1467: 3.7 c++11
-#if __cplusplus >= 201103L
   // Note that the change to [over.best.ics] was partially undone by CWG2076;
   // the resulting rule is tested with the tests for that change.
 
@@ -676,7 +663,6 @@ namespace cwg1467 {  // cwg1467: 3.7 c++11
     //   since-cxx11-note@#cwg1467-f-char32-4 {{candidate function not viable: expects an rvalue for 1st argument}}
   }
   } // namespace StringLiterals
-#endif
 } // namespace cwg1467
 
 namespace cwg1477 { // cwg1477: 2.7
@@ -702,25 +688,20 @@ int i = N::f();
 } // namespace cwg1477
 
 namespace cwg1479 { // cwg1479: 3.1
-#if __cplusplus >= 201103L
   int operator""_a(const char*, std::size_t = 0);
   // since-cxx11-error@-1 {{literal operator cannot have a default argument}}
-#endif
 } // namespace cwg1479
 
 namespace cwg1482 { // cwg1482: 3.0
                    // NB: sup 2516, test reused there
-#if __cplusplus >= 201103L
 template <typename T> struct S {
   typedef char I;
 };
 enum E2 : S<E2>::I { e };
 // since-cxx11-error@-1 {{use of undeclared identifier 'E2'}}
-#endif
 } // namespace cwg1482
 
 namespace cwg1487 { // cwg1487: 3.3
-#if __cplusplus >= 201103L
 struct A { // #cwg1482-A
   struct B {
     using A::A;
@@ -740,21 +721,17 @@ struct A { // #cwg1482-A
 struct D : A {
   using A::A;
 };
-#endif
 } // namespace cwg1487
 
 namespace cwg1490 {  // cwg1490: 3.7 c++11
-#if __cplusplus >= 201103L
   // List-initialization from a string literal
 
   char s[4]{"abc"}; // Ok
   std::initializer_list<char>{"abc"};
   // since-cxx11-error@-1 {{expected unqualified-id}}}
-#endif
 } // namespace cwg1490
 
 namespace cwg1495 { // cwg1495: 4
-#if __cplusplus >= 201103L
   // Deduction succeeds in both directions.
   template<typename T, typename U> struct A {}; // #cwg1495-A
   template<typename T, typename U> struct A<U, T> {};
@@ -792,16 +769,13 @@ namespace cwg1495 { // cwg1495: 4
   // since-cxx14-error@-1 {{variable template partial specialization is not more specialized than the primary template}}
   //   since-cxx14-note@#cwg1495-c {{template is declared here}}
 #endif
-#endif
 } // namespace cwg1495
 
 namespace cwg1496 { // cwg1496: no
-#if __cplusplus >= 201103L
 struct A {
     A() = delete;
 };
 // FIXME: 'A' should not be trivial because the class lacks at least one
 // default constructor which is not deleted.
 static_assert(__is_trivial(A), "");
-#endif
 } // namespace cwg1496

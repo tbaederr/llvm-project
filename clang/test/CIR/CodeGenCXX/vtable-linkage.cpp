@@ -6,14 +6,6 @@
 // RUN: %clang_cc1 %s -triple=x86_64-pc-linux -emit-llvm -o %t-classic.ll
 // RUN: FileCheck %s --input-file=%t-classic.ll --check-prefixes=LLVM
 //
-// RUN: %clang_cc1 -triple x86_64-pc-linux -std=c++03 -fclangir -emit-cir -mmlir --mlir-print-ir-before=cir-lowering-prepare %s -o %t.cir 2> %t-before.cir
-// RUN: FileCheck %s --input-file=%t-before.cir --check-prefixes=CIR
-// RUN: FileCheck %s --input-file=%t.cir --check-prefixes=CIR
-// RUN: %clang_cc1 %s -triple=x86_64-pc-linux -std=c++03 -fclangir -emit-llvm -o %t-cir.ll
-// RUN: FileCheck %s --input-file=%t-cir.ll --check-prefixes=LLVM
-// RUN: %clang_cc1 %s -triple=x86_64-pc-linux -std=c++03 -emit-llvm -o %t-classic.ll
-// RUN: FileCheck %s --input-file=%t-classic.ll --check-prefixes=LLVM
-//
 // RUN: %clang_cc1 -triple x86_64-pc-linux -std=c++11 -fclangir -emit-cir -mmlir --mlir-print-ir-before=cir-lowering-prepare %s -o %t.cir 2> %t-before.cir
 // RUN: FileCheck %s --input-file=%t-before.cir --check-prefixes=CIR
 // RUN: FileCheck %s --input-file=%t.cir --check-prefixes=CIR

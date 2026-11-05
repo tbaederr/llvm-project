@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++20 %s
 
@@ -31,12 +30,8 @@ namespace test3 {
 
   void test0() {
     pair<int, int> z = minmax({});
-#if __cplusplus <= 199711L // C++03 or earlier modes
-    // expected-error@-2 {{expected expression}}
-#else
-    // expected-error@-4 {{no matching function for call to 'minmax'}}
-    // expected-note@-8 {{candidate template ignored: couldn't infer template argument '_Tp'}}
-#endif
+    // expected-error@-1 {{no matching function for call to 'minmax'}}
+    // expected-note@-5 {{candidate template ignored: couldn't infer template argument '_Tp'}}
   }
 
   struct string {

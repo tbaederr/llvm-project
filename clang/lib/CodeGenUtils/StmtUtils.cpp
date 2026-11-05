@@ -43,7 +43,7 @@ bool checkIfLoopMustProgress(const LangOptions &LangOpts,
   // [...]
   // - continue execution of a trivial infinite loop ([stmt.iter.general]).
   if (CGOpts.getFiniteLoops() == CodeGenOptions::FiniteLoopsKind::Always ||
-      LangOpts.CPlusPlus11) {
+      LangOpts.CPlusPlus) {
     if (HasEmptyBody && CondIsTrue) {
       RemoveMustProgress();
       return false;

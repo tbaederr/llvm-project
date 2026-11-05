@@ -297,8 +297,7 @@ bool Sema::ActOnSuperScopeSpecifier(SourceLocation SuperLoc,
   return false;
 }
 
-bool Sema::isAcceptableNestedNameSpecifier(const NamedDecl *SD,
-                                           bool *IsExtension) {
+bool Sema::isAcceptableNestedNameSpecifier(const NamedDecl *SD) {
   if (!SD)
     return false;
 
@@ -311,24 +310,14 @@ bool Sema::isAcceptableNestedNameSpecifier(const NamedDecl *SD,
   if (!isa<TypeDecl>(SD))
     return false;
 
-  // Determine whether we have a class (or, in C++11, an enum) or
-  // a typedef thereof. If so, build the nested-name-specifier.
+  // Determine whether we have a class or an enum or a typedef thereof. If so,
+  // build the nested-name-specifier.
   if (const TypedefNameDecl *TD = dyn_cast<TypedefNameDecl>(SD)) {
-    if (TD->getUnderlyingType()->isRecordType())
+    if (TD->getUnderlyingType()->isRecordType() ||
+        TD->getUnderlyingType()->isEnumeralType())
       return true;
-    if (TD->getUnderlyingType()->isEnumeralType()) {
-      if (Context.getLangOpts().CPlusPlus11)
-        return true;
-      if (IsExtension)
-        *IsExtension = true;
-    }
-  } else if (isa<RecordDecl>(SD)) {
+  } else if (isa<RecordDecl>(SD) || isa<EnumDecl>(SD)) {
     return true;
-  } else if (isa<EnumDecl>(SD)) {
-    if (Context.getLangOpts().CPlusPlus11)
-      return true;
-    if (IsExtension)
-      *IsExtension = true;
   }
   if (auto *TD = dyn_cast<TagDecl>(SD)) {
     if (TD->isDependentType())
@@ -477,7 +466,6 @@ bool Sema::BuildCXXNestedNameSpecifier(Scope *S, NestedNameSpecInfo &IdInfo,
     Found.setContextRange(SS.getRange());
   }
 
-  bool ObjectTypeSearchedInScope = false;
   if (LookupCtx) {
     // Perform "qualified" name lookup into the declaration context we
     // computed, which is either the type of the base of a member access
@@ -516,8 +504,6 @@ bool Sema::BuildCXXNestedNameSpecifier(Scope *S, NestedNameSpecInfo &IdInfo,
         LookupName(Found, S);
       else if (ScopeLookupResult)
         Found.addDecl(ScopeLookupResult);
-
-      ObjectTypeSearchedInScope = true;
     }
   } else if (!isDependent) {
     // Perform unqualified name lookup in the current scope.
@@ -626,55 +612,7 @@ bool Sema::BuildCXXNestedNameSpecifier(Scope *S, NestedNameSpecInfo &IdInfo,
 
   NamedDecl *SD =
       Found.isSingleResult() ? Found.getRepresentativeDecl() : nullptr;
-  bool IsExtension = false;
-  bool AcceptSpec = isAcceptableNestedNameSpecifier(SD, &IsExtension);
-  if (!AcceptSpec && IsExtension) {
-    AcceptSpec = true;
-    Diag(IdInfo.IdentifierLoc, diag::ext_nested_name_spec_is_enum);
-  }
-  if (AcceptSpec) {
-    if (!ObjectType.isNull() && !ObjectTypeSearchedInScope &&
-        !getLangOpts().CPlusPlus11) {
-      // C++03 [basic.lookup.classref]p4:
-      //   [...] If the name is found in both contexts, the
-      //   class-name-or-namespace-name shall refer to the same entity.
-      //
-      // We already found the name in the scope of the object. Now, look
-      // into the current scope (the scope of the postfix-expression) to
-      // see if we can find the same name there. As above, if there is no
-      // scope, reconstruct the result from the template instantiation itself.
-      //
-      // Note that C++11 does *not* perform this redundant lookup.
-      NamedDecl *OuterDecl;
-      if (S) {
-        LookupResult FoundOuter(*this, IdInfo.Identifier, IdInfo.IdentifierLoc,
-                                LookupNestedNameSpecifierName);
-        LookupName(FoundOuter, S);
-        OuterDecl = FoundOuter.getAsSingle<NamedDecl>();
-      } else
-        OuterDecl = ScopeLookupResult;
-
-      if (isAcceptableNestedNameSpecifier(OuterDecl) &&
-          OuterDecl->getCanonicalDecl() != SD->getCanonicalDecl() &&
-          (!isa<TypeDecl>(OuterDecl) || !isa<TypeDecl>(SD) ||
-           !Context.hasSameType(
-               Context.getCanonicalTypeDeclType(cast<TypeDecl>(OuterDecl)),
-               Context.getCanonicalTypeDeclType(cast<TypeDecl>(SD))))) {
-        if (ErrorRecoveryLookup)
-          return true;
-
-         Diag(IdInfo.IdentifierLoc,
-              diag::err_nested_name_member_ref_lookup_ambiguous)
-           << IdInfo.Identifier;
-         Diag(SD->getLocation(), diag::note_ambig_member_ref_object_type)
-           << ObjectType;
-         Diag(OuterDecl->getLocation(), diag::note_ambig_member_ref_scope);
-
-         // Fall through so that we'll pick the name we found in the object
-         // type, since that's probably what the user wanted anyway.
-      }
-    }
-
+  if (isAcceptableNestedNameSpecifier(SD)) {
     MarkAnyDeclReferenced(SD->getLocation(), SD, /*OdrUse=*/false);
 
     // If we're just performing this lookup for error-recovery purposes,
@@ -694,10 +632,6 @@ bool Sema::BuildCXXNestedNameSpecifier(Scope *S, NestedNameSpecInfo &IdInfo,
       SS.Extend(Context, Alias, IdInfo.IdentifierLoc, IdInfo.CCLoc);
       return false;
     }
-
-    const auto *TD = cast<TypeDecl>(SD->getUnderlyingDecl());
-    if (isa<EnumDecl>(TD))
-      Diag(IdInfo.IdentifierLoc, diag::warn_cxx98_compat_enum_nested_name_spec);
 
     [[maybe_unused]] bool IsType = ::ExtendNestedNameSpecifier(
         *this, SS, SD, IdInfo.IdentifierLoc, IdInfo.CCLoc);

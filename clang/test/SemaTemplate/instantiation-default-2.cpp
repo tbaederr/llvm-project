@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17,precxx20 %std_cxx98-14 %s
+// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17,precxx20 %std_cxx11-14 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx17,precxx20 -std=c++17 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx20 %std_cxx20- %s
 

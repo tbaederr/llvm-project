@@ -23,7 +23,7 @@ class LambdaFunctionNameCheck : public ClangTidyCheck {
 public:
   LambdaFunctionNameCheck(StringRef Name, ClangTidyContext *Context);
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
 
   void storeOptions(ClangTidyOptions::OptionMap &Opts) override;

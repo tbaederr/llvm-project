@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s cppcoreguidelines-pro-bounds-constant-array-index %t
+// RUN: %check_clang_tidy -std=c++11-or-later %s cppcoreguidelines-pro-bounds-constant-array-index %t
 
 template <int index> struct B {
   int get() {

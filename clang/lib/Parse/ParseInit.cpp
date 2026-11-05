@@ -356,7 +356,7 @@ ExprResult Parser::ParseInitializerWithPotentialDesignator(
   // Handle a C++20 braced designated initialization, which results in
   // direct-list-initialization of the aggregate element. We allow this as an
   // extension from C++11 onwards (when direct-list-initialization was added).
-  if (Tok.is(tok::l_brace) && getLangOpts().CPlusPlus11) {
+  if (Tok.is(tok::l_brace) && getLangOpts().CPlusPlus) {
     PreferredType.enterDesignatedInitializer(
         Tok.getLocation(), DesignatorCompletion.PreferredBaseType, Desig);
     return Actions.ActOnDesignatedInitializer(Desig, SourceLocation(), false,

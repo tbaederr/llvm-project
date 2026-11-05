@@ -262,7 +262,7 @@ bool clang::analyze_format_string::ParseLengthModifier(FormatSpecifier &FS,
     ++I;
     break;
   case 'a':
-    if (IsScanf && !LO.C99 && !LO.CPlusPlus11) {
+    if (IsScanf && !LO.C99 && !LO.CPlusPlus) {
       // For scanf in C90, look at the next character to see if this should
       // be parsed as the GNU extension 'a' length modifier. If not, this
       // will be parsed as a conversion specifier.

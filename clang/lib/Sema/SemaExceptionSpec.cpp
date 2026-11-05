@@ -120,8 +120,6 @@ bool Sema::CheckSpecifiedExceptionType(QualType &T, SourceRange Range) {
   //   A type cv T, "array of T", or "function returning T" denoted
   //   in an exception-specification is adjusted to type T, "pointer to T", or
   //   "pointer to function returning T", respectively.
-  //
-  // We also apply this rule in C++98.
   if (T->isArrayType())
     T = Context.getArrayDecayedType(T);
   else if (T->isFunctionType())
@@ -329,7 +327,7 @@ bool Sema::CheckEquivalentExceptionSpec(FunctionDecl *Old, FunctionDecl *New) {
     //   If a declaration of a function has an implicit
     //   exception-specification, other declarations of the function shall
     //   not specify an exception-specification.
-    if (getLangOpts().CPlusPlus11 && getLangOpts().CXXExceptions &&
+    if (getLangOpts().CXXExceptions &&
         hasImplicitExceptionSpec(Old) != hasImplicitExceptionSpec(New)) {
       Diag(New->getLocation(), diag::ext_implicit_exception_spec_mismatch)
         << hasImplicitExceptionSpec(Old);
@@ -612,10 +610,10 @@ static bool CheckEquivalentExceptionSpecImpl(
       return false;
   }
 
-  // As a special compatibility feature, under C++0x we accept no spec and
+  // As a special compatibility feature, we accept no spec and
   // throw(std::bad_alloc) as equivalent for operator new and operator new[].
   // This is because the implicit declaration changed, but old code would break.
-  if (S.getLangOpts().CPlusPlus11 && IsOperatorNew) {
+  if (IsOperatorNew) {
     const FunctionProtoType *WithExceptions = nullptr;
     if (OldEST == EST_None && NewEST == EST_Dynamic)
       WithExceptions = New;

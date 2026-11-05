@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98 -ast-dump | FileCheck %s --check-prefixes CXX98
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
@@ -6,10 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace cwg2149 { // cwg2149: 3.1
 #if __cplusplus <= 201103L
@@ -31,7 +26,6 @@ void f() {
   X c[][2] = { 1, 2, 3, 4, 5, 6 };
   static_assert(sizeof(c) / sizeof(X[2]) == 1, "");
 
-  #if __cplusplus >= 201103L
   constexpr X ca[] = { 1, 2, 3, 4, 5, 6 };
   constexpr X cb[2] = { { 1, 2, 3 }, { 4, 5, 6 } };
   static_assert(ca[0].i == cb[0].i, "");
@@ -47,31 +41,5 @@ void f() {
   f2({ 1, 2, 3, 4, 5, 6 });
   // since-cxx11-error@-1 {{no matching function for call to 'f2'}}
   //   since-cxx11-note@#cwg2149-f2 {{candidate function [with N = 6] not viable: no known conversion from 'int' to 'const X[2]' for 1st argument}}
-  #endif
 }
 } // namespace cwg2149
-
-// Constant evaluation is not powerful enough in 98 mode to check for equality
-// via static_assert, even with constant folding enabled.
-
-// CXX98:       VarDecl {{.+}} a 'X[2]'
-// CXX98-NEXT:  `-InitListExpr {{.+}} 'X[2]' explicit
-// CXX98-NEXT:    |-InitListExpr {{.+}} 'X' implicit{{$}}
-// CXX98-NEXT:    | |-IntegerLiteral {{.+}} 'int' 1
-// CXX98-NEXT:    | |-IntegerLiteral {{.+}} 'int' 2
-// CXX98-NEXT:    | `-IntegerLiteral {{.+}} 'int' 3
-// CXX98-NEXT:    `-InitListExpr {{.+}} 'X' implicit{{$}}
-// CXX98-NEXT:      |-IntegerLiteral {{.+}} 'int' 4
-// CXX98-NEXT:      |-IntegerLiteral {{.+}} 'int' 5
-// CXX98-NEXT:      `-IntegerLiteral {{.+}} 'int' 6
-
-// CXX98:       VarDecl {{.+}} b 'X[2]'
-// CXX98-NEXT:  `-InitListExpr {{.+}} 'X[2]' explicit
-// CXX98-NEXT:    |-InitListExpr {{.+}} 'X' explicit{{$}}
-// CXX98-NEXT:    | |-IntegerLiteral {{.+}} 'int' 1
-// CXX98-NEXT:    | |-IntegerLiteral {{.+}} 'int' 2
-// CXX98-NEXT:    | `-IntegerLiteral {{.+}} 'int' 3
-// CXX98-NEXT:    `-InitListExpr {{.+}} 'X' explicit{{$}}
-// CXX98-NEXT:      |-IntegerLiteral {{.+}} 'int' 4
-// CXX98-NEXT:      |-IntegerLiteral {{.+}} 'int' 5
-// CXX98-NEXT:      `-IntegerLiteral {{.+}} 'int' 6

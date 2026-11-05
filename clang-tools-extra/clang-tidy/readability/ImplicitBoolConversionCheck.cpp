@@ -57,7 +57,7 @@ static StringRef getZeroLiteralToCompareWithForType(CastKind CastExprKind,
 
   case CK_PointerToBoolean:
   case CK_MemberPointerToBoolean: // Fall-through on purpose.
-    return (Context.getLangOpts().CPlusPlus11 || Context.getLangOpts().C23)
+    return (Context.getLangOpts().CPlusPlus || Context.getLangOpts().C23)
                ? "nullptr"
                : "0";
 
@@ -198,8 +198,8 @@ static void fixGenericExprCastFromBool(const DiagnosticBuilder &Diag,
 static StringRef
 getEquivalentForBoolLiteral(const CXXBoolLiteralExpr *BoolLiteral,
                             QualType DestType, const ASTContext &Context) {
-  // Prior to C++11, false literal could be implicitly converted to pointer.
-  if (!Context.getLangOpts().CPlusPlus11 &&
+  // In C, false literal can be implicitly converted to pointer.
+  if (!Context.getLangOpts().CPlusPlus &&
       (DestType->isPointerType() || DestType->isMemberPointerType()) &&
       BoolLiteral->getValue() == false) {
     return "0";

@@ -30,26 +30,7 @@ defm generic_with_type_arg : C2yCompat<
   "passing a type argument as the first operand to '_Generic' is">;
 
 // C++11 compatibility with C++98.
-defm cxx_enum_fixed_underlying_type : CXX11Compat<
-  "enumeration types with a fixed underlying type are",
-  /*ext_warn=*/false>;
 defm for_range : CXX11Compat<"range-based for loop is">;
-defm scoped_enum : CXX11Compat<"scoped enumerations are">;
-defm rvalue_reference : CXX11Compat<"rvalue references are">;
-defm ref_qualifier : CXX11Compat<"reference qualifiers on functions are">;
-defm generalized_initializer_lists : CXX11Compat<
-  "generalized initializer lists are">;
-defm cxx11_attributes : CXX11Compat<"[[]] attributes are", /*ext_warn*/false>;
-defm defaulted_deleted_function : CXX11Compat<
-  "%select{defaulted|deleted}0 function definitions are">;
-defm nonstatic_member_init : CXX11Compat<
-  "default member initializer for non-static data member is">;
-defm alias_declaration : CXX11Compat<"alias declarations are">;
-defm override_control_keyword : CXX11Compat<"'%0' keyword is">;
-defm inline_namespace : CXX11Compat<"inline namespaces are">;
-defm extern_template : CXX11Compat<"extern templates are", /*ext_warn*/false>;
-defm cxx_enumerator_list_comma : CXX11Compat<
-  "commas at the end of enumerator lists are", /*ext_warn*/false>;
 
 // C++14 compatibility with C++11 and earlier.
 defm decltype_auto_type_specifier : CXX14Compat<
@@ -125,9 +106,6 @@ let CategoryName = "Parse Issue" in {
 def ext_empty_translation_unit : Extension<
   "ISO C requires a translation unit to contain at least one declaration">,
   InGroup<DiagGroup<"empty-translation-unit">>;
-def warn_cxx98_compat_top_level_semi : Warning<
-  "extra ';' outside of a function is incompatible with C++98">,
-  InGroup<CXX98CompatExtraSemi>, DefaultIgnore;
 def ext_extra_semi : Extension<
   "extra ';' %select{"
   "outside of a function|"
@@ -135,9 +113,6 @@ def ext_extra_semi : Extension<
   "inside instance variable list|"
   "after member function definition}0">,
   InGroup<ExtraSemi>;
-def ext_extra_semi_cxx11 : Extension<
-  "extra ';' outside of a function is a C++11 extension">,
-  InGroup<CXX11ExtraSemi>;
 def warn_extra_semi_after_mem_fn_def : Warning<
   "extra ';' after member function definition">,
   InGroup<ExtraSemi>, DefaultIgnore;
@@ -212,9 +187,6 @@ def err_anonymous_enum_bitfield : Error<
   "ISO C++ only allows ':' in member enumeration declaration to introduce "
   "a fixed underlying type, not an anonymous bit-field">;
 
-def warn_cxx98_compat_alignof : Warning<
-  "alignof expressions are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def ext_alignof_expr : ExtWarn<
   "%0 applied to an expression is a GNU extension">, InGroup<GNUAlignofExpression>;
 def err_lambda_after_delete : Error<
@@ -425,9 +397,6 @@ def err_illegal_decl_reference_to_reference : Error<
   "%0 declared as a reference to a reference">;
 def err_init_list_bin_op : Error<"initializer list cannot be used on the "
   "%select{left|right}0 hand side of operator '%1'">;
-def warn_cxx98_compat_trailing_return_type : Warning<
-  "trailing return types are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def err_requires_clause_must_appear_after_trailing_return : Error<
   "trailing return type must appear before trailing requires clause">;
 def err_requires_clause_on_declarator_not_declaring_a_function : Error<
@@ -457,9 +426,6 @@ def warn_deprecated_missing_comma_before_ellipsis : Warning<
   InGroup<DeprecatedMissingCommaVariadicParam>;
 def err_unexpected_typedef_ident : Error<
   "unexpected type name %0: expected identifier">;
-def warn_cxx98_compat_decltype : Warning<
-  "'decltype' type specifier is incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def err_unexpected_scope_on_base_decltype : Error<
   "unexpected namespace scope prior to decltype">;
 def err_expected_class_name : Error<"expected class name">;
@@ -514,9 +480,6 @@ def err_unexpected_token_in_nested_name_spec : Error<
   "'%0' cannot be a part of nested name specifier; did you mean ':'?">;
 def err_bool_redeclaration : Error<
   "redeclaration of C++ built-in type 'bool'">;
-def warn_cxx98_compat_static_assert : Warning<
-  "'static_assert' declarations are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def err_function_definition_not_allowed : Error<
   "function definition is not allowed here">;
 def err_expected_end_of_enumerator : Error<
@@ -657,9 +620,6 @@ def warn_exception_spec_deprecated : Warning<
   "dynamic exception specifications are deprecated">,
   InGroup<DeprecatedDynamicExceptionSpec>, DefaultIgnore;
 def note_exception_spec_deprecated : Note<"use '%0' instead">;
-def warn_cxx98_compat_noexcept_decl : Warning<
-  "noexcept specifications are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def err_expected_catch : Error<"expected catch">;
 def err_using_namespace_in_class : Error<
   "'using namespace' is not allowed in classes">;
@@ -719,9 +679,6 @@ def err_literal_operator_string_prefix : Error<
   "string literal after 'operator' cannot have an encoding prefix">;
 def err_literal_operator_string_not_empty : Error<
   "string literal after 'operator' must be '\"\"'">;
-def warn_cxx98_compat_literal_operator : Warning<
-  "literal operators are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 
 // Classes.
 def err_anon_type_definition : Error<
@@ -730,19 +687,12 @@ def err_default_delete_in_multiple_declaration : Error<
   "'= %select{default|delete}0' is a function definition and must occur in a "
   "standalone declaration">;
 
-def warn_cxx98_compat_noexcept_expr : Warning<
-  "noexcept expressions are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
-def warn_cxx98_compat_nullptr : Warning<
-  "'nullptr' is incompatible with C++98">, InGroup<CXX98Compat>, DefaultIgnore;
 def ext_c_nullptr : Extension<
   "'nullptr' is a C23 extension">, InGroup<C23>;
 
 def warn_wrong_clang_attr_namespace : Warning<
   "'__clang__' is a predefined macro name, not an attribute scope specifier; "
   "did you mean '_Clang' instead?">, InGroup<IgnoredAttributes>;
-def warn_cxx98_compat_alignas : Warning<"'alignas' is incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def err_cxx11_attribute_forbids_arguments : Error<
   "attribute %0 cannot have an argument list">;
 def err_attribute_requires_arguments : Error<
@@ -821,12 +771,6 @@ def err_two_right_angle_brackets_need_space : Error<
 def err_right_angle_bracket_equal_needs_space : Error<
   "a space is required between a right angle bracket and an equals sign "
   "(use '> =')">;
-def warn_cxx11_right_shift_in_template_arg : Warning<
-  "use of right-shift operator ('>>') in template argument will require "
-  "parentheses in C++11">, InGroup<CXX11Compat>;
-def warn_cxx98_compat_two_right_angle_brackets : Warning<
-  "consecutive right angle brackets are incompatible with C++98 (use '> >')">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def err_templated_invalid_declaration : Error<
   "a static_assert declaration cannot be a template">;
 def err_multiple_template_declarators : Error<
@@ -974,12 +918,7 @@ def err_this_captured_by_reference : Error<
 def err_expected_capture : Error<
   "expected variable name or 'this' in lambda capture list">;
 def err_expected_lambda_body : Error<"expected body of lambda expression">;
-def warn_cxx98_compat_lambda : Warning<
-  "lambda expressions are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
-def ext_lambda : ExtWarn<"lambdas are a %select{C++11|clang HLSL}0 extension">,
-  InGroup<CXX11>;
-def ext_hlsl_lambda : ExtWarn<ext_lambda.Summary>,
+def ext_hlsl_lambda : ExtWarn<"lambdas are a clang HLSL extension">,
   InGroup<HLSLExtension>;
 def err_lambda_decl_specifier_repeated : Error<
   "%select{'mutable'|'static'|'constexpr'|'consteval'}0 cannot "

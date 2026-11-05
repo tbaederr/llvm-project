@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -std=c++14 -fsyntax-only -verify -pedantic -fcxx-exceptions %s
-// RUN: %clang_cc1 -fsyntax-only -verify -pedantic -fcxx-exceptions -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -pedantic -fcxx-exceptions -std=c++11 %s
 
 class C;
@@ -75,29 +74,19 @@ public; // expected-error{{expected ':'}}
 
 class F {
     int F1 { return 1; }
-#if __cplusplus <= 199711L
-    // expected-error@-2 {{function definition does not declare parameters}}
-#else
-    // expected-error@-4 {{expected expression}}
-    // expected-error@-5 {{expected}}
-    // expected-note@-6 {{to match this '{'}}
-    // expected-error@-7 {{expected ';' after class}}
-#endif
+    // expected-error@-1 {{expected expression}}
+    // expected-error@-2 {{expected}}
+    // expected-note@-3 {{to match this '{'}}
+    // expected-error@-4 {{expected ';' after class}}
 
     void F2 {}
-#if __cplusplus <= 199711L
-    // expected-error@-2 {{function definition does not declare parameters}}
-#else
-    // expected-error@-4 {{variable has incomplete type 'void'}}
-    // expected-error@-5 {{expected ';' after top level declarator}}
-#endif
+    // expected-error@-1 {{variable has incomplete type 'void'}}
+    // expected-error@-2 {{expected ';' after top level declarator}}
 
     typedef int F3() { return 0; } // expected-error{{function definition declared 'typedef'}}
     typedef void F4() {} // expected-error{{function definition declared 'typedef'}}
 };
-#if __cplusplus >= 201103L
-// expected-error@-2 {{extraneous closing brace}}
-#endif
+// expected-error@-1 {{extraneous closing brace}}
 
 namespace ctor_error {
   class Foo {}; // #defined-here
@@ -229,36 +218,18 @@ namespace BadFriend {
 
 class PR20760_a {
   int a = ); // expected-error {{expected expression}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
 
   int b = }; // expected-error {{expected expression}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
 
   int c = ]; // expected-error {{expected expression}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
 
 };
 class PR20760_b {
   int d = d); // expected-error {{expected ';'}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
 
   int e = d]; // expected-error {{expected ';'}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
 
   int f = d // expected-error {{expected ';'}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
 
 };
 
@@ -279,11 +250,9 @@ namespace PR41192 {
 extern struct A a;
 struct A {} ::PR41192::a; // ok, no missing ';' here  expected-warning {{extra qualification}}
 
-#if __cplusplus >= 201103L
 struct C;
 struct D { static C c; };
 struct C {} decltype(D())::c; // expected-error {{a 'decltype' specifier cannot be used in a declarative nested name specifier}}
-#endif
 }
 
 namespace ArrayMemberAccess {

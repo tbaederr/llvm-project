@@ -1,9 +1,7 @@
 // RUN: %clang_cc1 -verify -fopenmp %s
-// RUN: %clang_cc1 -verify -fopenmp -std=c++98 %s
 // RUN: %clang_cc1 -verify -fopenmp -std=c++11 %s
 
 // RUN: %clang_cc1 -verify -fopenmp-simd %s
-// RUN: %clang_cc1 -verify -fopenmp-simd -std=c++98 %s
 // RUN: %clang_cc1 -verify -fopenmp-simd -std=c++11 %s
 
 // expected-note@* 0+{{declared here}}
@@ -56,11 +54,7 @@ T tmain(T argc, S **argv) {
 #pragma omp for ordered (0xFFFFFFFFFFFFFFFF) // expected-error {{argument to 'ordered' clause requires a value that can be represented by a 64-bit}}
   for (int i = ST; i < N; i++)
     argv[0][i] = argv[0][i] - argv[0][i-ST];
-#if __cplusplus <= 199711L
-// expected-error@+4 2 {{integral constant expression}} expected-note@+4 0+{{constant expression}}
-#else
-// expected-error@+2 2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
-#endif
+// expected-error@+1 2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
 #pragma omp for ordered(argv[1] = 2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = ST; i < N; i++)
     argv[0][i] = argv[0][i] - argv[0][i - ST];
@@ -112,11 +106,7 @@ int main(int argc, char **argv) {
 #pragma omp for ordered(S1) // expected-error {{'S1' does not refer to a value}}
   for (int i = 4; i < 12; i++)
     argv[0][i] = argv[0][i] - argv[0][i - 4];
-#if __cplusplus <= 199711L
-// expected-error@+4 {{integral constant expression}} expected-note@+4 0+{{constant expression}}
-#else
-// expected-error@+2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
-#endif
+// expected-error@+1 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
 #pragma omp for ordered(argv[1] = 2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = 4; i < 12; i++)
     argv[0][i] = argv[0][i] - argv[0][i - 4];

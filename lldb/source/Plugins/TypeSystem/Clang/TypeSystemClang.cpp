@@ -487,7 +487,7 @@ static void ParseLangArgs(LangOptions &Opts, ArchSpec arch) {
 
   std::vector<std::string> Includes;
   LangOptions::setLangDefaults(Opts, clang::Language::ObjCXX, arch.GetTriple(),
-                               Includes, clang::LangStandard::lang_gnucxx98);
+                               Includes, clang::LangStandard::lang_gnucxx11);
 
   Opts.setValueVisibilityMode(DefaultVisibility);
 

@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wunused-value %s
-// RUN: %clang_cc1 -fsyntax-only -verify -Wunused-value -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wunused-value -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wunused-value -std=c++17 %s
 
@@ -16,9 +15,6 @@ namespace test0 {
     Box* box = new Box;
     box->i; // expected-warning {{expression result unused}}
     box->j;
-#if __cplusplus <= 199711L
-    // expected-warning@-2 {{expression result unused}}
-#endif
   }
 }
 
@@ -75,10 +71,8 @@ void f() {
   Unused();     // expected-warning {{expression result unused}}
   Unused(1);    // expected-warning {{expression result unused}}
   Unused(1, 1); // expected-warning {{expression result unused}}
-#if __cplusplus >= 201103L // C++11 or later
   Used({});
   Unused({}); // expected-warning {{expression result unused}}
-#endif
 }
 }
 
@@ -135,9 +129,6 @@ void volatile_array() {
   // idiomatically suppressing an 'unused variable' warning.
   (void)var1;
   (void)var2;
-#if __cplusplus < 201103L
-  // expected-warning@-2 {{expression result unused; assign into a variable to force a volatile load}}
-#endif
   (void)var3;
   (void)var4;
 
@@ -150,7 +141,6 @@ void volatile_array() {
   (void)arr4;
 }
 
-#if __cplusplus >= 201103L // C++11 or later
 namespace test5 {
 int v[(5, 6)]; // expected-warning {{left operand of comma operator has no effect}}
 void foo() {
@@ -166,7 +156,6 @@ template <typename T, int = (T{},0)> int c(int) { return 0; }
 template <typename T, int> int c(double) { return 1; }
 int foo() { return c<int>(0); }
 
-#endif
 
 #if __cplusplus >= 201703L // C++17 or later
 namespace test6 {

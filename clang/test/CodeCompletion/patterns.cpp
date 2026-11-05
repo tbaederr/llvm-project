@@ -70,11 +70,6 @@ int Cls::*memptr_return() {
 // RETURN-PTR: COMPLETION: Pattern : return <#expression#>;{{$}}
 // RETURN-PTR: COMPLETION: Pattern : return nullptr;
 
-// 'return nullptr' is not available before C++11.
-// RUN: %clang_cc1 -fsyntax-only -std=c++03 -code-completion-patterns -code-completion-at=%s:37:1 %s -o - | FileCheck -check-prefix=RETURN-PTR-STD03 %s
-// RUN: %clang_cc1 -fsyntax-only -std=c++03 -code-completion-patterns -code-completion-at=%s:41:1 %s -o - | FileCheck -check-prefix=RETURN-PTR-STD03 %s
-// RETURN-PTR-STD03-NOT: COMPLETION: Pattern : return nullptr;
-
 void something();
 
 void unbraced_if() {
@@ -82,7 +77,7 @@ void unbraced_if() {
     something();
   // line 83
 }
-// RUN: %clang_cc1 -fsyntax-only -code-completion-patterns -code-completion-at=%s:83:3 %s -o - | FileCheck -check-prefix=UNBRACED-IF %s
+// RUN: %clang_cc1 -fsyntax-only -code-completion-patterns -code-completion-at=%s:78:3 %s -o - | FileCheck -check-prefix=UNBRACED-IF %s
 // UNBRACED-IF: COMPLETION: Pattern : else
 // UNBRACED-IF-NEXT: <#statement#>;
 // UNBRACED-IF: COMPLETION: Pattern : else if (<#condition#>)
@@ -94,7 +89,7 @@ void braced_if() {
   }
   // line 95
 }
-// RUN: %clang_cc1 -fsyntax-only -code-completion-patterns -code-completion-at=%s:95:3 %s -o - | FileCheck -check-prefix=BRACED-IF %s
+// RUN: %clang_cc1 -fsyntax-only -code-completion-patterns -code-completion-at=%s:90:3 %s -o - | FileCheck -check-prefix=BRACED-IF %s
 // BRACED-IF: COMPLETION: Pattern : else {
 // BRACED-IF-NEXT: <#statements#>
 // BRACED-IF-NEXT: }

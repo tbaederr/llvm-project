@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 %s -triple=x86_64-apple-darwin10 -emit-llvm -o - -fcxx-exceptions -fexceptions -std=c++03 | FileCheck %s -check-prefixes=CHECK,CHECKv03
 // RUN: %clang_cc1 %s -triple=x86_64-apple-darwin10 -emit-llvm -o - -fcxx-exceptions -fexceptions -std=c++11 | FileCheck %s -check-prefixes=CHECK,CHECKv11
 
 // Test IR generation for partial destruction of aggregates.
@@ -45,7 +44,6 @@ namespace test0 {
   // CHECK-NEXT: br label
   // CHECK:      [[ED_AFTER:%.*]] = phi ptr [ [[ED_END]], {{%.*}} ], [ [[ED_CUR:%.*]], {{%.*}} ]
   // CHECK-NEXT: [[ED_CUR]] = getelementptr inbounds [[A]], ptr [[ED_AFTER]], i64 -1
-  // CHECKv03-NEXT: invoke void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[ED_CUR]])
   // CHECKv11-NEXT: call   void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[ED_CUR]])
   // CHECK:      [[T0:%.*]] = icmp eq ptr [[ED_CUR]], [[ED_BEGIN]]
   // CHECK-NEXT: br i1 [[T0]],
@@ -59,7 +57,6 @@ namespace test0 {
   // CHECK-NEXT: br i1 [[T0]],
   // CHECK:      [[E_AFTER:%.*]] = phi ptr [ [[PARTIAL_END]], {{%.*}} ], [ [[E_CUR:%.*]], {{%.*}} ]
   // CHECK-NEXT: [[E_CUR]] = getelementptr inbounds [[A]], ptr [[E_AFTER]], i64 -1
-  // CHECKv03-NEXT: invoke void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[E_CUR]])
   // CHECKv11-NEXT: call   void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[E_CUR]])
   // CHECK:      [[T0:%.*]] = icmp eq ptr [[E_CUR]], [[AS]]
   // CHECK-NEXT: br i1 [[T0]],
@@ -75,20 +72,10 @@ namespace test0 {
   // FIXME: There's some really bad block ordering here which causes
   // the partial destroy for the primary normal destructor to fall
   // within the primary EH destructor.
-  // CHECKv03:      landingpad { ptr, i32 }
-  // CHECKv03-NEXT:   cleanup
-  // CHECKv03:      [[T0:%.*]] = icmp eq ptr [[ED_BEGIN]], [[ED_CUR]]
-  // CHECKv03-NEXT: br i1 [[T0]]
-  // CHECKv03:      [[EDD_AFTER:%.*]] = phi ptr [ [[ED_CUR]], {{%.*}} ], [ [[EDD_CUR:%.*]], {{%.*}} ]
-  // CHECKv03-NEXT: [[EDD_CUR]] = getelementptr inbounds [[A]], ptr [[EDD_AFTER]], i64 -1
-  // CHECKv03-NEXT: invoke void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[EDD_CUR]])
-  // CHECKv03:      [[T0:%.*]] = icmp eq ptr [[EDD_CUR]], [[ED_BEGIN]]
-  // CHECKv03-NEXT: br i1 [[T0]]
 
   // Back to the primary EH destructor.
   // CHECK:      [[E_AFTER:%.*]] = phi ptr [ [[E_END]], {{%.*}} ], [ [[E_CUR:%.*]], {{%.*}} ]
   // CHECK-NEXT: [[E_CUR]] = getelementptr inbounds [[A]], ptr [[E_AFTER]], i64 -1
-  // CHECKv03-NEXT: invoke void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[E_CUR]])
   // CHECKv11-NEXT: call   void @_ZN5test01AD1Ev(ptr {{[^,]*}} [[E_CUR]])
   // CHECK:      [[T0:%.*]] = icmp eq ptr [[E_CUR]], [[E0]]
   // CHECK-NEXT: br i1 [[T0]],
@@ -122,8 +109,6 @@ namespace test1 {
   // CHECK-NEXT:   cleanup
   // CHECK:      landingpad { ptr, i32 }
   // CHECK-NEXT:   cleanup
-  // CHECKv03:      invoke void @_ZN5test11AD1Ev(ptr {{[^,]*}} [[Y]])
-  // CHECKv03:      invoke void @_ZN5test11AD1Ev(ptr {{[^,]*}} [[V]])
   // CHECKv11:      call   void @_ZN5test11AD1Ev(ptr {{[^,]*}} [[Y]])
   // CHECKv11:      call   void @_ZN5test11AD1Ev(ptr {{[^,]*}} [[V]])
 }
@@ -157,7 +142,6 @@ namespace test2 {
     // CHECK-NEXT: br i1 [[EMPTY]],
     // CHECK:      [[PAST:%.*]] = phi ptr [ [[CUR]], {{%.*}} ], [ [[DEL:%.*]], {{%.*}} ]
     // CHECK-NEXT: [[DEL]] = getelementptr inbounds [[A]], ptr [[PAST]], i64 -1
-    // CHECKv03-NEXT: invoke void @_ZN5test21AD1Ev(ptr {{[^,]*}} [[DEL]])
     // CHECKv11-NEXT: call   void @_ZN5test21AD1Ev(ptr {{[^,]*}} [[DEL]])
     // CHECK:      [[T0:%.*]] = icmp eq ptr [[DEL]], [[BEGIN]]
     // CHECK-NEXT: br i1 [[T0]],

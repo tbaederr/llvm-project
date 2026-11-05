@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -triple x86_64-apple-darwin10 %s
 // RUN: %clang_cc1 -x c++ -fsyntax-only -verify -triple x86_64-apple-darwin10 %s
-// RUN: %clang_cc1 -x c++ -fsyntax-only -verify -triple x86_64-apple-darwin10 -std=c++98 %s
 // RUN: %clang_cc1 -x c++ -fsyntax-only -verify -triple x86_64-apple-darwin10 -std=c++11 %s
 
 int f(int i) {

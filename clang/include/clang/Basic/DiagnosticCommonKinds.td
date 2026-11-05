@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 let Component = "Common" in {
-// C++11 compatibility with C++98.
-defm variadic_templates : CXX11Compat<"variadic templates are">;
-
 // C++23 compatibility with C++20 and earlier.
 defm size_t_suffix : CXX23Compat<"'size_t' suffix for literals is">;
 
@@ -217,12 +214,6 @@ def err_attribute_uuid_malformed_guid : Error<
 def ext_c99_longlong : Extension<
   "'long long' is an extension when C99 mode is not enabled">,
   InGroup<LongLong>;
-def ext_cxx11_longlong : Extension<
-  "'long long' is a C++11 extension">,
-  InGroup<CXX11LongLong>;
-def warn_cxx98_compat_longlong : Warning<
-  "'long long' is incompatible with C++98">,
-  InGroup<CXX98CompatPedantic>, DefaultIgnore;
 def err_cxx23_size_t_suffix: Error<
   "'size_t' suffix for literals is a C++23 feature">;
 def err_size_t_literal_too_large: Error<
@@ -249,17 +240,6 @@ def warn_old_implicitly_unsigned_long : Warning<
   "interpreting as 'unsigned long' per C89; this literal will "
   "%select{have type 'long long'|be ill-formed}0 in C99 onwards">,
   InGroup<C99Compat>;
-def warn_old_implicitly_unsigned_long_cxx : Warning<
-  "integer literal is too large to be represented in type 'long', "
-  "interpreting as 'unsigned long' per C++98; this literal will "
-  "%select{have type 'long long'|be ill-formed}0 in C++11 onwards">,
-  InGroup<CXX11Compat>;
-def ext_old_implicitly_unsigned_long_cxx : ExtWarn<
-  "integer literal is too large to be represented in type 'long' and is "
-  "subject to undefined behavior under C++98, interpreting as 'unsigned long'; "
-  "this literal will %select{have type 'long long'|be ill-formed}0 "
-  "in C++11 onwards">,
-  InGroup<CXX11Compat>;
 def ext_clang_enable_if : Extension<"'enable_if' is a clang extension">,
                           InGroup<GccCompat>;
 def ext_clang_diagnose_if : Extension<"'diagnose_if' is a clang extension">,

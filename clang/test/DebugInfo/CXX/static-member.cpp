@@ -1,5 +1,4 @@
 // RUN: %clangxx -target x86_64-unknown-unknown -g -gdwarf-4 %s -emit-llvm -S -o - | FileCheck --check-prefixes=CHECK,DWARF4,NOT-MS %s
-// RUN: %clangxx -target x86_64-unknown-unknown -g -gdwarf-4 -std=c++98 %s -emit-llvm -S -o - | FileCheck --check-prefixes=CHECK,DWARF4,NOT-MS %s
 // RUN: %clangxx -target x86_64-unknown-unknown -g -gdwarf-4 -std=c++11 %s -emit-llvm -S -o - | FileCheck --check-prefixes=CHECK,DWARF4,NOT-MS %s
 // RUN: %clangxx -target x86_64-unknown-unknown -g -gdwarf-5 -std=c++11 %s -emit-llvm -S -o - | FileCheck --check-prefixes=CHECK,DWARF5 %s
 // RUN: %clangxx -target x86_64-windows-msvc -g -gdwarf-4 %s -emit-llvm -S -o - | FileCheck --check-prefixes=CHECK,DWARF4 %s
@@ -18,11 +17,7 @@ class C
   const static bool const_a = true;
 protected:
   static int b;
-#if __cplusplus >= 201103L
   constexpr static float const_b = 3.14;
-#else
-  const static float const_b = 3.14;
-#endif
 public:
   static int c;
   const static int const_c = 18;

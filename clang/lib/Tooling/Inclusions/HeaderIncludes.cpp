@@ -41,7 +41,6 @@ namespace {
 LangOptions createLangOpts() {
   LangOptions LangOpts;
   LangOpts.CPlusPlus = 1;
-  LangOpts.CPlusPlus11 = 1;
   LangOpts.CPlusPlus14 = 1;
   LangOpts.LineComment = 1;
   LangOpts.CXXOperatorNames = 1;

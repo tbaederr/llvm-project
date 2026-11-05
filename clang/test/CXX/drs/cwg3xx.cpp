@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-linux-gnu %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-17,cxx98-20,cxx98 
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-linux-gnu %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-17,cxx98-20,cxx11-14,since-cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-linux-gnu %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-17,cxx98-20,cxx11-14,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-linux-gnu %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-17,cxx98-20,since-cxx11,since-cxx17
@@ -6,16 +5,8 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-linux-gnu %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx20-23,cxx23,since-cxx11,since-cxx17,since-cxx23
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-linux-gnu %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx20-23,cxx23,since-cxx11,since-cxx17,since-cxx23
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
-#if __cplusplus == 199711L
-#define __enable_constant_folding(x) (__builtin_constant_p(x) ? (x) : (x))
-#else
 #define __enable_constant_folding
-#endif
 
 namespace std {
 template<bool Cond, typename T = void>
@@ -93,19 +84,6 @@ namespace cwg301 { // cwg301: 3.5
 
 namespace cwg302 { // cwg302: 3.0
   struct A { A(); ~A(); };
-#if __cplusplus < 201103L
-  struct B {
-  // expected-error@-1 {{implicit default constructor for 'cwg302::B' must explicitly initialize the const member 'n'}}
-  //   expected-note@#cwg302-b {{in implicit default constructor for 'cwg302::B' first required here}}
-  //   expected-note@#cwg302-B-n {{declared here}}
-    const int n; // #cwg302-B-n
-    A a;
-  } b = B(); // #cwg302-b
-  // Trivial default constructor C::C() is not called here.
-  struct C {
-    const int n;
-  } c = C();
-#else
   struct B {
     const int n; // #cwg302-B-n
     A a;
@@ -121,7 +99,6 @@ namespace cwg302 { // cwg302: 3.0
   struct D {
     const int n = 0;
   } d = D();
-#endif
 } // namespace cwg302
 
 // cwg303: na
@@ -132,8 +109,6 @@ namespace cwg304 { // cwg304: 2.9
   // expected-error@-1 {{reference to type 'int' requires an initializer}}
 
   struct S { int &b; }; // #cwg304-S
-  // cxx98-error@-1 {{reference to type 'int' requires an initializer}}
-  //   cxx98-note@#cwg304-m {{in value-initialization of type 'S' here}}
   int m = S().b; // #cwg304-m
   // since-cxx11-error@-1 {{call to implicitly-deleted default constructor of 'S'}}
   //   since-cxx11-note@#cwg304-S {{default constructor of 'S' is implicitly deleted because field 'b' of reference type 'int &' would not be initialized}}
@@ -169,7 +144,6 @@ namespace cwg305 { // cwg305: no
     // expected-error@-1 {{no member named '~X' in 'cwg305::X<int>'}}
   }
 
-#if __cplusplus >= 201103L
   struct Y {
     template<typename T> using T1 = Y;
   };
@@ -196,7 +170,6 @@ namespace cwg305 { // cwg305: no
   template<typename A> using R = Q::R<int>;
   void qr(Q::R<int> x) { x.~R<char>(); }
   // since-cxx11-error@-1 {{no member named '~R' in 'cwg305::Q::R<int>'}}
-#endif
 } // namespace cwg305
 
 namespace cwg306 { // cwg306: dup 39
@@ -269,7 +242,6 @@ namespace cwg313 { // cwg313: dup 299 c++11
   struct A { operator int() const; };
   // FIXME: should this be available in c++98 mode?
   int *p = new int[A()];
-  // cxx98-error@-1 {{implicit conversion from array size expression of type 'A' to integral type 'int' is a C++11 extension}}
 } // namespace cwg313
 
 namespace cwg314 { // cwg314: no
@@ -336,12 +308,10 @@ namespace cwg319 { // cwg319: no
     struct A { int n; };
     extern A a; // FIXME: ill-formed
     X<A> xa;
-    // cxx98-error@-1 {{template argument uses local type 'A'}}
 
     typedef A B;
     extern B b; // FIXME: ill-formed
     X<B> xb;
-    // cxx98-error@-1 {{template argument uses local type 'A'}}
 
     const int n = 1;
     typedef int (*C)[n];
@@ -351,7 +321,6 @@ namespace cwg319 { // cwg319: no
 } // namespace cwg319
 
 namespace cwg320 { // cwg320: 3.1
-#if __cplusplus >= 201103L
   struct X {
     constexpr X() {}
     constexpr X(const X &x) : copies(x.copies + 1) {}
@@ -360,7 +329,6 @@ namespace cwg320 { // cwg320: 3.1
   constexpr X f(X x) { return x; }
   constexpr unsigned g(X x) { return x.copies; }
   static_assert(f(X()).copies == g(X()) + 1, "expected one extra copy for return value");
-#endif
 } // namespace cwg320
 
 namespace cwg321 { // cwg321: dup 557
@@ -775,7 +743,6 @@ namespace cwg347 { // cwg347: 2.7
 namespace cwg349 { // cwg349: no
   struct A {
     template <class T, typename std::enable_if<!__is_const(T), int>::type = 0>
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
     operator T ***(); // #cwg349-A
   };
 
@@ -787,7 +754,6 @@ namespace cwg349 { // cwg349: no
 
   struct B {
     template <class T, typename std::enable_if<__is_const(T), int>::type = 0>
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
     operator T ***();
   };
 
@@ -807,7 +773,6 @@ namespace cwg352 { // cwg352: 2.8
 
     template<typename T> void arg(T);
     template<typename T> int arg(T) = delete; // #cwg352-deleted
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
 
     void f(A::E e) {
       foo(e, &arg);
@@ -946,25 +911,17 @@ namespace cwg354 { // cwg354: 3.1 c++11
 
   template<int*> struct ptr {}; // #cwg354-ptr
   ptr<0> p0; // #cwg354-p0
-  // cxx98-error@#cwg354-p0 {{non-type template argument does not refer to any declaration}}
-  //   cxx98-note@#cwg354-ptr {{template parameter is declared here}}
   // cxx11-14-error@#cwg354-p0 {{null non-type template argument must be cast to template parameter type 'int *'}}
   //   cxx11-14-note@#cwg354-ptr {{template parameter is declared here}}
   // since-cxx17-error@#cwg354-p0 {{conversion from 'int' to 'int *' is not allowed in a converted constant expression}}
   //   since-cxx17-note@#cwg354-ptr {{template parameter is declared here}}
   ptr<(int*)0> p1;
-  // cxx98-error@-1 {{non-type template argument does not refer to any declaration}}
-  //   cxx98-note@#cwg354-ptr {{template parameter is declared here}}
   ptr<(float*)0> p2; // #cwg354-p2
-  // cxx98-error@#cwg354-p2 {{non-type template argument does not refer to any declaration}}
-  //   cxx98-note@#cwg354-ptr {{template parameter is declared here}}
   // cxx11-14-error@#cwg354-p2 {{null non-type template argument of type 'float *' does not match template parameter of type 'int *'}}
   //   cxx11-14-note@#cwg354-ptr {{template parameter is declared here}}
   // since-cxx17-error@#cwg354-p2 {{value of type 'float *' is not implicitly convertible to 'int *'}}
   //   since-cxx17-note@#cwg354-ptr {{template parameter is declared here}}
   ptr<(int S::*)0> p3; // #cwg354-p3
-  // cxx98-error@#cwg354-p3 {{non-type template argument does not refer to any declaration}}
-  //   cxx98-note@#cwg354-ptr {{template parameter is declared here}}
   // cxx11-14-error@#cwg354-p3 {{null non-type template argument of type 'int S::*' does not match template parameter of type 'int *'}}
   //   cxx11-14-note@#cwg354-ptr {{template parameter is declared here}}
   // since-cxx17-error@#cwg354-p3 {{value of type 'int S::*' is not implicitly convertible to 'int *'}}
@@ -974,30 +931,20 @@ namespace cwg354 { // cwg354: 3.1 c++11
   template<int> int both(); // #cwg354-both-int
   int b0 = both<0>();
   int b1 = both<(int*)0>();
-  // cxx98-error@-1 {{no matching function for call to 'both'}}
-  //   cxx98-note@#cwg354-both-int-ptr {{candidate template ignored: non-type template argument does not refer to any declaration for 1st template parameter}}
-  //   cxx98-note@#cwg354-both-int {{candidate template ignored: non-type template argument of type 'int *' must have an integral or enumeration type for 1st template parameter}}
 
   template<int S::*> struct ptr_mem {}; // #cwg354-ptr_mem
   ptr_mem<0> m0; // #cwg354-m0
-  // cxx98-error@#cwg354-m0 {{non-type template argument of type 'int' cannot be converted to a value of type 'int S::*'}}
-  //   cxx98-note@#cwg354-ptr_mem {{template parameter is declared here}}
   // cxx11-14-error@#cwg354-m0 {{null non-type template argument must be cast to template parameter type 'int S::*'}}
   //   cxx11-14-note@#cwg354-ptr_mem {{template parameter is declared here}}
   // since-cxx17-error@#cwg354-m0 {{conversion from 'int' to 'int S::*' is not allowed in a converted constant expression}}
   //   since-cxx17-note@#cwg354-ptr_mem {{template parameter is declared here}}
   ptr_mem<(int S::*)0> m1;
-  // cxx98-error@-1 {{non-type template argument is not a pointer to member constant}}
   ptr_mem<(float S::*)0> m2; // #cwg354-m2
-  // cxx98-error@#cwg354-m2 {{non-type template argument of type 'float S::*' cannot be converted to a value of type 'int S::*'}}
-  //   cxx98-note@#cwg354-ptr_mem {{template parameter is declared here}}
   // cxx11-14-error@#cwg354-m2 {{null non-type template argument of type 'float S::*' does not match template parameter of type 'int S::*'}}
   //   cxx11-14-note@#cwg354-ptr_mem {{template parameter is declared here}}
   // since-cxx17-error@#cwg354-m2 {{value of type 'float S::*' is not implicitly convertible to 'int S::*'}}
   //   since-cxx17-note@#cwg354-ptr_mem {{template parameter is declared here}}
   ptr_mem<(int *)0> m3; // #cwg354-m3
-  // cxx98-error@#cwg354-m3 {{non-type template argument of type 'int *' cannot be converted to a value of type 'int S::*'}}
-  //   cxx98-note@#cwg354-ptr_mem {{template parameter is declared here}}
   // cxx11-14-error@#cwg354-m3 {{null non-type template argument of type 'int *' does not match template parameter of type 'int S::*'}}
   //   cxx11-14-note@#cwg354-ptr_mem {{template parameter is declared here}}
   // since-cxx17-error@#cwg354-m3 {{value of type 'int *' is not implicitly convertible to 'int S::*'}}
@@ -1322,9 +1269,7 @@ namespace cwg382 { // cwg382: 2.7 c++11
   // FIXME: Should we allow this in C++98 mode?
   struct A { typedef int T; };
   typename A::T t;
-  // cxx98-error@-1 {{'typename' outside of a template is a C++11 extension}}
   typename cwg382::A a;
-  // cxx98-error@-1 {{'typename' outside of a template is a C++11 extension}}
   typename A b;
   // expected-error@-1 {{expected a qualified name after 'typename'}}
 } // namespace cwg382
@@ -1511,41 +1456,9 @@ namespace cwg389 { // cwg389: no
   typedef S::D WithoutLinkage4;
   typedef void (*WithoutLinkage5)(int (WithoutLinkage3::*)(char));
 
-#if __cplusplus >= 201103L
   // This has linkage even though its template argument does not.
   // FIXME: This is probably a defect.
   typedef T<WithoutLinkage1> WithLinkage10;
-#else
-  typedef int WithLinkage10; // dummy
-
-  typedef T<WithLinkage1> GoodArg1;
-  typedef T<WithLinkage2> GoodArg2;
-  typedef T<WithLinkage3a> GoodArg3a;
-  typedef T<WithLinkage3b> GoodArg3b;
-  typedef T<WithLinkage4a> GoodArg4a;
-  typedef T<WithLinkage4b> GoodArg4b;
-  typedef T<WithLinkage5> GoodArg5;
-  typedef T<WithLinkage6> GoodArg6;
-  typedef T<WithLinkage7> GoodArg7;
-  typedef T<WithLinkage8> GoodArg8;
-  typedef T<WithLinkage9> GoodArg9;
-
-  typedef T<WithoutLinkage1> BadArg1;
-  // expected-error@-1 {{template argument uses unnamed type}}
-  //   expected-note@#cwg389-no-link-1 {{unnamed type used in template argument was declared here}}
-  typedef T<WithoutLinkage2> BadArg2;
-  // expected-error@-1 {{template argument uses unnamed type}}
-  //   expected-note@#cwg389-no-link-2 {{unnamed type used in template argument was declared here}}
-  typedef T<WithoutLinkage3> BadArg3;
-  // expected-error@-1 {{template argument uses unnamed type}}
-  //   expected-note@#cwg389-C {{unnamed type used in template argument was declared here}}
-  typedef T<WithoutLinkage4> BadArg4;
-  // expected-error@-1 {{template argument uses unnamed type}}
-  //   expected-note@#cwg389-D {{unnamed type used in template argument was declared here}}
-  typedef T<WithoutLinkage5> BadArg5;
-  // expected-error@-1 {{template argument uses unnamed type}}
-  //   expected-note@#cwg389-C {{unnamed type used in template argument was declared here}}
-#endif
 
   extern WithLinkage1 withLinkage1;
   extern WithLinkage2 withLinkage2;
@@ -1613,15 +1526,10 @@ namespace cwg391 { // cwg391: 2.8 c++11
   class A { A(const A&); }; // #cwg391-A
   A fa();
   const A &a = fa();
-  // cxx98-error@-1 {{C++98 requires an accessible copy constructor for class 'cwg391::A' when binding a reference to a temporary; was private}}
-  //   cxx98-note@#cwg391-A {{implicitly declared private here}}
 
   struct B { B(const B&) = delete; }; // #cwg391-B
-  // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
   B fb();
   const B &b = fb();
-  // cxx98-error@-1 {{copying variable of type 'B' invokes deleted constructor}}
-  //   cxx98-note@#cwg391-B {{'B' has been explicitly marked deleted here}}
 
   template<typename T>
   struct C {
@@ -1656,8 +1564,7 @@ void h() {
 namespace cwg395 { // cwg395: 3.0
   struct S {
     template <typename T, int N>(&operator T())[N];
-    // cxx98-error@-1 {{cannot specify any part of a return type in the declaration of a conversion function}}
-    // since-cxx11-error@-2 {{cannot specify any part of a return type in the declaration of a conversion function; use an alias template to declare a conversion to 'T (&)[N]'}}
+    // since-cxx11-error@-1 {{cannot specify any part of a return type in the declaration of a conversion function; use an alias template to declare a conversion to 'T (&)[N]'}}
     template <typename T, int N> operator(T (&)[N])();
     // expected-error@-1 {{expected ')'}}
     //   expected-note@-2 {{to match this '('}}
@@ -1667,9 +1574,8 @@ namespace cwg395 { // cwg395: 3.0
     template <typename T, typename U> operator T (U::*)()() const { return 0; }
     // expected-error@-1 {{a type specifier is required for all declarations}}
     // expected-error@-2 {{conversion function cannot have any parameters}}
-    // cxx98-error@-3 {{cannot specify any part of a return type in the declaration of a conversion function}}
-    // since-cxx11-error@-4 {{cannot specify any part of a return type in the declaration of a conversion function; use an alias template to declare a conversion to 'T (())() const'}}
-    // expected-error@-5 {{conversion function cannot convert to a function type}}
+    // since-cxx11-error@-3 {{cannot specify any part of a return type in the declaration of a conversion function; use an alias template to declare a conversion to 'T (())() const'}}
+    // expected-error@-4 {{conversion function cannot convert to a function type}}
   };
 
   struct null1_t {
@@ -1687,7 +1593,6 @@ namespace cwg395 { // cwg395: 3.0
   //   expected-note@#cwg395-conv-func {{candidate template ignored: couldn't infer template argument 'T'}}
 
   template <typename T> using id = T;
-  // cxx98-error@-1 {{alias declarations are a C++11 extension}}
 
   struct T {
     template <typename T, int N> operator id<T[N]> &();
@@ -1696,7 +1601,6 @@ namespace cwg395 { // cwg395: 3.0
 
   struct null2_t {
     template<class T, class U> using ptr_mem_fun_t = T (U::*)();
-    // cxx98-error@-1 {{alias declarations are a C++11 extension}}
     template<class T, class U> operator ptr_mem_fun_t<T, U>() const { return 0; };
   } null2;
   int (S::*q)() = null2;

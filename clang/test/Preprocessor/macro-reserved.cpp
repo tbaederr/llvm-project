@@ -1,7 +1,7 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -pedantic -std=c++98 %s
+// RUN: %clang_cc1 -fsyntax-only -verify -pedantic -std=c++11 %s
 
 #define for 0    // expected-warning {{keyword is hidden by macro definition}}
-#define final 1
+#define final 1  // expected-warning {{keyword is hidden by macro definition}}
 #define __HAVE_X 0
 #define _HAVE_X 0
 #define X__Y
@@ -50,7 +50,7 @@
 #pragma clang diagnostic warning "-Wreserved-macro-identifier"
 
 #define switch if  // expected-warning {{keyword is hidden by macro definition}}
-#define final 1
+#define final 1  // expected-warning {{keyword is hidden by macro definition}}
 #define __HAVE_X 0 // expected-warning {{macro name is a reserved identifier}}
 #define _HAVE_X 0  // expected-warning {{macro name is a reserved identifier}}
 #define X__Y       // expected-warning {{macro name is a reserved identifier}}

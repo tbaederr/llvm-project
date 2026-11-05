@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-17
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-17,since-cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-17,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-17,since-cxx11
@@ -7,7 +6,6 @@
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx20,since-cxx11
 
 namespace cwg812 { // cwg812: 2.8
-#if __cplusplus >= 201103L
 namespace Q {
   inline namespace V1 {
     int i = 1; // #cwg812-v1-i
@@ -27,7 +25,6 @@ static_assert(Q::j, "");
 // since-cxx11-error@-1 {{reference to 'j' is ambiguous}}
 //   since-cxx11-note@#cwg812-v1-j {{candidate found by name lookup is 'cwg812::Q::V1::j'}}
 //   since-cxx11-note@#cwg812-v2-j {{candidate found by name lookup is 'cwg812::Q::V2::j'}}
-#endif
 } // namespace cwg812
 
 namespace cwg820 { // cwg820: 2.7
@@ -40,7 +37,6 @@ export template<typename T> void f() {}
 } // namespace cwg820
 
 namespace cwg861 { // cwg861: 2.7
-#if __cplusplus >= 201103L
 namespace A {
   inline namespace B {
     namespace C {
@@ -52,11 +48,9 @@ namespace A {
 }
 
 static_assert(A::i == 1, "");
-#endif
 } // namespace cwg861
 
 namespace cwg873 { // cwg873: 3.0
-#if __cplusplus >= 201103L
 template <typename T> void f(T &&);
 template <> void f(int &) = delete;  // #cwg873-lvalue-ref
 template <> void f(int &&) = delete; // #cwg873-rvalue-ref
@@ -68,11 +62,8 @@ void g(int i) {
   // since-cxx11-error@-1 {{call to deleted function 'f'}}
   //   since-cxx11-note@#cwg873-rvalue-ref {{candidate function [with T = int] has been explicitly deleted}}
 }
-#endif
 } // namespace cwg873
 
 // cwg882: 3.5
-#if __cplusplus >= 201103L
 int main() = delete;
 // since-cxx11-error@-1 {{'main' is not allowed to be deleted}}
-#endif

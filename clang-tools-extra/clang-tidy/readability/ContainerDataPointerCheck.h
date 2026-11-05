@@ -25,7 +25,7 @@ public:
   ContainerDataPointerCheck(StringRef Name, ClangTidyContext *Context);
 
   bool isLanguageVersionSupported(const LangOptions &LO) const override {
-    return LO.CPlusPlus11;
+    return LO.CPlusPlus;
   }
 
   void storeOptions(ClangTidyOptions::OptionMap &Opts) override;

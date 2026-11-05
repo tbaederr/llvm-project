@@ -2494,7 +2494,7 @@ bool VarDecl::mightBeUsableInConstantExpressions(const ASTContext &C) const {
 
   // In C++11, any variable of reference type can be used in a constant
   // expression if it is initialized by a constant expression.
-  if (Lang.CPlusPlus11 && getType()->isReferenceType())
+  if (Lang.CPlusPlus && getType()->isReferenceType())
     return true;
 
   // Only const objects can be used in constant expressions in C++. C++98 does
@@ -2515,7 +2515,7 @@ bool VarDecl::mightBeUsableInConstantExpressions(const ASTContext &C) const {
   // with the type and value of the declared object.
   // Additionally, in C++11, non-volatile constexpr variables can be used in
   // constant expressions.
-  return (Lang.CPlusPlus11 || Lang.C23) && isConstexpr();
+  return (Lang.CPlusPlus || Lang.C23) && isConstexpr();
 }
 
 bool VarDecl::isUsableInConstantExpressions(const ASTContext &Context) const {
@@ -2538,8 +2538,8 @@ bool VarDecl::isUsableInConstantExpressions(const ASTContext &Context) const {
   //   An integral constant-expression can involve only [...] const variables
   //   or static data members of integral or enumeration types initialized with
   //   [integer] constant expressions (dcl.init)
-  if ((Context.getLangOpts().CPlusPlus || Context.getLangOpts().OpenCL) &&
-      !Context.getLangOpts().CPlusPlus11 && !DefVD->hasICEInitializer(Context))
+  if (Context.getLangOpts().OpenCL && !Context.getLangOpts().CPlusPlus &&
+      !DefVD->hasICEInitializer(Context))
     return false;
   return true;
 }

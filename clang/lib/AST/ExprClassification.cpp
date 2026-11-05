@@ -254,7 +254,7 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
   case Expr::ArraySubscriptExprClass:
     if (cast<ArraySubscriptExpr>(E)->getBase()->getType()->isVectorType())
       return ClassifyInternal(Ctx, cast<ArraySubscriptExpr>(E)->getBase());
-    if (Lang.CPlusPlus11) {
+    if (Lang.CPlusPlus) {
       // Step over the array-to-pointer decay if present, but not over the
       // temporary materialization.
       auto *Base = cast<ArraySubscriptExpr>(E)->getBase()->IgnoreImpCasts();

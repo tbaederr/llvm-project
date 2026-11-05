@@ -1,9 +1,7 @@
 // RUN: %clang_cc1 -verify -fopenmp %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp -std=c++11 %s -Wuninitialized
 
 // RUN: %clang_cc1 -verify -fopenmp-simd %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp-simd -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp-simd -std=c++11 %s -Wuninitialized
 
 // expected-note@* 0+{{declared here}}
@@ -70,9 +68,7 @@ int main(int argc, char **argv) {
   for (int i = 4; i < 12; i++) argv[0][i] = argv[0][i] - argv[0][i-4]; // expected-error {{expected 4 for loops after '#pragma omp target parallel for simd', but found only 1}}
   #pragma omp target parallel for simd collapse (2+2)) // expected-warning {{extra tokens at the end of '#pragma omp target parallel for simd' are ignored}}  expected-note {{as specified in 'collapse' clause}}
   for (int i = 4; i < 12; i++) argv[0][i] = argv[0][i] - argv[0][i-4]; // expected-error {{expected 4 for loops after '#pragma omp target parallel for simd', but found only 1}}
-#if __cplusplus >= 201103L
 
-#endif 
   #pragma omp target parallel for simd collapse (foobool(1) > 0 ? 1 : 2) // expected-error {{integral constant expression}} expected-note 0+{{constant expression}}
   for (int i = 4; i < 12; i++) argv[0][i] = argv[0][i] - argv[0][i-4];
 

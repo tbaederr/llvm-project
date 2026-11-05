@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-17,cxx11-14,cxx98-14,since-cxx11,cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-17,cxx11-14,since-cxx14,cxx98-14,since-cxx11
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,cxx11-17,since-cxx14,since-cxx17,since-cxx11
@@ -17,7 +16,6 @@ namespace std {
 } // namespace std
 
 namespace cwg1305 { // cwg1305: 3.0
-#if __cplusplus >= 201103L
 struct Incomplete; // #cwg1305-Incomplete
 struct Complete {};
 
@@ -25,11 +23,9 @@ int incomplete = alignof(Incomplete(&)[]);
 // since-cxx11-error@-1 {{invalid application of 'alignof' to an incomplete type 'Incomplete'}}
 //   since-cxx11-note@#cwg1305-Incomplete {{forward declaration of 'cwg1305::Incomplete'}}
 int complete = alignof(Complete(&)[]);
-#endif
 } // namespace cwg1305
 
 namespace cwg1307 { // cwg1307: 14
-#if __cplusplus >= 201103L
 void f(int const (&)[2]);
 void f(int const (&)[3]);
 
@@ -37,7 +33,6 @@ void caller() {
   // This should not be ambiguous, the 2nd overload is better.
   f({1, 2, 3});
 }
-#endif // __cplusplus >= 201103L
 } // namespace cwg1307
 
 // cwg1308: sup 1330
@@ -79,7 +74,6 @@ namespace cwg1310 { // cwg1310: 5
     W<int>::W<int> w1b;
     // expected-error@-1 {{qualified reference to 'W' is a constructor name rather than a template name in this context}}
     W<int>::W<int>::X w1bx;
-#if __cplusplus >= 201103L
     typename W<int>::W w2a;
     // since-cxx11-error@-1 {{ISO C++ specifies that qualified reference to 'W' is a constructor name rather than a type in this context, despite preceding 'typename' keyword}}
     typename W<int>::W::X w2ax;
@@ -92,7 +86,6 @@ namespace cwg1310 { // cwg1310: 5
     typename W<int>::template W<int> w4;
     // since-cxx11-error@-1 {{ISO C++ specifies that qualified reference to 'W' is a constructor name rather than a template name in this context, despite preceding 'template' keyword}}
     typename W<int>::template W<int>::X w4x;
-#endif
 
     TT<W<int>::W> tt1;
     // expected-error@-1 {{qualified reference to 'W' is a constructor name rather than a type in this context}}
@@ -100,26 +93,21 @@ namespace cwg1310 { // cwg1310: 5
     // expected-error@-1 {{qualified reference to 'W' is a constructor name rather than a type in this context}}
     TT<W<int>::WBase> tt3;
     TTy<W<int>::WBase> tt3a;
-#if __cplusplus >= 201103L
     TT<W<int>::template W> tt2;
     // since-cxx11-error@-1 {{ISO C++ specifies that qualified reference to 'W' is a constructor name rather than a template name in this context, despite preceding 'template' keyword}}
     TT<W<int>::template WBase> tt4;
-#endif
 
     W<int> w;
     (void)w.W::W::n;
     (void)w.W<int>::W::n;
     (void)w.W<int>::W<int>::n;
-#if __cplusplus >= 201103L
     (void)w.W<int>::template W<int>::n;
-#endif
   }
 
   template<typename W>
   void wt_test() {
     typename W::W w2a;
     // expected-error@-1 {{ISO C++ specifies that qualified reference to 'W' is a constructor name rather than a type in this context, despite preceding 'typename' keyword}}
-    //   cxx98-note@#cwg1310-W-int {{in instantiation of function template specialization 'cwg1310::wt_test<cwg1310::W<int> >' requested here}}
     //   since-cxx11-note@#cwg1310-W-int {{in instantiation of function template specialization 'cwg1310::wt_test<cwg1310::W<int>>' requested here}}
     typename W::template W<int> w4;
     // expected-error@-1 {{ISO C++ specifies that qualified reference to 'W' is a constructor name rather than a template name in this context, despite preceding 'template' keyword}}
@@ -185,11 +173,9 @@ namespace cwg1330 { // cwg1330: 4 c++11
     //   since-cxx17-note@-2 {{use 'noexcept(false)' instead}}
     struct T {};
 
-#if __cplusplus >= 201103L
     void g() noexcept(&a == b) {}
     static int a;
     static constexpr int *b = &a;
-#endif
   };
 
   void (A::*af1)() throw(A::T) = &A::f;
@@ -199,9 +185,7 @@ namespace cwg1330 { // cwg1330: 4 c++11
   // cxx98-14-error@-1 {{target exception specification is not superset of source}}
   // since-cxx17-error@-2 {{cannot initialize a variable of type 'void (A::*)() throw()' with an rvalue of type 'void (A::*)() throw(T)': different exception specifications}}
 
-#if __cplusplus >= 201103L
   static_assert(noexcept(A().g()), "");
-#endif
 
   // Likewise, they're instantiated separately from an enclosing class template.
   template<typename U>
@@ -211,11 +195,9 @@ namespace cwg1330 { // cwg1330: 4 c++11
     //   since-cxx17-note@-2 {{use 'noexcept(false)' instead}}
     struct T {};
 
-#if __cplusplus >= 201103L
     void g() noexcept(&a == b && U::value) {}
     static int a;
     static constexpr int *b = &a;
-#endif
   };
 
   B<int> bi; // ok
@@ -235,7 +217,6 @@ namespace cwg1330 { // cwg1330: 4 c++11
   void (B<P>::*bpf1)() throw(B<P>::T, int) = &B<P>::f;
   // since-cxx17-error@-1 {{ISO C++17 does not allow dynamic exception specifications}}
   //   since-cxx17-note@-2 {{use 'noexcept(false)' instead}}
-  // cxx98-error@-3 {{target exception specification is not superset of source}}
 
   void (B<P>::*bpf2)() throw(int) = &B<P>::f;
   // since-cxx17-error@-1 {{ISO C++17 does not allow dynamic exception specifications}}
@@ -247,16 +228,13 @@ namespace cwg1330 { // cwg1330: 4 c++11
   // cxx98-14-error@-1 {{target exception specification is not superset of source}}
   // since-cxx17-error@-2 {{cannot initialize a variable of type 'void (B<P>::*)() throw()' with an rvalue of type 'void (B<P>::*)() throw(T, typename cwg1330::P::type)': different exception specifications}}
 
-#if __cplusplus >= 201103L
   static_assert(noexcept(B<P>().g()), "");
   struct Q { static const int value = false; };
   static_assert(!noexcept(B<Q>().g()), "");
-#endif
 
 #if __cplusplus <= 201402L
   template<typename T> int f() throw(typename T::error) { return 0; } // #cwg1330-f
   // cxx98-14-error@#cwg1330-f {{type 'int' cannot be used prior to '::' because it has no members}}
-  //   cxx98-note@#cwg1330-f-int {{in instantiation of function template specialization 'cwg1330::f<int>' requested here}}
   //   cxx11-14-note@#cwg1330-f-int {{in instantiation of exception specification for 'f<int>' requested here}}
   // cxx11-14-error@#cwg1330-f {{type 'char' cannot be used prior to '::' because it has no members}}
   //   cxx11-14-note@#cwg1330-f-char {{in instantiation of exception specification for 'f<char>' requested here}}
@@ -269,10 +247,8 @@ namespace cwg1330 { // cwg1330: 4 c++11
   // An exception-specification is needed even if the function is only used in
   // an unevaluated operand.
   int f1 = sizeof(f<int>()); // #cwg1330-f-int
-#if __cplusplus >= 201103L
   decltype(f<char>()) f2; // #cwg1330-f-char
   bool f3 = noexcept(f<float>()); /// #cwg1330-f-float
-#endif
   template int f<short>(); // #cwg1330-f-short
 #endif
 
@@ -280,10 +256,7 @@ namespace cwg1330 { // cwg1330: 4 c++11
     C() throw(typename T::type); // #cwg1330-C
     // since-cxx17-error@-1 {{ISO C++17 does not allow dynamic exception specifications}}
     //   since-cxx17-note@-2 {{use 'noexcept(false)' instead}}
-    // cxx98-error@#cwg1330-C {{type 'void' cannot be used prior to '::' because it has no members}}
-    //   cxx98-note@#cwg1330-C-void {{in instantiation of template class 'cwg1330::C<void>' requested here}}
     // expected-error@#cwg1330-C {{type 'int' cannot be used prior to '::' because it has no members}}
-    //   cxx98-note@#cwg1330-C-int {{in instantiation of template class 'cwg1330::C<int>' requested here}}
     //   since-cxx11-note@#cwg1330-C-int {{in instantiation of exception specification for 'C' requested here}}
     //   since-cxx11-note@#cwg1330-e {{in evaluation of exception specification for 'cwg1330::E::E' needed here}}
   };
@@ -297,7 +270,6 @@ namespace cwg1330 { // cwg1330: 4 c++11
 // cwg1334: sup 1719
 
 namespace cwg1336 { // cwg1336: 3.1
-#if __cplusplus >= 201103L
 struct A {
   A(int, int);
 };
@@ -312,7 +284,6 @@ void f() {
   // expected-error@-1 {{chosen constructor is explicit in copy-initialization}}
   //   expected-note@#cwg1336-B-ctor {{explicit constructor declared here}}
 }
-#endif
 } // namespace cwg1336
 
 namespace cwg1340 { // cwg1340: 2.9
@@ -346,23 +317,17 @@ struct S {
 
 namespace cwg1346 { // cwg1346: 3.5
   auto a(1);
-  // cxx98-error@-1 {{'auto' type specifier is a C++11 extension}}
   auto b(1, 2);
-  // cxx98-error@-1 {{'auto' type specifier is a C++11 extension}}
-  // expected-error@-2 {{initializer for variable 'b' with type 'auto' contains multiple expressions}}
-#if __cplusplus >= 201103L
+  // expected-error@-1 {{initializer for variable 'b' with type 'auto' contains multiple expressions}}
   auto c({});
   // since-cxx11-error@-1 {{cannot deduce type for variable 'c' with type 'auto' from parenthesized initializer list}}
   auto d({1});
   // since-cxx11-error@-1 {{cannot deduce type for variable 'd' with type 'auto' from parenthesized initializer list}}
   auto e({1, 2});
   // since-cxx11-error@-1 {{cannot deduce type for variable 'e' with type 'auto' from parenthesized initializer list}}
-#endif
   template<typename...Ts> void f(Ts ...ts) {
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
     auto x(ts...);
-    // cxx98-error@-1 {{'auto' type specifier is a C++11 extension}}
-    // expected-error@-2 {{initializer for variable 'x' with type 'auto' is empty}}
+    // expected-error@-1 {{initializer for variable 'x' with type 'auto' is empty}}
     //   expected-note@#cwg1346-f {{in instantiation of function template specialization 'cwg1346::f<>' requested here}}
   }
   template void f(); // #cwg1346-f
@@ -384,20 +349,15 @@ namespace cwg1346 { // cwg1346: 3.5
 
 namespace cwg1347 { // cwg1347: 3.1
   auto x = 5, *y = &x;
-  // cxx98-error@-1 {{'auto' type specifier is a C++11 extension}}
   auto z = y, *q = y;
-  // cxx98-error@-1 {{'auto' type specifier is a C++11 extension}}
-  // expected-error@-2 {{'auto' deduced as 'int *' in declaration of 'z' and deduced as 'int' in declaration of 'q'}}
-#if __cplusplus >= 201103L
+  // expected-error@-1 {{'auto' deduced as 'int *' in declaration of 'z' and deduced as 'int' in declaration of 'q'}}
   auto a = 5, b = {1, 2};
   // since-cxx11-error@-1 {{'auto' deduced as 'int' in declaration of 'a' and deduced as 'std::initializer_list<int>' in declaration of 'b'}}
   auto (*fp)(int) -> int, i = 0;
   // since-cxx11-error@-1 {{declaration with trailing return type must be the only declaration in its group}}
-#endif
 } // namespace cwg1347
 
 namespace cwg1350 { // cwg1350: 3.5
-#if __cplusplus >= 201103L
 struct NoexceptCtor {
   NoexceptCtor(int) noexcept {}
 };
@@ -464,22 +424,17 @@ struct D4 : NoexceptCtor, ThrowingDefaultArgTemplate {
 };
 
 static_assert(!__is_nothrow_constructible(D4, int), "");
-#endif
 } // namespace cwg1350
 
 namespace cwg1352 { // cwg1352: 3.0
 struct A {
-#if __cplusplus >= 201103L
   int a = sizeof(A);
-#endif
   void f(int b = sizeof(A));
 };
 
 template <typename T>
 struct B {
-#if __cplusplus >= 201103L
   int a = sizeof(B) + sizeof(T);
-#endif
   void f(int b = sizeof(B) + sizeof(T));
 };
 
@@ -487,7 +442,6 @@ template class B<int>;
 } // namespace cwg1352
 
 namespace cwg1358 { // cwg1358: 3.1
-#if __cplusplus >= 201103L
   struct Lit { constexpr operator int() const { return 0; } };
   struct NonLit { NonLit(); operator int(); }; // #cwg1358-NonLit
   struct NonConstexprConv { constexpr operator int() const; };
@@ -523,11 +477,9 @@ namespace cwg1358 { // cwg1358: 3.1
     // cxx11-20-error@-1 {{constexpr function's return type 'NonLit' is not a literal type}}
     //   cxx11-20-note@#cwg1358-NonLit {{'NonLit' is not literal because it is not an aggregate and has no constexpr constructors other than copy or move constructors}}
   };
-#endif
 } // namespace cwg1358
 
 namespace cwg1359 { // cwg1359: 3.5
-#if __cplusplus >= 201103L
   union A { constexpr A() = default; };
   union B { constexpr B() = default; int a; }; // #cwg1359-B
   // cxx11-17-error@-1 {{defaulted definition of default constructor cannot be marked constexpr before C++23}}
@@ -552,16 +504,12 @@ namespace cwg1359 { // cwg1359: 3.5
   // cxx11-17-error@-1 {{no matching constructor for initialization of 'Y'}}
   //   cxx11-17-note@#cwg1359-Y {{candidate constructor (the implicit copy constructor) not viable: requires 1 argument, but 0 were provided}}
   //   cxx11-17-note@#cwg1359-Y {{candidate constructor (the implicit move constructor) not viable: requires 1 argument, but 0 were provided}}
-#endif
 } // namespace cwg1359
 
 namespace cwg1388 { // cwg1388: 4
   template<typename A, typename ...T> void f(T..., A); // #cwg1388-f
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
   template<typename ...T> void g(T..., int); // #cwg1388-g
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
   template<typename ...T, typename A> void h(T..., A); // #cwg1388-h
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
 
   void test_f() {
     f(0); // ok, trailing parameter pack deduced to empty
@@ -601,17 +549,10 @@ namespace cwg1388 { // cwg1388: 4
   // we know exactly how many arguments correspond to it.
   template<typename T, typename U> struct pair {};
   template<typename ...T> struct tuple { typedef char type; }; //
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
   template<typename ...T, typename ...U> void f_pair_1(pair<T, U>..., int); // #cwg1388-f-1
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
-  // cxx98-error@-2 {{variadic templates are a C++11 extension}}
   template<typename ...T, typename U> void f_pair_2(pair<T, char>..., U);
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
   template<typename ...T, typename ...U> void f_pair_3(pair<T, U>..., tuple<U...>); // #cwg1388-f-3
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
-  // cxx98-error@-2 {{variadic templates are a C++11 extension}}
   template<typename ...T> void f_pair_4(pair<T, char>..., T...); // #cwg1388-f-4
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
   void g(pair<int, char> a, pair<long, char> b, tuple<char, char> c) {
     f_pair_1<int, long>(a, b, 0);
     // expected-error@-1 {{no matching function for call to 'f_pair_1'}}
@@ -689,7 +630,6 @@ namespace cwg1391 { // cwg1391: partial
   namespace partial_ordering {
     // FIXME: Second template should be considered more specialized because non-dependent parameter is ignored.
     template<typename T> int a(T, short) = delete; // #cwg1391-a-short
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
     template<typename T> int a(T*, char); // #cwg1391-a-char
     int test_a = a((int*)0, 0);
     // expected-error@-1 {{call to 'a' is ambiguous}} FIXME
@@ -700,7 +640,6 @@ namespace cwg1391 { // cwg1391: partial
     // deducing #1 from #2 ignores the second P/A pair, so deduction succeeds,
     // deducing #2 from #1 fails to deduce T, so deduction fails.
     template<typename T> int b(T, int) = delete; // #cwg1391-b-int
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
     template<typename T, typename U> int b(T*, U); // #cwg1391-b-U
     int test_b = b((int*)0, 0);
     // expected-error@-1 {{call to 'b' is ambiguous}} FIXME
@@ -720,14 +659,11 @@ namespace cwg1391 { // cwg1391: partial
 } // namespace cwg1391
 
 namespace cwg1394 { // cwg1394: 15
-#if __cplusplus >= 201103L
 struct Incomplete;
 Incomplete f(Incomplete) = delete; // well-formed
-#endif
 } // namespace cwg1394
 
 namespace cwg1395 { // cwg1395: 16
-#if __cplusplus >= 201103L
   template <typename T, typename... U> void f(T, U...);
   template <typename T> void f(T);
   // The non-pack overload is more specialized.
@@ -738,11 +674,9 @@ namespace cwg1395 { // cwg1395: 16
     f(&i);
     static_assert(g(0) == 2, "");
   }
-#endif
 } // namespace cwg1395
 
 namespace cwg1397 { // cwg1397: 3.2
-#if __cplusplus >= 201103L
 struct A {
 // cxx11-error@-1 {{default member initializer for 'p' needed within definition of enclosing class 'A' outside of member functions}}
 //   cxx11-note@#cwg1397-p {{in evaluation of exception specification for 'cwg1397::A::A' needed here}}
@@ -752,12 +686,10 @@ struct A {
   //   since-cxx14-note@-2 {{default member initializer declared here}}
   operator void*() const { return nullptr; }
 };
-#endif
 } // namespace cwg1397
 
 namespace cwg1399 { // cwg1399: dup 1388
   template<typename ...T> void f(T..., int, T...) {} // #cwg1399-f
-  // cxx98-error@-1 {{variadic templates are a C++11 extension}}
   void g() {
     f(0);
     f<int>(0, 0, 0);

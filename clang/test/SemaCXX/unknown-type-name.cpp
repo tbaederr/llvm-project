@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // PR3990
@@ -99,9 +98,6 @@ template<typename T> int junk1(T::junk);
 #endif
 template<typename T> int junk2(T::junk) throw(); // expected-error{{missing 'typename'}}
 template<typename T> int junk3(T::junk) = delete; // expected-error{{missing 'typename'}}
-#if __cplusplus <= 199711L
-//expected-warning@-2 {{deleted function definitions are a C++11 extension}}
-#endif
 
 template<typename T> int junk4(T::junk j); // expected-error{{missing 'typename'}}
 

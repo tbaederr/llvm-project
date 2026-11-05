@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++03 -fblocks -triple x86_64-windows-msvc -fms-extensions -fsyntax-only -fexceptions -fcxx-exceptions -verify %s
 // RUN: %clang_cc1 -std=c++11 -fblocks -triple x86_64-windows-msvc -fms-extensions -fsyntax-only -fexceptions -fcxx-exceptions -verify %s
 
 // Basic usage should work.
@@ -38,16 +37,6 @@ void instantiate_bad_scope_tmpl() {
   bad_builtin_scope_template<might_crash>();
 }
 
-#if __cplusplus < 201103L
-template <typename T, T FN()>
-T func_template() {
-  return FN(); // expected-error 2{{builtin functions must be directly called}}
-}
-void inject_builtins() {
-  func_template<void *, __exception_info>(); // expected-note {{instantiation of}}
-  func_template<unsigned long, __exception_code>(); // expected-note {{instantiation of}}
-}
-#endif
 
 void use_seh_after_cxx() {
   try { // expected-note {{conflicting 'try' here}}
@@ -71,7 +60,6 @@ void use_cxx_after_seh() {
   }
 }
 
-#if __cplusplus >= 201103L
 void use_seh_in_lambda() {
   ([]() {
     __try {
@@ -84,7 +72,6 @@ void use_seh_in_lambda() {
   } catch (int) {
   }
 }
-#endif
 
 void use_seh_in_block() {
   void (^b)() = ^{

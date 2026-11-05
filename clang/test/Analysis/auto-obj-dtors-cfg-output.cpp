@@ -1,7 +1,3 @@
-// RUN: %clang_analyze_cc1 -std=c++98 -fcxx-exceptions -fexceptions -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=false %s > %t 2>&1
-// RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX98,WARNINGS %s
-// RUN: %clang_analyze_cc1 -std=c++98 -fcxx-exceptions -fexceptions -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=true %s > %t 2>&1
-// RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX98,ANALYZER,CXX98-ANALYZER %s
 // RUN: %clang_analyze_cc1 -std=c++11 -fcxx-exceptions -fexceptions -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=false %s > %t 2>&1
 // RUN: FileCheck --input-file=%t -check-prefixes=CHECK,CXX11,WARNINGS,CXX11-WARNINGS %s
 // RUN: %clang_analyze_cc1 -std=c++11 -fcxx-exceptions -fexceptions -analyzer-checker=debug.DumpCFG -analyzer-config cfg-rich-constructors=true %s > %t 2>&1
@@ -77,13 +73,8 @@ void test_const_ref() {
 // CHECK-NEXT:   Succs (1): B1
 // CHECK:      [B1]
 // WARNINGS-NEXT:   1: A() (CXXConstructExpr, A)
-// CXX98-ANALYZER-NEXT:   1: A() (CXXConstructExpr, [B1.2], A)
 // CXX11-ANALYZER-NEXT:   1: A() (CXXConstructExpr, [B1.3], A)
 // CHECK-NEXT:   2: [B1.1] (BindTemporary)
-// CXX98-NEXT:   3: [B1.2].x
-// CXX98-NEXT:   4: [B1.3]
-// CXX98-NEXT:   5: const int &x = A().x;
-// CXX98-NEXT:   6: [B1.5].~A() (Implicit destructor)
 // CXX11-NEXT:   3: [B1.2]
 // CXX11-NEXT:   4: [B1.3].x
 // CXX11-NEXT:   5: [B1.4] (ImplicitCastExpr, NoOp, const int)
@@ -101,15 +92,8 @@ void test_const_ref_to_field() {
 // CHECK-NEXT:     Succs (1): B1
 // CHECK:        [B1]
 // WARNINGS-NEXT:     1: A() (CXXConstructExpr, A)
-// CXX98-ANALYZER-NEXT:     1: A() (CXXConstructExpr, [B1.2], A)
 // CXX11-ANALYZER-NEXT:     1: A() (CXXConstructExpr, [B1.3], A)
 // CHECK-NEXT:     2: [B1.1] (BindTemporary)
-// CXX98-NEXT:     3: A::x
-// CXX98-NEXT:     4: &[B1.3]
-// CXX98-NEXT:     5: [B1.2] .* [B1.4]
-// CXX98-NEXT:     6: [B1.5]
-// CXX98-NEXT:     7: const int &x = A() .* &A::x;
-// CXX98-NEXT:     8: [B1.7].~A() (Implicit destructor)
 // CXX11-NEXT:     3: [B1.2]
 // CXX11-NEXT:     4: A::x
 // CXX11-NEXT:     5: &[B1.4]
@@ -163,8 +147,6 @@ void test_aggregate_lifetime_extension() {
   B bb[2] = {A(), A()};
 }
 
-// In C++98 such class 'C' will not be an aggregate.
-#if __cplusplus >= 201103L
 // FIXME: There should be automatic destructors at the end of the scope.
 // CXX11:        [B2 (ENTRY)]
 // CXX11-NEXT:     Succs (1): B1
@@ -249,7 +231,6 @@ void test_aggregate_array_lifetime_extension() {
   C c = {{A(), A()}};
   C cc[2] = {{{A(), A()}}, {{A(), A()}}};
 }
-#endif
 
 // CHECK:        [B2 (ENTRY)]
 // CHECK-NEXT:     Succs (1): B1

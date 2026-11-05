@@ -4787,10 +4787,6 @@ MemInitResult
 Sema::BuildDelegatingInitializer(TypeSourceInfo *TInfo, Expr *Init,
                                  CXXRecordDecl *ClassDecl) {
   SourceLocation NameLoc = TInfo->getTypeLoc().getSourceRange().getBegin();
-  if (!LangOpts.CPlusPlus11)
-    return Diag(NameLoc, diag::err_delegating_ctor)
-           << TInfo->getTypeLoc().getSourceRange();
-  Diag(NameLoc, diag::warn_cxx98_compat_delegating_ctor);
 
   bool InitList = true;
   MultiExprArg Args = Init;
@@ -7069,7 +7065,7 @@ static bool canPassInRegisters(Sema &S, CXXRecordDecl *D,
     HasNonDeletedCopyOrMove = true;
   }
 
-  if (S.getLangOpts().CPlusPlus11 && D->needsImplicitMoveConstructor() &&
+  if (D->needsImplicitMoveConstructor() &&
       !D->defaultedMoveConstructorIsDeleted()) {
     if (!D->hasTrivialMoveConstructorForCall())
       return false;
@@ -7694,9 +7690,6 @@ static bool defaultedSpecialMemberIsConstexpr(
     Sema &S, CXXRecordDecl *ClassDecl, CXXSpecialMemberKind CSM, bool ConstArg,
     CXXConstructorDecl *InheritedCtor = nullptr,
     Sema::InheritedConstructorInfo *Inherited = nullptr) {
-  if (!S.getLangOpts().CPlusPlus11)
-    return false;
-
   // C++11 [dcl.constexpr]p4:
   // In the definition of a constexpr constructor [...]
   bool Ctor = true;
@@ -10038,8 +10031,7 @@ bool Sema::ShouldDeleteSpecialMember(CXXMethodDecl *MD,
     return false;
   CXXRecordDecl *RD = MD->getParent();
   assert(!RD->isDependentType() && "do deletion after instantiation");
-  if (!LangOpts.CPlusPlus || (!LangOpts.CPlusPlus11 && !RD->isLambda()) ||
-      RD->isInvalidDecl())
+  if (!LangOpts.CPlusPlus || RD->isInvalidDecl())
     return false;
 
   // C++11 [expr.lambda.prim]p19:
@@ -10340,9 +10332,7 @@ enum TrivialSubobjectKind {
   /// The subobject is a base class.
   TSK_BaseClass,
   /// The subobject is a non-static data member.
-  TSK_Field,
-  /// The object is actually the complete object.
-  TSK_CompleteObject
+  TSK_Field
 };
 
 /// Check whether the special member selected for a given type would be trivial.
@@ -10373,18 +10363,12 @@ static bool checkTrivialSubobjectCall(Sema &S, SourceLocation SubobjLoc,
       S.Diag(SubobjLoc, diag::note_nontrivial_no_copy)
           << Kind << SubType.getUnqualifiedType() << CSM << SubType;
     else if (Selected->isUserProvided()) {
-      if (Kind == TSK_CompleteObject)
-        S.Diag(Selected->getLocation(), diag::note_nontrivial_user_provided)
-            << Kind << SubType.getUnqualifiedType() << CSM;
-      else {
-        S.Diag(SubobjLoc, diag::note_nontrivial_user_provided)
-            << Kind << SubType.getUnqualifiedType() << CSM;
-        S.Diag(Selected->getLocation(), diag::note_declared_at);
-      }
+      S.Diag(SubobjLoc, diag::note_nontrivial_user_provided)
+          << Kind << SubType.getUnqualifiedType() << CSM;
+      S.Diag(Selected->getLocation(), diag::note_declared_at);
     } else {
-      if (Kind != TSK_CompleteObject)
-        S.Diag(SubobjLoc, diag::note_nontrivial_subobject)
-            << Kind << SubType.getUnqualifiedType() << CSM;
+      S.Diag(SubobjLoc, diag::note_nontrivial_subobject)
+          << Kind << SubType.getUnqualifiedType() << CSM;
 
       // Explain why the defaulted or deleted special member isn't trivial.
       S.SpecialMemberIsTrivial(Selected, CSM,
@@ -10444,18 +10428,6 @@ static bool checkTrivialClassMembers(Sema &S, CXXRecordDecl *RD,
   }
 
   return true;
-}
-
-void Sema::DiagnoseNontrivial(const CXXRecordDecl *RD,
-                              CXXSpecialMemberKind CSM) {
-  CanQualType Ty = Context.getCanonicalTagType(RD);
-
-  bool ConstArg = (CSM == CXXSpecialMemberKind::CopyConstructor ||
-                   CSM == CXXSpecialMemberKind::CopyAssignment);
-  checkTrivialSubobjectCall(*this, RD->getLocation(), Ty, ConstArg, CSM,
-                            TSK_CompleteObject,
-                            TrivialABIHandling::IgnoreTrivialABI,
-                            /*Diagnose*/ true);
 }
 
 bool Sema::SpecialMemberIsTrivial(CXXMethodDecl *MD, CXXSpecialMemberKind CSM,
@@ -10954,8 +10926,7 @@ void Sema::AddImplicitlyDeclaredMembersToClass(CXXRecordDecl *ClassDecl) {
         DeclareImplicitCopyConstructor(ClassDecl);
     }
 
-    if (getLangOpts().CPlusPlus11 &&
-        ClassDecl->needsImplicitMoveConstructor()) {
+    if (ClassDecl->needsImplicitMoveConstructor()) {
       ++getASTContext().NumImplicitMoveConstructors;
 
       if (ClassDecl->needsOverloadResolutionForMoveConstructor() ||
@@ -10976,7 +10947,7 @@ void Sema::AddImplicitlyDeclaredMembersToClass(CXXRecordDecl *ClassDecl) {
         DeclareImplicitCopyAssignment(ClassDecl);
     }
 
-    if (getLangOpts().CPlusPlus11 && ClassDecl->needsImplicitMoveAssignment()) {
+    if (ClassDecl->needsImplicitMoveAssignment()) {
       ++getASTContext().NumImplicitMoveAssignmentOperators;
 
       // Likewise for the move assignment operator.
@@ -11626,10 +11597,8 @@ void Sema::CheckConversionDeclarator(Declarator &D, QualType &R,
       }
     } else if (!Proto->getReturnType()->isDependentType()) {
       DB << /*typedef*/1 << Proto->getReturnType();
-    } else if (getLangOpts().CPlusPlus11) {
-      DB << /*alias template*/2 << Proto->getReturnType();
     } else {
-      DB << /*might not be fixable*/3;
+      DB << /*alias template*/2 << Proto->getReturnType();
     }
 
     // Recover by incorporating the other type chunks into the result type.
@@ -11659,12 +11628,6 @@ void Sema::CheckConversionDeclarator(Declarator &D, QualType &R,
   // return type.
   if (D.isInvalidType())
     R = Context.getFunctionType(ConvType, {}, Proto->getExtProtoInfo());
-
-  // C++0x explicit conversion operators.
-  if (DS.hasExplicitSpecifier())
-    DiagCompat(DS.getExplicitSpecLoc(),
-               diag_compat::explicit_conversion_functions)
-        << SourceRange(DS.getExplicitSpecRange());
 }
 
 Decl *Sema::ActOnConversionDeclarator(CXXConversionDecl *Conversion) {
@@ -12788,15 +12751,7 @@ Decl *Sema::ActOnUsingDeclaration(Scope *S, AccessSpecifier AS,
   case UnqualifiedIdKind::IK_ConstructorName:
   case UnqualifiedIdKind::IK_ConstructorTemplateId:
     // C++11 inheriting constructors.
-    Diag(Name.getBeginLoc(),
-         getLangOpts().CPlusPlus11
-             ? diag::warn_cxx98_compat_using_decl_constructor
-             : diag::err_using_decl_constructor)
-        << SS.getRange();
-
-    if (getLangOpts().CPlusPlus11) break;
-
-    return nullptr;
+    break;
 
   case UnqualifiedIdKind::IK_DestructorName:
     Diag(Name.getBeginLoc(), diag::err_using_decl_destructor) << SS.getRange();
@@ -12818,9 +12773,7 @@ Decl *Sema::ActOnUsingDeclaration(Scope *S, AccessSpecifier AS,
 
   // Warn about access declarations.
   if (UsingLoc.isInvalid()) {
-    Diag(Name.getBeginLoc(), getLangOpts().CPlusPlus11
-                                 ? diag::err_access_decl
-                                 : diag::warn_access_decl_deprecated)
+    Diag(Name.getBeginLoc(), diag::err_access_decl)
         << FixItHint::CreateInsertion(SS.getRange().getBegin(), "using ");
   }
 
@@ -12914,56 +12867,6 @@ IsEquivalentForUsingDecl(ASTContext &Context, NamedDecl *D1, NamedDecl *D2) {
 bool Sema::CheckUsingShadowDecl(BaseUsingDecl *BUD, NamedDecl *Orig,
                                 const LookupResult &Previous,
                                 UsingShadowDecl *&PrevShadow) {
-  // Diagnose finding a decl which is not from a base class of the
-  // current class.  We do this now because there are cases where this
-  // function will silently decide not to build a shadow decl, which
-  // will pre-empt further diagnostics.
-  //
-  // We don't need to do this in C++11 because we do the check once on
-  // the qualifier.
-  //
-  // FIXME: diagnose the following if we care enough:
-  //   struct A { int foo; };
-  //   struct B : A { using A::foo; };
-  //   template <class T> struct C : A {};
-  //   template <class T> struct D : C<T> { using B::foo; } // <---
-  // This is invalid (during instantiation) in C++03 because B::foo
-  // resolves to the using decl in B, which is not a base class of D<T>.
-  // We can't diagnose it immediately because C<T> is an unknown
-  // specialization. The UsingShadowDecl in D<T> then points directly
-  // to A::foo, which will look well-formed when we instantiate.
-  // The right solution is to not collapse the shadow-decl chain.
-  if (!getLangOpts().CPlusPlus11 && CurContext->isRecord())
-    if (auto *Using = dyn_cast<UsingDecl>(BUD)) {
-      DeclContext *OrigDC = Orig->getDeclContext();
-
-      // Handle enums and anonymous structs.
-      if (isa<EnumDecl>(OrigDC))
-        OrigDC = OrigDC->getParent();
-      CXXRecordDecl *OrigRec = cast<CXXRecordDecl>(OrigDC);
-      while (OrigRec->isAnonymousStructOrUnion())
-        OrigRec = cast<CXXRecordDecl>(OrigRec->getDeclContext());
-
-      if (cast<CXXRecordDecl>(CurContext)->isProvablyNotDerivedFrom(OrigRec)) {
-        if (OrigDC == CurContext) {
-          Diag(Using->getLocation(),
-               diag::err_using_decl_nested_name_specifier_is_current_class)
-              << Using->getQualifierLoc().getSourceRange();
-          Diag(Orig->getLocation(), diag::note_using_decl_target);
-          Using->setInvalidDecl();
-          return true;
-        }
-
-        Diag(Using->getQualifierLoc().getBeginLoc(),
-             diag::err_using_decl_nested_name_specifier_is_not_base_class)
-            << Using->getQualifier() << cast<CXXRecordDecl>(CurContext)
-            << Using->getQualifierLoc().getSourceRange();
-        Diag(Orig->getLocation(), diag::note_using_decl_target);
-        Using->setInvalidDecl();
-        return true;
-      }
-    }
-
   if (Previous.empty()) return false;
 
   NamedDecl *Target = Orig;
@@ -13201,8 +13104,6 @@ public:
         // No-one ever wants a using-declaration to name an injected-class-name
         // of a base class, unless they're declaring an inheriting constructor.
         ASTContext &Ctx = ND->getASTContext();
-        if (!Ctx.getLangOpts().CPlusPlus11)
-          return false;
         CanQualType FoundType = Ctx.getCanonicalTagType(FoundRecord);
 
         // Check that the injected-class-name is named as a member of its own
@@ -13764,51 +13665,25 @@ bool Sema::CheckUsingDeclQualifier(SourceLocation UsingLoc, bool HasTypename,
         // We will have already diagnosed the problem on the template
         // definition,  Maybe we should do so again?
       } else if (R->getAsSingle<TypeDecl>()) {
-        if (getLangOpts().CPlusPlus11) {
-          // Convert 'using X::Y;' to 'using Y = X::Y;'.
-          Diag(SS.getBeginLoc(), diag::note_using_decl_class_member_workaround)
-              << diag::MemClassWorkaround::AliasDecl
-              << FixItHint::CreateInsertion(SS.getBeginLoc(),
-                                            NameInfo.getName().getAsString() +
-                                                " = ");
-        } else {
-          // Convert 'using X::Y;' to 'typedef X::Y Y;'.
-          SourceLocation InsertLoc = getLocForEndOfToken(NameInfo.getEndLoc());
-          Diag(InsertLoc, diag::note_using_decl_class_member_workaround)
-              << diag::MemClassWorkaround::TypedefDecl
-              << FixItHint::CreateReplacement(UsingLoc, "typedef")
-              << FixItHint::CreateInsertion(
-                     InsertLoc, " " + NameInfo.getName().getAsString());
-        }
+        // Convert 'using X::Y;' to 'using Y = X::Y;'.
+        Diag(SS.getBeginLoc(), diag::note_using_decl_class_member_workaround)
+            << diag::MemClassWorkaround::AliasDecl
+            << FixItHint::CreateInsertion(
+                   SS.getBeginLoc(), NameInfo.getName().getAsString() + " = ");
       } else if (R->getAsSingle<VarDecl>()) {
-        // Don't provide a fixit outside C++11 mode; we don't want to suggest
-        // repeating the type of the static data member here.
-        FixItHint FixIt;
-        if (getLangOpts().CPlusPlus11) {
-          // Convert 'using X::Y;' to 'auto &Y = X::Y;'.
-          FixIt = FixItHint::CreateReplacement(
-              UsingLoc, "auto &" + NameInfo.getName().getAsString() + " = ");
-        }
-
+        // Convert 'using X::Y;' to 'auto &Y = X::Y;'.
         Diag(UsingLoc, diag::note_using_decl_class_member_workaround)
-            << diag::MemClassWorkaround::ReferenceDecl << FixIt;
+            << diag::MemClassWorkaround::ReferenceDecl
+            << FixItHint::CreateReplacement(
+                   UsingLoc,
+                   "auto &" + NameInfo.getName().getAsString() + " = ");
       } else if (R->getAsSingle<EnumConstantDecl>()) {
-        // Don't provide a fixit outside C++11 mode; we don't want to suggest
-        // repeating the type of the enumeration here, and we can't do so if
-        // the type is anonymous.
-        FixItHint FixIt;
-        if (getLangOpts().CPlusPlus11) {
-          // Convert 'using X::Y;' to 'auto &Y = X::Y;'.
-          FixIt = FixItHint::CreateReplacement(
-              UsingLoc,
-              "constexpr auto " + NameInfo.getName().getAsString() + " = ");
-        }
-
+        // Convert 'using X::Y;' to 'constexpr auto Y = X::Y;'.
         Diag(UsingLoc, diag::note_using_decl_class_member_workaround)
-            << (getLangOpts().CPlusPlus11
-                    ? diag::MemClassWorkaround::ConstexprVar
-                    : diag::MemClassWorkaround::ConstVar)
-            << FixIt;
+            << diag::MemClassWorkaround::ConstexprVar
+            << FixItHint::CreateReplacement(
+                   UsingLoc, "constexpr auto " +
+                                 NameInfo.getName().getAsString() + " = ");
       }
     }
 
@@ -14819,9 +14694,6 @@ void Sema::referenceDLLExportedClassMethods() {
 }
 
 void Sema::AdjustDestructorExceptionSpec(CXXDestructorDecl *Destructor) {
-  assert(getLangOpts().CPlusPlus11 &&
-         "adjusting dtor exception specs was introduced in c++11");
-
   if (Destructor->isDependentContext())
     return;
 
@@ -15074,34 +14946,12 @@ buildSingleCopyAssignRecursively(Sema &S, SourceLocation Loc, QualType T,
   //       subobject of x as a single function argument (as if by explicit
   //       qualification; that is, ignoring any possible virtual overriding
   //       functions in more derived classes);
-  //
-  // C++03 [class.copy]p13:
-  //     - if the subobject is of class type, the copy assignment operator for
-  //       the class is used (as if by explicit qualification; that is,
-  //       ignoring any possible virtual overriding functions in more derived
-  //       classes);
   if (auto *ClassDecl = T->getAsCXXRecordDecl()) {
     // Look for operator=.
     DeclarationName Name
       = S.Context.DeclarationNames.getCXXOperatorName(OO_Equal);
     LookupResult OpLookup(S, Name, Loc, Sema::LookupOrdinaryName);
     S.LookupQualifiedName(OpLookup, ClassDecl, false);
-
-    // Prior to C++11, filter out any result that isn't a copy/move-assignment
-    // operator.
-    if (!S.getLangOpts().CPlusPlus11) {
-      LookupResult::Filter F = OpLookup.makeFilter();
-      while (F.hasNext()) {
-        NamedDecl *D = F.next();
-        if (CXXMethodDecl *Method = dyn_cast<CXXMethodDecl>(D))
-          if (Method->isCopyAssignmentOperator() ||
-              (!Copying && Method->isMoveAssignmentOperator()))
-            continue;
-
-        F.erase();
-      }
-      F.done();
-    }
 
     // Suppress the protected check (C++ [class.protected]) for each of the
     // assignment operators we found. This strange dance is required when
@@ -15437,7 +15287,7 @@ void Sema::DefineImplicitCopyAssignment(SourceLocation CurrentLocation,
   //   The [definition of an implicitly declared copy assignment operator] is
   //   deprecated if the class has a user-declared copy constructor or a
   //   user-declared destructor.
-  if (getLangOpts().CPlusPlus11 && CopyAssignOperator->isImplicit())
+  if (CopyAssignOperator->isImplicit())
     diagnoseDeprecatedCopyOperation(*this, CopyAssignOperator);
 
   // C++0x [class.copy]p30:
@@ -16195,7 +16045,7 @@ void Sema::DefineImplicitCopyConstructor(SourceLocation CurrentLocation,
   //   The [definition of an implicitly declared copy constructor] is
   //   deprecated if the class has a user-declared copy assignment operator
   //   or a user-declared destructor.
-  if (getLangOpts().CPlusPlus11 && CopyConstructor->isImplicit())
+  if (CopyConstructor->isImplicit())
     diagnoseDeprecatedCopyOperation(*this, CopyConstructor);
 
   if (SetCtorInitializers(CopyConstructor, /*AnyErrors=*/false)) {
@@ -18505,7 +18355,7 @@ Decl *Sema::ActOnFriendTypeDecl(Scope *S, const DeclSpec &DS,
   //
   // If the friend keyword isn't first, or if the declarations has any type
   // qualifiers, then the declaration doesn't have that form.
-  if (getLangOpts().CPlusPlus11 && !DS.isFriendSpecifiedFirst())
+  if (!DS.isFriendSpecifiedFirst())
     Diag(FriendLoc, diag::err_friend_not_first_in_declaration);
   if (DS.getTypeQualifiers()) {
     if (DS.getTypeQualifiers() & DeclSpec::TQ_const)
@@ -18543,33 +18393,18 @@ Decl *Sema::ActOnFriendTypeDecl(Scope *S, const DeclSpec &DS,
     Invalid = true;
   }
 
-  if (!T->isElaboratedTypeSpecifier()) {
-    if (TempParams.size()) {
-      // C++23 [dcl.pre]p5:
-      //   In a simple-declaration, the optional init-declarator-list can be
-      //   omitted only when declaring a class or enumeration, that is, when
-      //   the decl-specifier-seq contains either a class-specifier, an
-      //   elaborated-type-specifier with a class-key, or an enum-specifier.
-      //
-      // The declaration of a template-declaration or explicit-specialization
-      // is never a member-declaration, so this must be a simple-declaration
-      // with no init-declarator-list. Therefore, this is ill-formed.
-      Diag(Loc, diag::err_tagless_friend_type_template) << DS.getSourceRange();
-      return nullptr;
-    } else if (const RecordDecl *RD = T->getAsRecordDecl()) {
-      SmallString<16> InsertionText(" ");
-      InsertionText += RD->getKindName();
-
-      Diag(Loc, getLangOpts().CPlusPlus11
-                    ? diag::warn_cxx98_compat_unelaborated_friend_type
-                    : diag::ext_unelaborated_friend_type)
-          << (unsigned)RD->getTagKind() << T
-          << FixItHint::CreateInsertion(getLocForEndOfToken(FriendLoc),
-                                        InsertionText);
-    } else {
-      DiagCompat(FriendLoc, diag_compat::nonclass_type_friend)
-          << T << DS.getSourceRange();
-    }
+  if (!T->isElaboratedTypeSpecifier() && TempParams.size()) {
+    // C++23 [dcl.pre]p5:
+    //   In a simple-declaration, the optional init-declarator-list can be
+    //   omitted only when declaring a class or enumeration, that is, when
+    //   the decl-specifier-seq contains either a class-specifier, an
+    //   elaborated-type-specifier with a class-key, or an enum-specifier.
+    //
+    // The declaration of a template-declaration or explicit-specialization
+    // is never a member-declaration, so this must be a simple-declaration
+    // with no init-declarator-list. Therefore, this is ill-formed.
+    Diag(Loc, diag::err_tagless_friend_type_template) << DS.getSourceRange();
+    return nullptr;
   }
 
   // C++98 [class.friend]p1: A friend of a class is a function
@@ -18774,14 +18609,6 @@ NamedDecl *Sema::ActOnFriendFunctionDecl(Scope *S, Declarator &D,
     if (RequireCompleteDeclContext(SS, DC)) return nullptr;
 
     LookupQualifiedName(Previous, DC);
-
-    // C++ [class.friend]p1: A friend of a class is a function or
-    //   class that is not a member of the class . . .
-    if (DC->Equals(CurContext))
-      Diag(DS.getFriendSpecLoc(),
-           getLangOpts().CPlusPlus11 ?
-             diag::warn_cxx98_compat_friend_is_member :
-             diag::err_friend_is_member);
 
     //   - There's a dependent scope specifier, in which case we use an
     //     arbitrary context and wait for instantiation.

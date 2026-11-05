@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fsyntax-only
 // RUN: %clang_cc1 -std=c++11 %s -verify
 
 // In C++11, we must perform overload resolution to determine which function is

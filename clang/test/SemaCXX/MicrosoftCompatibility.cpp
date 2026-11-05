@@ -369,16 +369,10 @@ struct Derived : Base {
 
 class A {
   virtual ~A() throw();
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{overridden virtual function is here}}
-#endif
 };
 
 class B : public A {
   virtual ~B();
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{exception specification of overriding function is more lax than base version}}
-#endif
 };
 
 void f4() throw(); // expected-note {{previous declaration is here}}

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fgnu-keywords -fsyntax-only -verify %s
 // RUN: %clang_cc1 -std=c++11 -fgnu-keywords -fsyntax-only -verify %s
 
 struct B {

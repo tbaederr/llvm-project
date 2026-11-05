@@ -29,7 +29,7 @@ public:
             "LegacyResourceConsumers", "::free;::realloc;::freopen;::fclose")) {
   }
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
 
   /// Make configuration of checker discoverable.

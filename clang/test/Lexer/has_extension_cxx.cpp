@@ -1,5 +1,4 @@
-// RUN: %clang_cc1 -std=c++98 -E %s -o - | FileCheck %s
-// RUN: %clang_cc1 -std=c++11 -E %s -o - | FileCheck %s --check-prefix=CHECK11
+// RUN: %clang_cc1 -std=c++11 -E %s -o - | FileCheck %s --check-prefixes=CHECK,CHECK11
 // RUN: %clang_cc1 -std=c++20 -E %s -o - | FileCheck %s --check-prefix=CHECK20
 // RUN: %clang_cc1 -std=c++23 -E %s -o - | FileCheck %s --check-prefix=CHECK23
 
@@ -78,7 +77,6 @@ int has_binary_literals();
 int has_variable_templates();
 #endif
 
-// CHECK-NOT: has_init_captures
 // CHECK11: has_init_captures
 #if __has_extension(cxx_init_captures)
 int has_init_captures();

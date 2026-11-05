@@ -176,7 +176,7 @@ void ClangHighlighter::Highlight(const HighlightStyle &options,
   // right.
   LangOptions Opts;
   Opts.ObjC = true;
-  // FIXME: This should probably set CPlusPlus, CPlusPlus11, ... too
+  // FIXME: This should probably set CPlusPlus, CPlusPlus14, ... too
   Opts.CPlusPlus17 = true;
   Opts.AllowLiteralDigitSeparator = true;
   Opts.LineComment = true;

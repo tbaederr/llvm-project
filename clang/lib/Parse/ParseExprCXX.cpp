@@ -1234,12 +1234,7 @@ ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
                      LambdaIntroducer &Intro) {
   SourceLocation LambdaBeginLoc = Intro.Range.getBegin();
   if (getLangOpts().HLSL)
-    Diag(LambdaBeginLoc, diag::ext_hlsl_lambda) << /*HLSL*/ 1;
-  else
-    Diag(LambdaBeginLoc, getLangOpts().CPlusPlus11
-                             ? diag::warn_cxx98_compat_lambda
-                             : diag::ext_lambda)
-        << /*C++*/ 0;
+    Diag(LambdaBeginLoc, diag::ext_hlsl_lambda);
 
   PrettyStackTraceLoc CrashInfo(PP.getSourceManager(), LambdaBeginLoc,
                                 "lambda expression parsing");
@@ -1816,9 +1811,7 @@ Parser::ParseCXXTypeConstructExpression(const DeclSpec &DS) {
                             DeclaratorContext::FunctionalCast);
   ParsedType TypeRep = Actions.ActOnTypeName(DeclaratorInfo).get();
 
-  assert((Tok.is(tok::l_paren) ||
-          (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)))
-         && "Expected '(' or '{'!");
+  assert(Tok.isOneOf(tok::l_paren, tok::l_brace) && "Expected '(' or '{'!");
 
   if (Tok.is(tok::l_brace)) {
     PreferredType.enterTypeCast(Tok.getLocation(), TypeRep.get());
@@ -2114,8 +2107,7 @@ Sema::ConditionResult Parser::ParseCondition(StmtResult *InitStmt,
     ConsumeToken();
 
   ExprResult InitExpr = ExprError();
-  if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-    Diag(Tok.getLocation(), diag::compat_cxx11_generalized_initializer_lists);
+  if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
     InitExpr = ParseBraceInitializer();
   } else if (CopyInitialization) {
     PreferredType.enterVariableInit(Tok.getLocation(), DeclOut);
@@ -2481,8 +2473,7 @@ bool Parser::ParseUnqualifiedIdOperator(CXXScopeSpec &SS, bool EnteringContext,
       // Consume the 'new' or 'delete'.
       SymbolLocations[SymbolIdx++] = ConsumeToken();
       // Check for array new/delete.
-      if (Tok.is(tok::l_square) &&
-          (!getLangOpts().CPlusPlus11 || NextToken().isNot(tok::l_square))) {
+      if (Tok.is(tok::l_square) && NextToken().isNot(tok::l_square)) {
         // Consume the '[' and ']'.
         BalancedDelimiterTracker T(*this, tok::l_square);
         T.consumeOpen();
@@ -2589,9 +2580,7 @@ bool Parser::ParseUnqualifiedIdOperator(CXXScopeSpec &SS, bool EnteringContext,
   //     operator string-literal identifier
   //     operator user-defined-string-literal
 
-  if (getLangOpts().CPlusPlus11 && isTokenStringLiteral()) {
-    Diag(Tok.getLocation(), diag::warn_cxx98_compat_literal_operator);
-
+  if (isTokenStringLiteral()) {
     SourceLocation DiagLoc;
     unsigned DiagId = 0;
 
@@ -3101,8 +3090,7 @@ Parser::ParseCXXNewExpression(bool UseGlobal, SourceLocation Start) {
     Initializer = Actions.ActOnParenListExpr(ConstructorLParen,
                                              ConstructorRParen,
                                              ConstructorArgs);
-  } else if (Tok.is(tok::l_brace) && getLangOpts().CPlusPlus11) {
-    Diag(Tok.getLocation(), diag::compat_cxx11_generalized_initializer_lists);
+  } else if (Tok.is(tok::l_brace)) {
     Initializer = ParseBraceInitializer();
   }
   if (Initializer.isInvalid())

@@ -1,7 +1,6 @@
 // RUN: %clang_cc1 -std=c++23 -fsyntax-only -verify=expected                -triple %itanium_abi_triple -Wbind-to-temporary-copy %s
 // RUN: %clang_cc1 -std=c++20 -fsyntax-only -verify=expected                -triple %itanium_abi_triple -Wbind-to-temporary-copy %s
-// RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify=expected,cxx98_11,cxx11 -triple %itanium_abi_triple -Wbind-to-temporary-copy %s
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -verify=expected,cxx98_11,cxx98 -triple %itanium_abi_triple -Wbind-to-temporary-copy %s
+// RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify=expected,cxx98_11       -triple %itanium_abi_triple -Wbind-to-temporary-copy %s
 
 class X {
 public:
@@ -126,7 +125,7 @@ void f(Yb& a) {
 class AutoPtrRef { };
 
 class AutoPtr {
-  AutoPtr(AutoPtr &); // cxx98-note {{declared private here}}
+  AutoPtr(AutoPtr &);
 
 public:
   AutoPtr();
@@ -142,7 +141,7 @@ AutoPtr test_auto_ptr(bool Cond) {
 
   AutoPtr p;
   if (Cond)
-    return p; // cxx98-error {{calling a private constructor}}
+    return p;
 
   return AutoPtr();
 }
@@ -152,14 +151,12 @@ struct A1 {
   ~A1();
 
 private:
-  A1(const A1 &); // cxx98_11-note 2 {{declared private here}}
+  A1(const A1 &); // cxx98_11-note {{declared private here}}
 };
 
 A1 f() {
   // FIXME: redundant diagnostics!
   return "Hello"; // cxx98_11-error {{calling a private constructor}}
-  // cxx98-warning@-1 {{an accessible copy constructor}}
-  // cxx11-warning@-2 {{copying parameter of type 'A1' when binding a reference to a temporary would invoke an inaccessible constructor in C++98}}
 }
 
 namespace source_locations {
@@ -202,11 +199,7 @@ namespace crazy_declarators {
     *operator int();  // expected-error {{put the complete type after 'operator'}}
     // No suggestion of using a typedef here; that's not possible.
     template<typename T> (&operator T())();
-#if __cplusplus <= 199711L
-    // expected-error-re@-2 {{cannot specify any part of a return type in the declaration of a conversion function{{$}}}}
-#else
-    // expected-error-re@-4 {{cannot specify any part of a return type in the declaration of a conversion function; use an alias template to declare a conversion to 'T (&)()'{{$}}}}
-#endif
+    // expected-error-re@-1 {{cannot specify any part of a return type in the declaration of a conversion function; use an alias template to declare a conversion to 'T (&)()'{{$}}}}
 
   };
 }
@@ -225,9 +218,7 @@ namespace smart_ptr {
   };
 
   struct X { // expected-note{{candidate constructor (the implicit copy constructor) not}}
-#if __cplusplus >= 201103L
-  // expected-note@-2 {{candidate constructor (the implicit move constructor) not}}
-#endif
+  // expected-note@-1 {{candidate constructor (the implicit move constructor) not}}
 
     explicit X(Y); // expected-note {{not a candidate}}
   };
@@ -252,11 +243,7 @@ struct Other {
 
 void test_any() {
   Any any = Other();
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{cannot pass object of non-POD type 'Other' through variadic constructor; call will abort at runtime}}
-#else
-  // expected-error@-4 {{cannot pass object of non-trivial type 'Other' through variadic constructor; call will abort at runtime}}
-#endif
+  // expected-error@-1 {{cannot pass object of non-trivial type 'Other' through variadic constructor; call will abort at runtime}}
 }
 
 namespace PR7055 {
@@ -453,9 +440,7 @@ namespace PR18234 {
     operator enum E { e } (); // expected-error {{'PR18234::A::E' cannot be defined in a type specifier}}
     operator struct S { int n; } (); // expected-error {{'PR18234::A::S' cannot be defined in a type specifier}}
     // expected-note@-1 {{candidate constructor (the implicit copy constructor) not viable: no known conversion from 'struct A' to 'const S &' for 1st argument}}
-#if __cplusplus >= 201103L
-  // expected-note@-3 {{candidate constructor (the implicit move constructor) not viable: no known conversion from 'struct A' to 'S &&' for 1st argument}}
-#endif
+  // expected-note@-2 {{candidate constructor (the implicit move constructor) not viable: no known conversion from 'struct A' to 'S &&' for 1st argument}}
   } a;
   A::S s = a; // expected-error {{no viable conversion from 'struct A' to 'A::S'}}
   A::E e = a; // expected-note {{'e' declared here}}
@@ -473,7 +458,6 @@ struct S {
 };
 }
 
-#if __cplusplus >= 201103L
 namespace GH218261 {
   struct S {
     template <typename T>
@@ -489,9 +473,7 @@ namespace GH218261 {
 
   static_assert(S().operator int() == 4, "");
 }
-#endif
 
-#if __cplusplus >= 201103L
 namespace dependent_conversion_function_id_lookup {
 namespace gh77583 {
 struct A1 {
@@ -511,7 +493,6 @@ template<typename T> struct B : A2<T> {
 using Result = B<int>::Lookup<int>;
 using Result = int (A2<int>::*)();
 }
-#endif
 
 namespace GH121706 {
 struct S {

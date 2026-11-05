@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 int x(1);
@@ -16,9 +15,7 @@ public: explicit Y(float);
 };
 
 class X { // expected-note{{candidate constructor (the implicit copy constructor)}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 {{candidate constructor (the implicit move constructor) not viable}}
 
 public:
   explicit X(int); // expected-note{{candidate constructor}}
@@ -27,9 +24,7 @@ public:
 };
 
 class Z { // expected-note{{candidate constructor (the implicit copy constructor)}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 {{candidate constructor (the implicit move constructor) not viable}}
 
 public:
   Z(int); // expected-note{{candidate constructor}}

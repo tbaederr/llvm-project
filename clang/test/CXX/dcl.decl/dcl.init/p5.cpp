@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -Wno-deprecated-builtins -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wno-deprecated-builtins -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wno-deprecated-builtins %s
 
@@ -11,25 +10,6 @@ typedef int &IR;
 IR r; // expected-error {{declaration of reference variable 'r' requires an initializer}}
 int n = IR(); // expected-error {{reference to type 'int' requires an initializer}}
 
-#if __cplusplus < 201103L
-struct S { // expected-error {{implicit default constructor for 'S' must explicitly initialize the reference member}}
-  int &x; // expected-note {{declared here}} expected-error 3{{reference to type 'int' requires an initializer}}
-};
-S s; // expected-note {{implicit default constructor for 'S' first required here}}
-S f() {
-  return S(); // expected-note {{in value-initialization of type 'S' here}}
-}
-
-struct T
-  : S { // expected-note 2{{in value-initialization of type 'S' here}}
-};
-T t = T(); // expected-note {{in value-initialization of type 'T' here}}
-
-struct U {
-  T t[3]; // expected-note {{in value-initialization of type 'T' here}}
-};
-U u = U(); // expected-note {{in value-initialization of type 'U' here}}
-#else
 struct S {
   int &x; // expected-note 4{{because field 'x' of reference type 'int &' would not be initialized}}
 };
@@ -47,7 +27,6 @@ struct U {
   T t[3]; // expected-note {{because field 't' has a deleted default constructor}}
 };
 U u = U(); // expected-error {{deleted default constructor}}
-#endif
 
 // Ensure that we handle C++11 in-class initializers properly as an extension.
 // In this case, there is no user-declared default constructor, so we

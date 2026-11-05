@@ -321,14 +321,9 @@ static bool EvaluateValue(PPValue &Result, Token &PeekTok, DefinedTracker &DT,
       PP.Diag(PeekTok, diag::err_pp_invalid_udl) << /*integer*/1;
 
     // 'long long' is a C99 or C++11 feature.
-    if (!PP.getLangOpts().C99 && Literal.isLongLong) {
-      if (PP.getLangOpts().CPlusPlus)
-        PP.Diag(PeekTok,
-             PP.getLangOpts().CPlusPlus11 ?
-             diag::warn_cxx98_compat_longlong : diag::ext_cxx11_longlong);
-      else
-        PP.Diag(PeekTok, diag::ext_c99_longlong);
-    }
+    if (!PP.getLangOpts().C99 && !PP.getLangOpts().CPlusPlus &&
+        Literal.isLongLong)
+      PP.Diag(PeekTok, diag::ext_c99_longlong);
 
     // 'z/uz' literals are a C++23 feature.
     if (Literal.isSizeT) {

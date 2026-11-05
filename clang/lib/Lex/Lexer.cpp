@@ -2208,8 +2208,7 @@ bool Lexer::LexNumericConstant(Token &Result, const char *CurPtr) {
   return true;
 }
 
-/// LexUDSuffix - Lex the ud-suffix production for user-defined literal suffixes
-/// in C++11, or warn on a ud-suffix in C++98.
+/// LexUDSuffix - Lex the ud-suffix production for user-defined literal suffixes.
 const char *Lexer::LexUDSuffix(Token &Result, const char *CurPtr,
                                bool IsStringLiteral) {
   assert(LangOpts.CPlusPlus);
@@ -2226,15 +2225,6 @@ const char *Lexer::LexUDSuffix(Token &Result, const char *CurPtr,
       Consumed = true;
     else
       return CurPtr;
-  }
-
-  if (!LangOpts.CPlusPlus11) {
-    if (!isLexingRawMode())
-      Diag(CurPtr,
-           C == '_' ? diag::warn_cxx11_compat_user_defined_literal
-                    : diag::warn_cxx11_compat_reserved_user_defined_literal)
-        << FixItHint::CreateInsertion(getSourceLocation(CurPtr), " ");
-    return CurPtr;
   }
 
   // C++11 [lex.ext]p10, [usrlit.suffix]p1: A program containing a ud-suffix
@@ -2308,12 +2298,11 @@ bool Lexer::LexStringLiteral(Token &Result, const char *CurPtr,
   // Does this string contain the \0 character?
   const char *NulCharacter = nullptr;
 
-  if (!isLexingRawMode() &&
+  if (!isLexingRawMode() && !LangOpts.CPlusPlus &&
       (Kind == tok::utf8_string_literal ||
        Kind == tok::utf16_string_literal ||
        Kind == tok::utf32_string_literal))
-    Diag(BufferPtr, LangOpts.CPlusPlus ? diag::warn_cxx98_compat_unicode_literal
-                                       : diag::warn_c99_compat_unicode_literal);
+    Diag(BufferPtr, diag::warn_c99_compat_unicode_literal);
 
   char C = getAndAdvanceChar(CurPtr, Result);
   while (C != '"') {
@@ -2389,9 +2378,6 @@ bool Lexer::LexRawStringLiteral(Token &Result, const char *CurPtr,
   //  Between the initial and final double quote characters of the raw string,
   //  any transformations performed in phases 1 and 2 (trigraphs,
   //  universal-character-names, and line splicing) are reverted.
-
-  if (!isLexingRawMode())
-    Diag(BufferPtr, diag::warn_cxx98_compat_raw_string_literal);
 
   unsigned PrefixLen = 0;
 
@@ -2555,14 +2541,14 @@ bool Lexer::LexCharConstant(Token &Result, const char *CurPtr,
   const char *NulCharacter = nullptr;
 
   if (!isLexingRawMode()) {
-    if (Kind == tok::utf16_char_constant || Kind == tok::utf32_char_constant)
-      Diag(BufferPtr, LangOpts.CPlusPlus
-                          ? diag::warn_cxx98_compat_unicode_literal
-                          : diag::warn_c99_compat_unicode_literal);
-    else if (Kind == tok::utf8_char_constant)
+    if (Kind == tok::utf16_char_constant || Kind == tok::utf32_char_constant) {
+      if (!LangOpts.CPlusPlus)
+        Diag(BufferPtr, diag::warn_c99_compat_unicode_literal);
+    } else if (Kind == tok::utf8_char_constant) {
       Diag(BufferPtr, LangOpts.CPlusPlus
                           ? diag::warn_cxx14_compat_u8_character_literal
                           : diag::warn_c17_compat_u8_character_literal);
+    }
   }
 
   char C = getAndAdvanceChar(CurPtr, Result);
@@ -3778,15 +3764,11 @@ uint32_t Lexer::tryReadUCN(const char *&StartPtr, const char *SlashLoc,
 
     return 0;
   } else if (CodePoint >= 0xD800 && CodePoint <= 0xDFFF) {
-    // C++03 allows UCNs representing surrogate characters. C99 and C++11 don't.
+    // C99 and C++11 don't allow UCNs representing surrogate characters.
     // We don't use isLexingRawMode() here because we need to diagnose bad
     // UCNs even when skipping preprocessing tokens in a #if block.
-    if (Result && PP) {
-      if (LangOpts.CPlusPlus && !LangOpts.CPlusPlus11)
-        Diag(BufferPtr, diag::warn_ucn_escape_surrogate);
-      else
-        Diag(BufferPtr, diag::err_ucn_escape_invalid);
-    }
+    if (Result && PP)
+      Diag(BufferPtr, diag::err_ucn_escape_invalid);
     return 0;
   }
 
@@ -4006,7 +3988,7 @@ LexStart:
     // Notify MIOpt that we read a non-whitespace/non-comment token.
     MIOpt.ReadToken();
 
-    if (LangOpts.CPlusPlus11 || LangOpts.C11) {
+    if (LangOpts.CPlusPlus || LangOpts.C11) {
       Char = getCharAndSize(CurPtr, SizeTmp);
 
       // UTF-16 string literal
@@ -4064,7 +4046,7 @@ LexStart:
     // Notify MIOpt that we read a non-whitespace/non-comment token.
     MIOpt.ReadToken();
 
-    if (LangOpts.CPlusPlus11 || LangOpts.C11) {
+    if (LangOpts.CPlusPlus || LangOpts.C11) {
       Char = getCharAndSize(CurPtr, SizeTmp);
 
       // UTF-32 string literal
@@ -4402,7 +4384,7 @@ LexStart:
       CurPtr = ConsumeChar(CurPtr, SizeTmp, Result);
       Kind = tok::lessequal;
     } else if (LangOpts.Digraphs && Char == ':') { // '<:' -> '['
-      if (LangOpts.CPlusPlus11 &&
+      if (LangOpts.CPlusPlus &&
           getCharAndSize(CurPtr + SizeTmp, SizeTmp2) == ':') {
         // C++0x [lex.pptoken]p3:
         //  Otherwise, if the next three characters are <:: and the subsequent
@@ -4413,8 +4395,6 @@ LexStart:
         char After = getCharAndSize(CurPtr + SizeTmp + SizeTmp2, SizeTmp3);
         if (After != ':' && After != '>') {
           Kind = tok::less;
-          if (!isLexingRawMode())
-            Diag(BufferPtr, diag::warn_cxx98_compat_less_colon_colon);
           break;
         }
       }

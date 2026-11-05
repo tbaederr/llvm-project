@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -verify -fcxx-exceptions %s
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -verify -fcxx-exceptions %s -fexperimental-new-constant-interpreter
+// RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify -fcxx-exceptions %s
+// RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify -fcxx-exceptions %s -fexperimental-new-constant-interpreter
 
 //
 // Tests for "expression traits" intrinsics such as __is_lvalue_expr.
@@ -364,7 +364,9 @@ void expr_ref_4()
     // then E1.E2 is an lvalue...
     Class lvalue;
     ASSERT_LVALUE(lvalue.dataMember);
-    ASSERT_RVALUE(Class().dataMember);
+    // C++11: E1.E2 is an xvalue if E1 is an rvalue.
+    static_assert(!__is_lvalue_expr(Class().dataMember), "should be an xvalue");
+    static_assert(!__is_rvalue_expr(Class().dataMember), "should be an xvalue");
 
     // - If E1.E2 refers to a static member function, ... then E1.E2
     // is an lvalue
@@ -502,7 +504,9 @@ void expr_mptr_oper()
     // only if its first operand is an lvalue and its second operand
     // is a pointer to data member... (cont'd)
     typedef Class MakeRValue;
-    ASSERT_RVALUE(MakeRValue().*(&Class::dataMember));
+    // C++11: the result is an xvalue if the first operand is an rvalue.
+    static_assert(!__is_lvalue_expr(MakeRValue().*(&Class::dataMember)), "should be an xvalue");
+    static_assert(!__is_rvalue_expr(MakeRValue().*(&Class::dataMember)), "should be an xvalue");
     //ASSERT_RVALUE(MakeRValue().*(&Class::NonstaticMemberFunction));
     Class lvalue;
     ASSERT_LVALUE(lvalue.*(&Class::dataMember));

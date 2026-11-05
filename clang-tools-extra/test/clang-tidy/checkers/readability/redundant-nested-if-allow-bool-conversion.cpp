@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -check-suffixes=ALLOWBOOL -std=c++98-or-later %s \
+// RUN: %check_clang_tidy -check-suffixes=ALLOWBOOL -std=c++11-or-later %s \
 // RUN:   readability-redundant-nested-if %t -- \
 // RUN:   -config='{CheckOptions: {readability-redundant-nested-if.AllowUserDefinedBoolConversion: true}}' -- \
 // RUN:   -I %S -fno-delayed-template-parsing

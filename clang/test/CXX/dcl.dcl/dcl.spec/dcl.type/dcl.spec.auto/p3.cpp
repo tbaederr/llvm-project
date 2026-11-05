@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++11
-// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++98 -Wno-c++11-extensions -Wc++11-compat 
 void f() {
   auto a = a; // expected-error{{variable 'a' declared with deduced type 'auto' cannot appear in its own initializer}}
   auto *b = b; // expected-error{{variable 'b' declared with deduced type 'auto *' cannot appear in its own initializer}}
@@ -50,7 +49,6 @@ void p3example() {
   same<__typeof(y), double> yHasTypeDouble;
 }
 
-#if __cplusplus >= 201103L
 namespace PR13293 {
   // Ensure that dependent declarators have their deduction delayed.
   int f(char);
@@ -85,7 +83,6 @@ namespace PR13293 {
   }
   template void h<double>();
 }
-#endif
 
 auto fail((unknown)); // expected-error{{use of undeclared identifier 'unknown'}}
 int& crash = fail;

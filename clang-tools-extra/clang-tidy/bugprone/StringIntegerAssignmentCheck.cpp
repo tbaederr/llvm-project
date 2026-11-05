@@ -172,11 +172,9 @@ void StringIntegerAssignmentCheck::check(
     return;
   }
 
-  if (getLangOpts().CPlusPlus11) {
-    Diag << FixItHint::CreateInsertion(Loc, IsWideCharType ? "std::to_wstring("
-                                                           : "std::to_string(")
-         << FixItHint::CreateInsertion(EndLoc, ")");
-  }
+  Diag << FixItHint::CreateInsertion(Loc, IsWideCharType ? "std::to_wstring("
+                                                         : "std::to_string(")
+       << FixItHint::CreateInsertion(EndLoc, ")");
 }
 
 } // namespace clang::tidy::bugprone

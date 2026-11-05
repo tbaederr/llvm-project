@@ -95,7 +95,7 @@ StringFindStrContainsCheck::StringFindStrContainsCheck(
 
 bool StringFindStrContainsCheck::isLanguageVersionSupported(
     const LangOptions &LangOpts) const {
-  return LangOpts.CPlusPlus11;
+  return LangOpts.CPlusPlus;
 }
 
 void StringFindStrContainsCheck::storeOptions(

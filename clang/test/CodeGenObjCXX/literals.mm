@@ -1,16 +1,16 @@
-// RUN: %clang_cc1 -std=gnu++98 -I %S/Inputs -triple x86_64-apple-darwin10 -emit-llvm -fblocks -fobjc-arc -fobjc-runtime-has-weak -fexceptions -fobjc-exceptions -fcxx-exceptions -fobjc-arc-exceptions -O2 -disable-llvm-passes -o - %s | FileCheck %s
+// RUN: %clang_cc1 -std=gnu++11 -I %S/Inputs -triple x86_64-apple-darwin10 -emit-llvm -fblocks -fobjc-arc -fobjc-runtime-has-weak -fexceptions -fobjc-exceptions -fcxx-exceptions -fobjc-arc-exceptions -O2 -disable-llvm-passes -o - %s | FileCheck %s
 
 #include "literal-support.h"
 
 struct X {
   X();
-  ~X();
+  ~X() noexcept(false);
   operator id() const;
 };
 
 struct Y {
   Y();
-  ~Y();
+  ~Y() noexcept(false);
   operator id() const;
 };
 

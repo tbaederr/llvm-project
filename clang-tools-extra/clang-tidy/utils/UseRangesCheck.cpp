@@ -349,7 +349,7 @@ void UseRangesCheck::check(const MatchFinder::MatchResult &Result) {
 
 bool UseRangesCheck::isLanguageVersionSupported(
     const LangOptions &LangOpts) const {
-  return LangOpts.CPlusPlus11;
+  return LangOpts.CPlusPlus;
 }
 
 UseRangesCheck::UseRangesCheck(StringRef Name, ClangTidyContext *Context)

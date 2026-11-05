@@ -843,12 +843,9 @@ MacroArgs *Preprocessor::ReadMacroCallArgumentList(Token &MacroName,
 
     // Empty arguments are standard in C99 and C++0x, and are supported as an
     // extension in other modes.
-    if (ArgTokens.size() == ArgTokenStart && !getLangOpts().C99) {
-      if (getLangOpts().CPlusPlus)
-        DiagCompat(Tok, diag_compat::empty_fnmacro_arg);
-      else
-        Diag(Tok, diag::ext_empty_fnmacro_arg);
-    }
+    if (ArgTokens.size() == ArgTokenStart && !getLangOpts().C99 &&
+        !getLangOpts().CPlusPlus)
+      Diag(Tok, diag::ext_empty_fnmacro_arg);
 
     // Add a marker EOF token to the end of the token list for this argument.
     Token EOFTok = Token::createEof(Tok.getLocation());

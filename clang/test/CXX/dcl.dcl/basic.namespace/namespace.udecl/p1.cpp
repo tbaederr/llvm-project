@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // We have to avoid ADL for this test.
@@ -7,9 +6,7 @@
 template <unsigned N> class test {};
 
 class foo {};	// expected-note {{candidate constructor (the implicit copy constructor) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 {{candidate constructor (the implicit move constructor) not viable}}
 test<0> foo(foo); // expected-note {{candidate}}
 
 namespace Test0 {

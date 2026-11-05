@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fcxx-exceptions -fsyntax-only -verify -W -Wall -Wno-deprecated-builtins -Wno-unused-but-set-variable -Wrange-loop-analysis -triple arm64-linux-gnu -target-feature +sve -std=c++98 %s
 // RUN: %clang_cc1 -fcxx-exceptions -fsyntax-only -verify -W -Wall -Wno-deprecated-builtins -Wno-unused-but-set-variable -Wrange-loop-analysis -triple arm64-linux-gnu -target-feature +sve -std=c++11 %s
 // RUN: %clang_cc1 -fcxx-exceptions -fsyntax-only -verify -W -Wall -Wno-deprecated-builtins -Wno-unused-but-set-variable -Wrange-loop-analysis -triple arm64-linux-gnu -target-feature +sve -std=c++17 %s
 // RUN: %clang_cc1 -fcxx-exceptions -fsyntax-only -verify -W -Wall -Wno-deprecated-builtins -Wno-unused-but-set-variable -Wrange-loop-analysis -triple arm64-linux-gnu -target-feature +sve -std=gnu++17 %s
@@ -25,15 +24,9 @@ int sizeof_int8 = sizeof(svint8_t);             // expected-error {{invalid appl
 int sizeof_int8_var = sizeof(*extern_int8_ptr); // expected-error {{invalid application of 'sizeof' to sizeless type 'svint8_t'}}
 int sizeof_int8_var_ptr = sizeof(extern_int8_ptr);
 
-#if __cplusplus >= 201103L
 int alignof_int8 = alignof(svint8_t);                // expected-error {{invalid application of 'alignof' to sizeless type 'svint8_t'}}
 int alignof_int8_var = alignof(*extern_int8_ptr);    // expected-error {{invalid application of 'alignof' to sizeless type 'svint8_t'}} expected-warning {{GNU extension}}
 int alignof_int8_var_ptr = alignof(extern_int8_ptr); // expected-warning {{GNU extension}}
-#else
-int alignof_int8 = _Alignof(svint8_t);                // expected-error {{invalid application of 'alignof' to sizeless type 'svint8_t'}}
-int alignof_int8_var = _Alignof(*extern_int8_ptr);    // expected-error {{invalid application of 'alignof' to sizeless type 'svint8_t'}} expected-warning {{GNU extension}}
-int alignof_int8_var_ptr = _Alignof(extern_int8_ptr); // expected-warning {{GNU extension}}
-#endif
 
 void pass_int8(svint8_t); // expected-note {{no known conversion}}
 
@@ -92,13 +85,8 @@ void func(int sel) {
   svint8_t init_int8 = local_int8;
   svint8_t bad_init_int8 = for; // expected-error {{expected expression}}
 
-#if __cplusplus >= 201103L
   int empty_brace_init_int = {};
   svint8_t empty_brace_init_int8 = {};
-#else
-  int empty_brace_init_int = {}; // expected-error {{scalar initializer cannot be empty}}
-  svint8_t empty_brace_init_int8 = {}; // expected-error {{initializer for sizeless type 'svint8_t' (aka '__SVInt8_t') cannot be empty}}
-#endif
   svint8_t brace_init_int8 = {local_int8};
   svint8_t bad_brace_init_int8_1 = {local_int8, 0};    // expected-error {{excess elements in initializer for indivisible sizeless type 'svint8_t'}}
   svint8_t bad_brace_init_int8_2 = {0};                // expected-error {{rvalue of type 'int'}}
@@ -248,9 +236,7 @@ union sized_union {
 void pass_int8_ref(svint8_t &); // expected-note {{not viable}}
 
 svint8_t &return_int8_ref();
-#if __cplusplus >= 201103L
 svint8_t &&return_int8_rvalue_ref();
-#endif
 
 template <typename T>
 struct s_template {
@@ -290,11 +276,9 @@ struct wrapper {
   wrapper_iterator<T> end() const;
 };
 
-#if __cplusplus >= 201103L
 struct explicit_conv {
   explicit operator svint8_t() const; // expected-note {{explicit conversion function is not a candidate}}
 };
-#endif
 
 struct constructible_from_sizeless {
   constructible_from_sizeless(svint8_t);
@@ -302,9 +286,7 @@ struct constructible_from_sizeless {
 
 void with_default(svint8_t = svint8_t());
 
-#if __cplusplus >= 201103L
 constexpr int ce_taking_int8(svint8_t) { return 1; } // expected-error {{constexpr function's 1st parameter type 'svint8_t' (aka '__SVInt8_t') is not a literal type}}
-#endif
 
 #if __cplusplus < 201703L
 void throwing_func() throw(svint8_t); // expected-error {{sizeless type 'svint8_t' (aka '__SVInt8_t') is not allowed in exception specification}}
@@ -318,17 +300,13 @@ template <typename T>
 void template_fn_ref(T &) {}
 template <typename T>
 void template_fn_const_ref(const T &) {}
-#if __cplusplus >= 201103L
 template <typename T>
 void template_fn_rvalue_ref(T &&) {}
-#endif
 
-#if __cplusplus >= 201103L
 template <typename T>
 using array_alias = T[1]; // expected-error {{array has sizeless element type 'svint8_t' (aka '__SVInt8_t')}}
 extern array_alias<int> *array_alias_int_ptr;
 extern array_alias<svint8_t> *array_alias_int8_ptr; // expected-note {{in instantiation of template type alias 'array_alias' requested here}}
-#endif
 
 extern "C" svint8_t c_return_int8();
 
@@ -344,13 +322,11 @@ void cxx_only(int sel) {
   return_int8_ref() = local_int8;
   return_int8_ref() = local_int16; // expected-error {{assigning to 'svint8_t' (aka '__SVInt8_t') from incompatible type 'svint16_t'}}
 
-#if __cplusplus >= 201103L
   local_int8 = return_int8_rvalue_ref();
   local_int16 = return_int8_rvalue_ref(); // expected-error {{assigning to 'svint16_t' (aka '__SVInt16_t') from incompatible type 'svint8_t'}}
 
   return_int8_rvalue_ref() = local_int8;  // expected-error {{expression is not assignable}}
   return_int8_rvalue_ref() = local_int16; // expected-error {{expression is not assignable}}
-#endif
 
   local_int8 = static_cast<svint8_t>(local_int8);
   local_int8 = static_cast<svint8_t>(local_int16);  // expected-error {{static_cast from 'svint16_t' (aka '__SVInt16_t') to 'svint8_t' (aka '__SVInt8_t') is not allowed}}
@@ -416,7 +392,6 @@ void cxx_only(int sel) {
   ref_int8 = local_int8;
   local_int8 = ref_int8;
 
-#if __cplusplus >= 201103L
   svint8_t zero_init_int8{};
   svint8_t init_int8{local_int8};
   svint8_t bad_brace_init_int8_1{local_int8, 0};    // expected-error {{excess elements in initializer for indivisible sizeless type 'svint8_t'}}
@@ -429,18 +404,13 @@ void cxx_only(int sel) {
   svint8_t &ref_init_int8{local_int8};
 
   template_fn_direct<svint8_t>({wrapper<svint8_t>()});
-#endif
 
   template_fn_direct(local_int8);
   template_fn_ref(local_int8);
   template_fn_const_ref(local_int8);
-#if __cplusplus >= 201103L
   template_fn_rvalue_ref(local_int8);
-#endif
 
-#if __cplusplus >= 201103L
   constexpr svint8_t ce_int8_a = wrapper<svint8_t>(); // expected-error {{constexpr variable cannot have non-literal type 'const svint8_t'}}
-#endif
 
   (void)typeid(__SVInt8_t);
   (void)typeid(__SVInt8_t *);
@@ -499,14 +469,10 @@ void cxx_only(int sel) {
   _Static_assert(__is_reference(const svint8_t &), "");
   _Static_assert(!__is_lvalue_reference(svint8_t), "");
   _Static_assert(__is_lvalue_reference(svint8_t &), "");
-#if __cplusplus >= 201103L
   _Static_assert(!__is_lvalue_reference(svint8_t &&), "");
-#endif
   _Static_assert(!__is_rvalue_reference(svint8_t), "");
   _Static_assert(!__is_rvalue_reference(svint8_t &), "");
-#if __cplusplus >= 201103L
   _Static_assert(__is_rvalue_reference(svint8_t &&), "");
-#endif
   _Static_assert(!__is_fundamental(svint8_t), "");
   _Static_assert(__is_object(svint8_t), "");
   _Static_assert(!__is_scalar(svint8_t), "");
@@ -528,12 +494,10 @@ void cxx_only(int sel) {
   _Static_assert(!__is_signed(svint8_t), "");
   _Static_assert(!__is_unsigned(svint8_t), "");
 
-#if __cplusplus >= 201103L
   auto auto_int8 = local_int8;
   auto auto_int16 = local_int16;
 #if __cplusplus >= 201703L
   auto [auto_int8_a] = local_int8; // expected-error {{cannot bind non-class, non-array type 'svint8_t' (aka '__SVInt8_t')}}
-#endif
 #endif
 
   s_ptr_template<int> y;
@@ -541,11 +505,8 @@ void cxx_only(int sel) {
 
   constructible_from_sizeless cfs1(local_int8);
   constructible_from_sizeless cfs2 = local_int8;
-#if __cplusplus >= 201103L
   constructible_from_sizeless cfs3{local_int8};
-#endif
 
-#if __cplusplus >= 201103L
   local_int8 = ([]() { return svint8_t(); })();
   local_int8 = ([]() -> svint8_t { return svint8_t(); })();
   auto fn1 = [&local_int8](svint8_t x) { local_int8 = x; };
@@ -566,14 +527,11 @@ void cxx_only(int sel) {
   for (const svint8_t x : wrapper<const svint8_t &>()) {
     (void)x;
   }
-#endif
 }
 
-#if __cplusplus >= 201103L
 svint8_t ret_bad_conv() { return explicit_conv(); } // expected-error {{no viable conversion from returned value of type 'explicit_conv' to function return type 'svint8_t'}}
 
 #pragma clang diagnostic warning "-Wc++98-compat"
 
-void incompat_init() { __attribute__((unused)) svint8_t foo = {}; } // expected-warning {{initializing 'svint8_t' (aka '__SVInt8_t') from an empty initializer list is incompatible with C++98}}
+void incompat_init() { __attribute__((unused)) svint8_t foo = {}; }
 
-#endif

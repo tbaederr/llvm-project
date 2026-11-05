@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98,cxx98-11,cxx98-14,cxx98-17
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx98-11,cxx98-14,cxx98-17
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,cxx98-14,cxx98-17
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx17,cxx98-17
@@ -8,21 +7,12 @@
 
 typedef __decltype(sizeof(0)) size_t;
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
-#if __cplusplus == 199711L
-#define __enable_constant_folding(x) (__builtin_constant_p(x) ? (x) : (x))
-#else
 #define __enable_constant_folding
-#endif
 
 namespace cwg200 { // cwg200: dup 214
   template <class T> T f(int);
   template <class T, class U> T f(U) = delete;
-  // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
 
   void g() {
     f<int>(1);
@@ -531,10 +521,8 @@ namespace cwg226 { // cwg226: no
   // are listed as a defect (in c++98) not an extension. EDG accepts them in
   // strict c++98 mode.
   template<typename T = void> void f() {}
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T> struct S {
     template<typename U = void> void g();
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
     template<typename U> struct X;
     template<typename U> void h();
   };
@@ -553,26 +541,19 @@ namespace cwg226 { // cwg226: no
     //  h and i are ill-formed because they are not the only declarations of the
     //  function in the translation unit.
     template<typename=void> void friend_f();
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
     template<typename=void> void friend_g() {}
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
     template<typename=void> void friend_h() {}
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
     template<typename=void> void friend_i() {}
-    // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   };
   template<typename> void friend_i();
 
   template<typename=void, typename X> void foo(X) {}
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename=void, typename X> struct Foo {};
   // expected-error@-1 {{template parameter missing a default argument}}
   //   expected-note@-2 {{previous default template argument defined here}}
 
   template<typename=void, typename X, typename, typename Y> int foo(X, Y);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename, typename X, typename=void, typename Y> int foo(X, Y);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   int x = foo(0, 0);
 } // namespace cwg226
 
@@ -630,8 +611,7 @@ namespace cwg231 { // cwg231: 2.7
 
 namespace cwg236 { // cwg236: 3.2
   void *p = int();
-  // cxx98-warning@-1 {{expression which evaluates to zero treated as a null pointer constant of type 'void *'}}
-  // since-cxx11-error@-2 {{cannot initialize a variable of type 'void *' with an rvalue of type 'int'}}
+  // since-cxx11-error@-1 {{cannot initialize a variable of type 'void *' with an rvalue of type 'int'}}
 } // namespace cwg236
 
 namespace cwg237 { // cwg237: dup 470
@@ -702,7 +682,6 @@ namespace cwg243 { // cwg243: 2.8
   };
   struct B {
     operator A() = delete; // #cwg243-B
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
   } b;
   A a1(b);
   A a2 = b;
@@ -869,7 +848,6 @@ namespace cwg250 { // cwg250: 2.7
   FPtr fp = &f<3>;
 
   template<int I = 3> void g(double x[]);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   FPtr gp = &g<>;
 } // namespace cwg250
 
@@ -899,7 +877,6 @@ namespace cwg252 { // cwg252: 3.1
   struct E {
     void operator delete(void*, int);
     void operator delete(void*) = delete; // #cwg252-E
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
     virtual ~E();
   };
   E::~E() {}
@@ -910,7 +887,6 @@ namespace cwg252 { // cwg252: 3.1
     // If both functions are available, the first one is a placement delete.
     void operator delete(void*, size_t);
     void operator delete(void*) = delete; // #cwg252-F
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
     virtual ~F();
   };
   F::~F() {}
@@ -1086,10 +1062,7 @@ namespace cwg262 { // cwg262: 2.7
 namespace cwg263 { // cwg263: 3.3
   struct X {};
   struct Y {
-#if __cplusplus < 201103L
-    friend X::X() throw();
-    friend X::~X() throw();
-#elif __cplusplus <= 201703L
+#if __cplusplus <= 201703L
     friend constexpr X::X() noexcept;
     friend X::~X();
 #else
@@ -1456,7 +1429,6 @@ namespace cwg299 { // cwg299: 2.8 c++11
   };
   // FIXME: should this apply to c++98 mode?
   int *p = new int[S()];
-  // cxx98-error@-1 {{implicit conversion from array size expression of type 'S' to integral type 'int' is a C++11 extension}}
   int *q = new int[T()]; // #cwg299-q
   // cxx98-11-error@#cwg299-q {{ambiguous conversion of array size expression of type 'T' to an integral or enumeration type}}
   //  cxx98-11-note@#cwg299-int {{conversion to integral type 'int' declared here}}

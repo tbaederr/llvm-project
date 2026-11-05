@@ -1,7 +1,3 @@
-// RUN: %clang_cc1 -pedantic -Wall -Wno-unused-but-set-variable -Wno-comment -verify -fcxx-exceptions -x c++ -std=c++98 -Wno-c++14-extensions %s
-// RUN: cp %s %t-98
-// RUN: not %clang_cc1 -pedantic -Wall -Wno-unused-but-set-variable -Wno-comment -fcxx-exceptions -fixit -x c++ -std=c++98 -Wno-c++14-extensions %t-98
-// RUN: %clang_cc1 -fsyntax-only -pedantic -Wall -Wno-unused-but-set-variable -Werror -Wno-comment -fcxx-exceptions -x c++ -std=c++98 -Wno-c++14-extensions %t-98
 // RUN: not %clang_cc1 -fsyntax-only -pedantic -fdiagnostics-parseable-fixits -x c++ -std=c++11 -Wno-c++14-extensions %s 2>&1 | FileCheck %s
 // RUN: %clang_cc1 -pedantic -Wall -Wno-unused-but-set-variable -Wno-comment -verify -fcxx-exceptions -x c++ -std=c++11 -Wno-c++14-extensions %s
 // RUN: cp %s %t-11
@@ -27,9 +23,6 @@ template<int Value> struct CT { template<typename> struct Inner; }; // expected-
 
 // FIXME: In C++11 this gets 'expected unqualified-id' which fixit can't fix.
 // Probably parses as `CT<10> > 2 > ct;` rather than `CT<(10 >> 2)> ct;`.
-#if __cplusplus < 201103L
-CT<10 >> 2> ct; // expected-warning{{require parentheses}}
-#endif
 
 class C3 {
 public:
@@ -49,11 +42,7 @@ protected:
 };
 
 class B : public A {
-#if __cplusplus >= 201103L
   A::foo; // expected-error{{ISO C++11 does not allow access declarations}}
-#else
-  A::foo; // expected-warning{{access declarations are deprecated}}
-#endif
 };
 
 void f() throw(); // expected-note{{previous}}
@@ -297,10 +286,6 @@ namespace greatergreater {
     int p = 0;
     (void)(t<int>==p); // expected-error {{use '> ='}}
     (void)(t<int>>=p); // expected-error {{use '> >'}}
-#if __cplusplus < 201103L
-    (void)(t<S<int>>>=p); // expected-error {{use '> >'}}
-    (Shr)t<S<int>>>>=p; // expected-error {{use '> >'}}
-#endif
 
     // FIXME: We correct this to 't<int> > >= p;' not 't<int> >>= p;'
     //(Shr)t<int>>>=p;
@@ -410,7 +395,6 @@ struct F : A  // expected-error{{expected '{' after base class list}}
   // CHECK: fix-it:"{{.*}}":{[[@LINE-1]]:13-[[@LINE-1]]:13}:" {"
   F() { }
 };
-#if __cplusplus >= 201103L
 struct G : A  // expected-error{{expected '{' after base class list}}
   // CHECK: fix-it:"{{.*}}":{[[@LINE-1]]:13-[[@LINE-1]]:13}:" {"
   constexpr G(int) { }
@@ -419,7 +403,6 @@ struct H : A  // expected-error{{expected '{' after base class list}}
   // CHECK: fix-it:"{{.*}}":{[[@LINE-1]]:13-[[@LINE-1]]:13}:" {"
   static_assert(true, "");
 };
-#endif
 }
 
 struct conversion_operator {

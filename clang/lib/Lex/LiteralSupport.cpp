@@ -734,22 +734,19 @@ static bool ProcessUCNEscape(const char *ThisTokBegin, const char *&ThisTokBuf,
       // $, @, ` are allowed in all language modes
       (UcnVal != 0x24 && UcnVal != 0x40 && UcnVal != 0x60)) {
     bool IsError =
-        (!(Features.CPlusPlus11 || Features.C23) || !in_char_string_literal);
-    if (Diags) {
+        (!(Features.CPlusPlus || Features.C23) || !in_char_string_literal);
+    // Valid in C++ literals without a diagnostic.
+    if (Diags && (IsError || !Features.CPlusPlus)) {
       char BasicSCSChar = UcnVal;
       if (UcnVal >= 0x20 && UcnVal < 0x7f)
         Diag(Diags, Features, Loc, ThisTokBegin, UcnBegin, ThisTokBuf,
              IsError ? diag::err_ucn_escape_basic_scs
-             : Features.CPlusPlus
-                 ? diag::warn_cxx98_compat_literal_ucn_escape_basic_scs
-                 : diag::warn_c23_compat_literal_ucn_escape_basic_scs)
+                     : diag::warn_c23_compat_literal_ucn_escape_basic_scs)
             << StringRef(&BasicSCSChar, 1);
       else
         Diag(Diags, Features, Loc, ThisTokBegin, UcnBegin, ThisTokBuf,
              IsError ? diag::err_ucn_control_character
-             : Features.CPlusPlus
-                 ? diag::warn_cxx98_compat_literal_ucn_control_character
-                 : diag::warn_c23_compat_literal_ucn_control_character);
+                     : diag::warn_c23_compat_literal_ucn_control_character);
     }
     if (IsError)
       return false;
@@ -1332,7 +1329,7 @@ void NumericLiteralParser::ParseDecimalOrOctalCommon(SourceLocation TokLoc){
 /// treat it as an invalid suffix.
 bool NumericLiteralParser::isValidUDSuffix(const LangOptions &LangOpts,
                                            StringRef Suffix) {
-  if (!LangOpts.CPlusPlus11 || Suffix.empty())
+  if (!LangOpts.CPlusPlus || Suffix.empty())
     return false;
 
   // By C++11 [lex.ext]p10, ud-suffixes starting with an '_' are always valid.

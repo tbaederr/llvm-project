@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -triple x86_64-apple-darwin9.0.0 -fsyntax-only -verify %s
 // RUN: %clang_cc1 -x objective-c++ -std=c++11 -triple x86_64-apple-darwin9.0.0 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -x objective-c++ -std=c++03 -triple x86_64-apple-darwin9.0.0 -fsyntax-only -verify %s
 
 #if !__has_feature(attribute_availability_with_version_underscores)
 # error "missing feature"

@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s readability-trailing-comma %t
+// RUN: %check_clang_tidy -std=c++11-or-later %s readability-trailing-comma %t
 
 struct S { int x, y; };
 

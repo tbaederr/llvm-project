@@ -2086,7 +2086,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc,
 
     Diag(Loc, diag::err_for_range_identifier)
         << (ForRangeInfo.ExpansionStmt != nullptr)
-        << ((getLangOpts().CPlusPlus11 && !getLangOpts().CPlusPlus17)
+        << (!getLangOpts().CPlusPlus17
                 ? FixItHint::CreateInsertion(Loc, "auto &&")
                 : FixItHint());
 
@@ -2125,7 +2125,8 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc,
           MightBeForRangeStmt ? &ForRangeInfo : nullptr);
       FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
       if (ForRangeInfo.ParsedForRangeDecl()) {
-        DiagCompat(ForRangeInfo.ColonLoc, diag_compat::for_range);
+        if (!getLangOpts().CPlusPlus)
+          DiagCompat(ForRangeInfo.ColonLoc, diag_compat::for_range);
         ForRangeInfo.LoopVar = FirstPart;
         FirstPart = StmtResult();
       } else if (Tok.is(tok::semi)) { // for (int x = 4;
@@ -2166,7 +2167,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc,
         // we will err below. This way we do not warn on an unused expression
         // that was an error in the first place, like with: for (expr : expr);
         bool IsRangeBasedFor =
-            getLangOpts().CPlusPlus11 && !ForEach && Tok.is(tok::colon);
+            getLangOpts().CPlusPlus && !ForEach && Tok.is(tok::colon);
         FirstPart = Actions.ActOnExprStmt(Value, !IsRangeBasedFor);
       }
     }
@@ -2183,7 +2184,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc,
         return StmtError();
       }
       Collection = ParseExpression();
-    } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::colon) && FirstPart.get()) {
+    } else if (getLangOpts().CPlusPlus && Tok.is(tok::colon) && FirstPart.get()) {
       // User tried to write the reasonable, but ill-formed, for-range-statement
       //   for (expr : expr) { ... }
       Diag(Tok, diag::err_for_range_expected_decl)
@@ -2487,12 +2488,9 @@ StmtResult Parser::ParseReturnStatement() {
       return StmtError();
     }
 
-    if (Tok.is(tok::l_brace) && getLangOpts().CPlusPlus) {
+    if (Tok.is(tok::l_brace) && getLangOpts().CPlusPlus)
       R = ParseInitializer();
-      if (R.isUsable())
-        DiagCompat(R.get()->getBeginLoc(),
-                   diag_compat::generalized_initializer_lists);
-    } else
+    else
       R = ParseExpression();
     if (R.isInvalid()) {
       SkipUntil(tok::r_brace, StopAtSemi | StopBeforeMatch);

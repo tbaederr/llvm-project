@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx98-14 %s
+// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx11-14 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx17 -std=c++17 %s
 
 template<template<typename T> class X> struct A; // #A
@@ -41,9 +41,6 @@ A<f> *a9; // expected-error{{must be a class template}}
 
 // Evil digraph '<:' is parsed as '[', expect error.
 A<::N::Z> *a10;
-#if __cplusplus <= 199711L
-// expected-error@-2 {{found '<::' after a template name which forms the digraph '<:' (aka '[') and a ':', did you mean '< ::'?}}
-#endif
 
 // Do not do a digraph correction here.
 A<: :N::Z> *a11;  // expected-error{{expected expression}} \
@@ -70,38 +67,25 @@ namespace N {
 
 // PR12179
 template <typename Primitive, template <Primitive...> class F>
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{variadic templates are a C++11 extension}}
-#endif
 
 struct unbox_args {
   typedef typename Primitive::template call<F> x;
 };
 
 template <template <typename> class... Templates>
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{variadic templates are a C++11 extension}}
-#endif
 
 struct template_tuple {
-#if __cplusplus >= 201103L
   static constexpr int N = sizeof...(Templates);
-#endif
 };
 template <typename T>
 struct identity {};
 template <template <typename> class... Templates>
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{variadic templates are a C++11 extension}}
-#endif
 
 template_tuple<Templates...> f7() {}
 
-#if __cplusplus >= 201103L
 struct S : public template_tuple<identity, identity> {
   static_assert(N == 2, "Number of template arguments incorrect");
 };
-#endif
 
 void foo() {
   f7<identity>();

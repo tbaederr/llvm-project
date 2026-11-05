@@ -1,8 +1,8 @@
-// RUN: %clang_cc1 -triple armv7-apple-darwin9 -emit-llvm -o - %s -Wno-return-type-c-linkage -std=c++03 | FileCheck %s -check-prefixes=CHECK
+// RUN: %clang_cc1 -triple armv7-apple-darwin9 -emit-llvm -o - %s -Wno-return-type-c-linkage -std=c++11 | FileCheck %s -check-prefixes=CHECK
 
 // For now just check that the RISC-V triples are accepted, but don't check the IR, as swiftcall is not yet supported.
-// RUN: %clang_cc1 -triple riscv32-unknown-linux-gnu -emit-llvm -o - %s -Wno-return-type-c-linkage -std=c++03
-// RUN: %clang_cc1 -triple riscv64-unknown-linux-gnu -emit-llvm -o - %s -Wno-return-type-c-linkage -std=c++03
+// RUN: %clang_cc1 -triple riscv32-unknown-linux-gnu -emit-llvm -o - %s -Wno-return-type-c-linkage -std=c++11
+// RUN: %clang_cc1 -triple riscv64-unknown-linux-gnu -emit-llvm -o - %s -Wno-return-type-c-linkage -std=c++11
 
 // This isn't really testing anything ARM-specific; it's just a convenient
 // 32-bit platform.
@@ -52,7 +52,7 @@ typedef struct {
 TEST(struct_1);
 // CHECK-LABEL: define {{.*}} @return_struct_1()
 // CHECK:   [[RET:%.*]] = alloca [[REC:%.*]], align 4
-// CHECK:   @llvm.memset
+// CHECK:   @llvm.memcpy
 // CHECK:   [[T0:%.*]] = getelementptr inbounds nuw [[AGG:{ i32, \[2 x i8\], i8, \[1 x i8\], float, float }]], ptr [[RET]], i32 0, i32 0
 // CHECK:   [[FIRST:%.*]] = load i32, ptr [[T0]], align 4
 // CHECK:   [[T0:%.*]] = getelementptr inbounds nuw [[AGG]], ptr [[RET]], i32 0, i32 2

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
@@ -16,7 +15,6 @@ namespace std {
 } // namespace std
 
 namespace cwg919 { // cwg919: 2.7
-#if __cplusplus >= 201103L
 namespace N {
   inline namespace M {
     template <typename, typename>
@@ -35,11 +33,9 @@ struct N::S<float, T> {};
 
 template <>
 void N::f<int>() {}
-#endif
 } // namespace cwg919
 
 namespace cwg921 { // cwg921: 3.1
-#if __cplusplus >= 201103L
 namespace N {
   struct S {};
   inline namespace M {
@@ -47,29 +43,23 @@ namespace N {
   }
 }
 int i = f(N::S{});
-#endif
 } // namespace cwg921
 
 namespace cwg926 { // cwg926: 2.8
-#if __cplusplus >= 201103L
 namespace N {
   inline namespace {
     struct S {};
   }
 }
 N::S s;
-#endif
 } // namespace cwg926
 
 namespace cwg930 { // cwg930: 2.7
-#if __cplusplus >= 201103L
 static_assert(alignof(int[]) == alignof(int), "");
 static_assert(alignof(int[][2]) == alignof(int[2]), "");
-#endif
 } // namespace cwg930
 
 namespace cwg941 { // cwg941: 3.9
-#if __cplusplus >= 201103L
 template <typename>
 void f() = delete;
 
@@ -93,11 +83,9 @@ struct B {
 };
 
 template<> void B::f<int>() {}
-#endif
 } // namespace cwg941
 
 namespace cwg948 { // cwg948: 3.7
-#if __cplusplus >= 201103L
   class A {
   public:
      constexpr A(int v) : v(v) { }
@@ -122,17 +110,14 @@ namespace cwg948 { // cwg948: 3.7
      for (; constexpr A i = 0; ) { }
      while (constexpr A i = 0) { }
   }
-#endif
 } // namespace cwg948
 
 namespace cwg950 { // cwg950: 3.1
-#if __cplusplus >= 201103L
 struct A {};
 struct B : decltype(A()) {};
 
 template <typename T>
 struct C : decltype(T()) {};
-#endif
 } // namespace cwg950
 
 namespace cwg952 { // cwg952: 2.8
@@ -185,7 +170,6 @@ struct B : A {
 namespace cwg960 { // cwg960: 3.0
 struct a {};
 class A {
-#if __cplusplus >= 201103L
   // Check lvalue ref vs rvalue ref vs pointer.
   virtual a& rvalue_ref();
   virtual a&& lvalue_ref();
@@ -195,11 +179,9 @@ class A {
   virtual a* pointer_vs_rvalue_ref(); // #cwg960-A-pointer_vs_rvalue_ref
   virtual a&& lvalue_ref_vs_pointer(); // #cwg960-A-lvalue_ref_vs_pointer
   virtual a* pointer_vs_lvalue_ref(); // #cwg960-A-pointer_vs_lvalue_ref
-#endif
 };
 
 class B : A {
-#if __cplusplus >= 201103L
   // Check lvalue ref vs rvalue ref vs pointer.
   a& rvalue_ref() override;
   a&& lvalue_ref() override;
@@ -227,17 +209,14 @@ class B : A {
   a&& pointer_vs_lvalue_ref() override;
   // since-cxx11-error@-1 {{virtual function 'pointer_vs_lvalue_ref' has a different return type ('a &&') than the function it overrides (which has return type 'a *')}}
   //   since-cxx11-note@#cwg960-A-pointer_vs_lvalue_ref {{overridden virtual function is here}}
-#endif
 };
 
 } // namespace cwg960
 
 namespace cwg974 { // cwg974: 3.3
-#if __cplusplus >= 201103L
   void test() {
     auto lam = [](int x = 42) { return x; };
   }
-#endif
 } // namespace cwg974
 
 namespace cwg977 { // cwg977: 2.7
@@ -246,11 +225,9 @@ enum E { e = E() }; // #cwg977-E
 // expected-error@#cwg977-E {{invalid use of incomplete type 'E'}}
 //   expected-note@#cwg977-E {{definition of 'cwg977::E' is not complete until the closing '}'}}
 #endif
-#if __cplusplus >= 201103L
 enum E2 : int { e2 = E2() };
 enum struct E3 { e = static_cast<int>(E3()) };
 enum struct E4 : int { e = static_cast<int>(E4()) };
-#endif
 } // namespace cwg977
 
 namespace cwg986 { // cwg986: 2.7
@@ -298,29 +275,22 @@ cwg987::S<int, int> s2;
 
 int (*p1)() = &f<int>;
 // since-cxx11-error@-1 {{use of undeclared identifier 'f'}}
-// cxx98-error@-2 {{use of undeclared identifier 'f'; did you mean 'N::f'?}}
-//   cxx98-note@#cwg987-f {{'N::f' declared here}}
 int (*p2)() = &cwg987::f<int>;
 // since-cxx11-error@-1 {{no member named 'f' in namespace 'cwg987'}}
 // since-cxx11-error@-2 {{expected '(' for function-style cast or type construction}}
 // since-cxx11-error@-3 {{expected expression}}
-// cxx98-error@-4 {{no template named 'f' in namespace 'cwg987'; did you mean 'N::f'?}}
-//   cxx98-note@#cwg987-f {{'N::f' declared here}}
 } // namespace cwg987
 
 namespace cwg988 { // cwg988: 2.7
-#if __cplusplus >= 201103L
 void f(int& lvalue_ref, int&& rvalue_ref) {
   static_assert(__is_same(decltype(lvalue_ref)&,  int&),  "");
   static_assert(__is_same(decltype(lvalue_ref)&&, int&),  "");
   static_assert(__is_same(decltype(rvalue_ref)&,  int&),  "");
   static_assert(__is_same(decltype(rvalue_ref)&&, int&&), "");
 }
-#endif
 } // namespace cwg988
 
 namespace cwg990 { // cwg990: 3.5
-#if __cplusplus >= 201103L
   struct A { // #cwg990-A
     A(std::initializer_list<int>); // #cwg990-A-init-list
   };
@@ -351,5 +321,4 @@ namespace cwg990 { // cwg990: 3.5
     D(std::initializer_list<double>);
   };
   D d{};
-#endif
 } // namespace cwg990

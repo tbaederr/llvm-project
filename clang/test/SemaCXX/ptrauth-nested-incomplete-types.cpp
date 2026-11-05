@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -fptrauth-intrinsics -fsyntax-only -ferror-limit 1 -verify -std=c++26 %s
-// RUN: %clang_cc1 -fptrauth-intrinsics -fsyntax-only -ferror-limit 1 -verify -std=c++03 %s
-// RUN: %clang_cc1                      -fsyntax-only -ferror-limit 1 -verify -std=c++03 %s
+// RUN: %clang_cc1 -fptrauth-intrinsics -fsyntax-only -ferror-limit 1 -verify -std=c++11 %s
+// RUN: %clang_cc1                      -fsyntax-only -ferror-limit 1 -verify -std=c++11 %s
 
 /// Force two errors so we hit the error limit leading to skip of template instantiation
 # "" // expected-error {{invalid preprocessing directive}}

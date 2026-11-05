@@ -50,6 +50,12 @@ in a future version of Clang.
 
 ### C++ Specific Potentially Breaking Changes
 
+- Support for C++98 and C++03 has been removed. `-std=c++98`, `-std=c++03`,
+  `-std=gnu++98` and `-std=gnu++03` are rejected; C++11 is the minimum.
+  `-ansi` now implies `-std=c++11` for C++ inputs.
+  The `-Wc++98-compat` diagnostic groups are kept for compatibility but no
+  longer emit diagnostics.
+
 - The `[[carries_dependency]]` attribute is no longer recognized, in any language
   mode, as it was removed from the standard by
   [P3475R2](https://wg21.link/P3475R2).
@@ -1431,6 +1437,8 @@ documentation](CIR/index.md) for more information regarding ClangIR's status and
 
 - Add `RegroupByDirectory` value to `IncludeBlocks` to group includes by
   category priority and top-level directory.
+- `Standard: c++03` now lexes as C++11 (e.g. `"foo"_a` is a user-defined
+  literal), since the lexer no longer has a C++98 mode.
 - Add `SpacesInBlockComments` option to control spacing after `/*` and
   before `*/` in ordinary block comments.
 - Add `AfterRequiresExpression` sub-option of `BraceWrapping` to wrap the

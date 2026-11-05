@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -triple x86_64-apple-darwin10.0.0 -fsyntax-only -verify %s -Winvalid-offsetof -std=c++98
-// RUN: %clang_cc1 -triple x86_64-apple-darwin10.0.0 -fsyntax-only -verify %s -Winvalid-offsetof -std=c++98 -fexperimental-new-constant-interpreter
+// RUN: %clang_cc1 -triple x86_64-apple-darwin10.0.0 -fsyntax-only -verify %s -Winvalid-offsetof -std=c++11
+// RUN: %clang_cc1 -triple x86_64-apple-darwin10.0.0 -fsyntax-only -verify %s -Winvalid-offsetof -std=c++11 -fexperimental-new-constant-interpreter
 
 struct NonPOD {
   virtual void f();
@@ -11,12 +11,12 @@ struct P {
 };
 
 void f() {
-  int i = __builtin_offsetof(P, fieldThatPointsToANonPODType.m); // expected-warning{{'offsetof' on non-POD type 'P'}}
+  int i = __builtin_offsetof(P, fieldThatPointsToANonPODType.m); // expected-warning{{'offsetof' on non-standard-layout type 'P'}}
 }
 
 struct Base { int x; };
 struct Derived : Base { int y; };
-int o = __builtin_offsetof(Derived, x); // expected-warning{{'offsetof' on non-POD type}}
+int o = __builtin_offsetof(Derived, x); // expected-warning{{'offsetof' on non-standard-layout type}}
 
 const int o2 = sizeof(__builtin_offsetof(Derived, x));
 
@@ -25,9 +25,10 @@ struct HasArray {
 };
 
 // Constant and non-constant offsetof expressions
-void test_ice(int i) {
+void test_ice(int i) { // expected-note {{declared here}}
   int array0[__builtin_offsetof(HasArray, array[5])];
-  int array1[__builtin_offsetof(HasArray, array[i])]; // expected-warning {{variable length arrays in C++ are a Clang extension}}
+  int array1[__builtin_offsetof(HasArray, array[i])]; // expected-warning {{variable length arrays in C++ are a Clang extension}} \
+                                                         expected-note {{function parameter 'i' with unknown value cannot be used in a constant expression}}
 }
 
 // Bitfields
@@ -51,9 +52,9 @@ struct Derived2 : public Base1, public Base2 {
   int z;
 };
 
-int derived1[__builtin_offsetof(Derived2, x) == 0? 1 : -1]; // expected-warning{{'offsetof' on non-POD type 'Derived2'}}
-int derived2[__builtin_offsetof(Derived2, y)  == 4? 1 : -1]; // expected-warning{{'offsetof' on non-POD type 'Derived2'}}
-int derived3[__builtin_offsetof(Derived2, z)  == 8? 1 : -1]; // expected-warning{{'offsetof' on non-POD type 'Derived2'}}
+int derived1[__builtin_offsetof(Derived2, x) == 0? 1 : -1]; // expected-warning{{'offsetof' on non-standard-layout type 'Derived2'}}
+int derived2[__builtin_offsetof(Derived2, y)  == 4? 1 : -1]; // expected-warning{{'offsetof' on non-standard-layout type 'Derived2'}}
+int derived3[__builtin_offsetof(Derived2, z)  == 8? 1 : -1]; // expected-warning{{'offsetof' on non-standard-layout type 'Derived2'}}
 
 // offsetof referring to anonymous struct in base.
 // PR7769
@@ -66,7 +67,7 @@ struct foo {
 struct bar : public foo  {
 };
 
-int anonstruct[__builtin_offsetof(bar, x) == 0 ? 1 : -1]; // expected-warning{{'offsetof' on non-POD type 'bar'}}
+int anonstruct[__builtin_offsetof(bar, x) == 0 ? 1 : -1];
 
 
 struct LtoRCheck {
@@ -81,7 +82,7 @@ struct Base {
   int Field;
 };
 struct Derived : virtual Base {
-  void Fun() { (void)__builtin_offsetof(Derived, Field); } // expected-warning {{'offsetof' on non-POD type}} \
+  void Fun() { (void)__builtin_offsetof(Derived, Field); } // expected-warning {{'offsetof' on non-standard-layout type}} \
                                                               expected-error {{invalid application of 'offsetof' to a field of a virtual base}}
 };
 }

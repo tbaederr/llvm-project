@@ -1,5 +1,5 @@
-// RUN: %clang_cc1 -verify -x c++ -std=c++98 %s
-// RUN: not %clang_cc1 -fdiagnostics-parseable-fixits -x c++ -std=c++98 %s 2>&1 | FileCheck %s
+// RUN: %clang_cc1 -verify -x c++ -std=c++11 %s
+// RUN: not %clang_cc1 -fdiagnostics-parseable-fixits -x c++ -std=c++11 %s 2>&1 | FileCheck %s
 
 struct S {
   int n;
@@ -31,11 +31,11 @@ S F2();
 
 namespace N {
   void test() {
-    // CHECK: fix-it:"{{.*}}":{35:9-35:11}:" = {}"
+    // CHECK: fix-it:"{{.*}}":{35:9-35:11}:"{}"
     S s1(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
 
     // CHECK: fix-it:"{{.*}}":{39:9-39:10}:";"
-    // CHECK: fix-it:"{{.*}}":{40:7-40:9}:" = {}"
+    // CHECK: fix-it:"{{.*}}":{40:7-40:9}:"{}"
     S s2, // expected-note {{change this ',' to a ';' to call 'F2'}}
     F2(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
 
@@ -62,7 +62,7 @@ namespace N {
     // Don't emit warning and fixit because direct initializer is not permitted here.
     if (int n(int())){} // expected-error {{function type is not allowed here}}
 
-    // CHECK: fix-it:"{{.*}}":{66:8-66:10}:" = {}"
+    // CHECK: fix-it:"{{.*}}":{66:8-66:10}:"{}"
     U u(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
 
     // CHECK: fix-it:"{{.*}}":{69:8-69:10}:""
@@ -71,10 +71,10 @@ namespace N {
     // CHECK: fix-it:"{{.*}}":{72:8-72:10}:""
     W w(); // expected-warning {{function declaration}} expected-note {{remove parentheses}}
 
-    // TODO: Removing the parens here would not initialize U::n.
-    // Maybe suggest an " = X()" initializer for this case?
-    // Maybe suggest removing the parens anyway?
-    X x(); // expected-warning {{function declaration}}
+    // Removing the parens here would not initialize U::n,
+    // so suggest a "{}" initializer instead.
+    // CHECK: fix-it:"{{.*}}":{77:8-77:10}:"{}"
+    X x(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
 
     // CHECK: fix-it:"{{.*}}":{80:11-80:13}:" = 0"
     int n1(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
@@ -89,11 +89,11 @@ namespace N {
 
     typedef void *Ptr;
 
-    // CHECK: fix-it:"{{.*}}":{93:10-93:12}:" = 0"
+    // CHECK: fix-it:"{{.*}}":{93:10-93:12}:" = nullptr"
     Ptr p(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
 
 #define NULL 0
-    // CHECK: fix-it:"{{.*}}":{97:10-97:12}:" = NULL"
+    // CHECK: fix-it:"{{.*}}":{97:10-97:12}:" = nullptr"
     Ptr p(); // expected-warning {{function declaration}} expected-note {{replace parentheses with an initializer}}
 
     // CHECK: fix-it:"{{.*}}":{100:11-100:13}:" = false"

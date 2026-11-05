@@ -1,6 +1,4 @@
 // RUN: %clang_cc1 -std=c++1z -fno-sized-deallocation -fsyntax-only -verify %s
-// RUN: %clang_cc1 -std=c++03 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -std=c++03 -faligned-allocation -fsyntax-only -verify %s
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify %s
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -verify -fsized-deallocation %s
 
@@ -16,16 +14,7 @@
 typedef __SIZE_TYPE__ size_t;
 namespace std {
   struct nothrow_t {};
-#if __cplusplus >= 201103L
 enum class align_val_t : size_t {};
-#else
-  enum align_val_t {
-  // We can't force an underlying type when targeting windows.
-# ifndef _WIN32
-    __zero = 0, __max = (size_t)-1
-# endif
-  };
-#endif
 }
 std::nothrow_t nothrow;
 

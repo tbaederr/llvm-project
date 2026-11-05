@@ -130,7 +130,7 @@ computeReferencedDecls(const clang::Expr *Expr) {
 }
 
 static QualType computeVariableType(const Expr *Expr, const ASTContext &Ctx) {
-  if (Ctx.getLangOpts().CPlusPlus11)
+  if (Ctx.getLangOpts().CPlusPlus)
     return Ctx.getAutoDeductType();
 
   if (Expr->hasPlaceholderType(BuiltinType::PseudoObject)) {

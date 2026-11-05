@@ -1,13 +1,9 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98 -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++2a %s
 
 struct S {
   S();
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{because type 'S' has a user-provided default constructor}}
-#endif
 };
 
 struct { // expected-error {{anonymous structs and classes must be class members}} expected-warning {{does not declare anything}}
@@ -16,9 +12,6 @@ struct { // expected-error {{anonymous structs and classes must be class members
 struct E {
   struct {
     S x;
-#if __cplusplus <= 199711L
-    // expected-error@-2 {{anonymous struct member 'x' has a non-trivial default constructor}}
-#endif
   };
   static struct { // expected-warning {{does not declare anything}}
   };
@@ -29,14 +22,9 @@ struct E {
 
 template <class T> void foo(T);
 typedef struct { // expected-error {{anonymous non-C-compatible type given name for linkage purposes by typedef declaration after its linkage was computed; add a tag name here to establish linkage prior to definition}}
-// expected-note@-1 {{unnamed type used in template argument was declared here}}
 
   void test() { // expected-note {{type is not C-compatible due to this member declaration}}
     foo(this);
-#if __cplusplus <= 199711L
-    // expected-warning@-2 {{template argument uses unnamed type}}
-    // expected-note@-3 {{while substituting deduced template arguments}}
-#endif
   }
 } A; // expected-note {{type is given name 'A' for linkage purposes by this typedef declaration}}
 
@@ -130,10 +118,6 @@ namespace ValidButUnsupported {
   typedef struct { // expected-error {{unsupported}}
     enum X {};
     int arr[&f<X> ? 1 : 2];
-#if __cplusplus < 201103L
-    // expected-warning@-2 {{folded to constant}}
-    // expected-warning@-3 {{variable length arrays in C++ are a Clang extension}}
-#endif
   } C; // expected-note {{by this typedef}}
 }
 
@@ -211,18 +195,14 @@ namespace ForwardDeclaredMember {
   struct A;
   struct A {
     int x = 0;
-    // cxx98-warning@-1 {{default member initializer for non-static data member is a C++11 extension}}
-    // cxx98-note@-2 {{because field 'x' has an initializer}}
   };
   struct B {
     struct {
       A y;
-      // cxx98-error@-1 {{anonymous struct member 'y' has a non-trivial default constructor}}
     };
   };
 }
 
-#if __cplusplus >= 201103L
 namespace GH167217 {
 
 struct NonMovable {
@@ -251,4 +231,3 @@ static_assert(!__is_constructible(Wrapper2, const Wrapper2&), "");
 static_assert(!__is_constructible(Wrapper2, Wrapper2), "");
 
 }
-#endif

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++14 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++1z %s
@@ -55,17 +54,10 @@ namespace pointer_to_object_parameters {
   X an_X;
   X array_of_Xs[10];
   A2<X_ptr> *a12;
-#if __cplusplus < 201103L
-  // expected-error@-2 {{must have its address taken}}
-#else
-  // expected-error@-4 {{not a constant expression}} expected-note@-4 {{read of non-constexpr variable}}
-#endif
+  // expected-error@-1 {{not a constant expression}} expected-note@-1 {{read of non-constexpr variable}}
   A2<array_of_Xs> *a13;
   A2<&an_X> *a13_2;
   A2<(&an_X)> *a13_3;
-#if __cplusplus < 201103L
-  // expected-warning@-2 {{parentheses around address non-type template argument are a C++11 extension}}
-#endif
 
   // PR6244
   struct X1 {} X1v;
@@ -77,20 +69,14 @@ namespace pointer_to_object_parameters {
   int *bar; // expected-note 0-1{{declared here}}
   template <int *> struct zed {}; // expected-note 0-2{{template parameter is declared here}}
   void g(zed<bar>*);
-#if __cplusplus < 201103L
-  // expected-error@-2 {{must have its address taken}}
-#else
-  // expected-error@-4 {{not a constant expression}} expected-note@-4 {{read of non-constexpr variable}}
-#endif
+  // expected-error@-1 {{not a constant expression}} expected-note@-1 {{read of non-constexpr variable}}
 
   int baz; // expected-note 0-1{{declared here}}
   void g2(zed<baz>*);
-#if __cplusplus < 201103L
-  // expected-error@-2 {{must have its address taken}}
-#elif __cplusplus <= 201402L
-  // expected-error@-4 {{not a constant expression}} expected-note@-4 {{read of non-const variable}}
+#if __cplusplus <= 201402L
+  // expected-error@-2 {{not a constant expression}} expected-note@-2 {{read of non-const variable}}
 #else
-  // expected-error@-6 {{not implicitly convertible to 'int *'}}
+  // expected-error@-4 {{not implicitly convertible to 'int *'}}
 #endif
 
   void g3(zed<&baz>*); // okay
@@ -175,11 +161,7 @@ namespace pointer_to_function {
   void x0c(X0<g>); // expected-error-re{{type 'int (float)' {{.*}}convert{{.*}} 'int (*)(int)'}}
   void x0d(X0<&g>); // expected-error-re{{type 'int (*)(float)' {{.*}}convert{{.*}} 'int (*)(int)'}}
   void x0e(X0<funcptr>);
-#if __cplusplus < 201103L
-  // expected-error@-2 {{must have its address taken}}
-#else
-  // expected-error@-4 {{not a constant expression}} expected-note@-4 {{read of non-constexpr variable}}
-#endif
+  // expected-error@-1 {{not a constant expression}} expected-note@-1 {{read of non-constexpr variable}}
 }
 
 //     -- For a non-type template-parameter of type reference to function, no

@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++17 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++20 %s
@@ -13,9 +12,7 @@
 namespace std { class type_info {}; }
 
 struct dummy {}; // expected-note 3 {{candidate constructor (the implicit copy constructor)}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 3 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 3 {{candidate constructor (the implicit move constructor) not viable}}
 
 template<typename T>
 int f0(T x) {

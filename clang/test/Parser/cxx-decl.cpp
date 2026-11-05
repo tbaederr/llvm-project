@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -verify -fsyntax-only -triple i386-linux -Wredundant-parens -pedantic-errors -fcxx-exceptions -fexceptions %s
-// RUN: %clang_cc1 -verify -fsyntax-only -triple i386-linux -Wredundant-parens -pedantic-errors -fcxx-exceptions -fexceptions -std=c++98 %s
 // RUN: %clang_cc1 -verify -fsyntax-only -triple i386-linux -Wredundant-parens -pedantic-errors -fcxx-exceptions -fexceptions -std=c++11 %s
 
 const char const *x10; // expected-error {{duplicate 'const' declaration specifier}}
@@ -49,9 +48,6 @@ class asm_class_test {
 };
 
 enum { fooenum = 1, };
-#if __cplusplus <= 199711L
-// expected-error@-2 {{commas at the end of enumerator lists are a C++11 extension}}
-#endif
 
 struct a {
   int Type : fooenum;
@@ -87,9 +83,6 @@ namespace Commas {
   *global6,
   &global7 = global1,
   &&global8 = static_cast<int&&>(global1),
-#if __cplusplus <= 199711L
-  // expected-error@-2 2{{rvalue references are a C++11 extension}}
-#endif
 
   S::a,
   global9,
@@ -194,9 +187,6 @@ namespace PR15017 {
 
 // Ensure we produce at least some diagnostic for attributes in C++98.
 [[]] struct S; // expected-error {{misplaced attributes}}
-#if __cplusplus < 201103L
-// expected-error@-2 {{[[]] attributes are a C++11 extension}}
-#endif
 
 namespace test7 {
   struct Foo {
@@ -224,18 +214,12 @@ namespace PR5066 {
   X<int N> x; // expected-error {{type-id cannot have a name}}
 
   using T = int (*T)(); // expected-error {{type-id cannot have a name}}
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{alias declarations are a C++11 extensio}}
-#endif
 
 }
 
 namespace PR17255 {
 void foo() {
   typename A::template B<> c; // expected-error {{use of undeclared identifier 'A'}}
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{'template' keyword outside of a template}}
-#endif
 }
 }
 
@@ -298,16 +282,10 @@ namespace rdar37099386 {
 // PR8380
 extern ""      // expected-error {{unknown linkage language}}
 test6a { ;// expected-error {{a type specifier is required for all declarations}}
-#if __cplusplus <= 199711L
-// expected-error@-2 {{expected ';' after top level declarator}}
-#else
-// expected-error@-4 {{expected expression}}
-// expected-note@-5 {{to match this}}
-#endif
+// expected-error@-1 {{expected expression}}
+// expected-note@-2 {{to match this}}
 
   int test6b;
-#if __cplusplus >= 201103L
-// expected-error@+3 {{expected}}
-// expected-error@-3 {{expected ';' after top level declarator}}
-#endif
+// expected-error@+2 {{expected}}
+// expected-error@-2 {{expected ';' after top level declarator}}
 

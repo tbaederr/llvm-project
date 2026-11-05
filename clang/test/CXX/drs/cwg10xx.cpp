@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14
@@ -42,7 +41,6 @@ namespace cwg1004 { // cwg1004: 5
   // name lookup of "T::template A" names the constructor.
   template<class T, template<class> class U = T::template A> struct Third { };
   // expected-error@-1 {{ISO C++ specifies that qualified reference to 'A' is a constructor name rather than a template name in this context, despite preceding 'typename' keyword}}
-  //   cxx98-note@#cwg1004-t {{in instantiation of default argument for 'Third<A<int> >' required here}}
   //   since-cxx11-note@#cwg1004-t {{in instantiation of default argument for 'Third<A<int>>' required here}}
   Third<A<int> > t; // #cwg1004-t
 } // namespace cwg1004
@@ -58,7 +56,7 @@ namespace cwg1042 { // cwg1042: 3.5
   foo f = 12;
   // since-cxx14-warning@-1 {{'foo' is deprecated}}
   //   since-cxx14-note@#cwg1042-using {{'foo' has been explicitly marked deprecated here}}
-#elif __cplusplus >= 201103L
+#else
   // C++11 did not have any attributes that could be applied to an alias
   // declaration, so the best we can test is that we accept an empty attribute
   // list in this mode.
@@ -71,7 +69,6 @@ namespace cwg1048 { // cwg1048: 3.6
   const A f();
   A g();
   typedef const A CA;
-#if __cplusplus >= 201103L
   // ok: we deduce non-const A in each case.
   A &&a = [] (int n) {
     while (1) switch (n) {
@@ -81,7 +78,6 @@ namespace cwg1048 { // cwg1048: 3.6
       case 3: return CA();
     }
   } (0);
-#endif
 } // namespace cwg1048
 
 namespace cwg1054 { // cwg1054: no
@@ -98,7 +94,6 @@ namespace cwg1054 { // cwg1054: no
 } // namespace cwg1054
 
 namespace cwg1070 { // cwg1070: 3.5
-#if __cplusplus >= 201103L
   struct A {
     A(std::initializer_list<int>);
   };
@@ -113,7 +108,6 @@ namespace cwg1070 { // cwg1070: 3.5
     std::initializer_list<double> c;
   };
   C c = {};
-#endif
 } // namespace cwg1070
 
 namespace cwg1077 { // cwg1077: 2.7
@@ -143,7 +137,6 @@ namespace M {
 } // namespace cwg1077
 
 namespace cwg1094 { // cwg1094: 24
-#if __cplusplus >= 201103L
 enum class E : bool { Zero, One };
 constexpr E from_double(double d) { return static_cast<E>(d); }
 
@@ -171,5 +164,4 @@ static_assert(static_cast<G>(2.5) == G::Two, "");
 static_assert(static_cast<G>(__builtin_nan("")) == G::Zero, "");
 // since-cxx11-error@-1 {{static assertion expression is not an integral constant expression}}
 //   since-cxx11-note@-2 {{value NaN is outside the range of representable values of type 'G'}}
-#endif
 } // namespace cwg1094

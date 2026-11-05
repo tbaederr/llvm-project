@@ -4,12 +4,12 @@
 // extensions. In comparison to the extensions available in C, the !, ?:, && and
 // || operators work on vector types.
 
-typedef long long v2i64 __attribute__((vector_size(16))); // expected-warning {{'long long' is incompatible with C++98}}
+typedef long long v2i64 __attribute__((vector_size(16)));
 typedef int v2i32 __attribute__((vector_size(8)));
 typedef short v2i16 __attribute__((vector_size(4)));
 typedef char v2i8 __attribute__((vector_size(2)));
 
-typedef unsigned long long v2u64 __attribute__((vector_size(16))); // expected-warning {{'long long' is incompatible with C++98}}
+typedef unsigned long long v2u64 __attribute__((vector_size(16)));
 typedef unsigned int v2u32 __attribute__((vector_size(8)));
 typedef unsigned short v2u16 __attribute__((vector_size(4)));
 typedef unsigned char v2u8 __attribute__((vector_size(2)));
@@ -22,16 +22,16 @@ typedef int v4i32 __attribute((vector_size(16)));
 void arithmeticTest(void);
 void logicTest(void);
 void comparisonTest(void);
-void floatTestSignedType(char a, short b, int c, long long d); // expected-warning {{'long long' is incompatible with C++98}}
+void floatTestSignedType(char a, short b, int c, long long d);
 void floatTestUnsignedType(unsigned char a, unsigned short b, unsigned int c,
-                           unsigned long long d); // expected-warning {{'long long' is incompatible with C++98}}
+                           unsigned long long d);
 void floatTestConstant(void);
-void intTestType(char a, short b, int c, long long d); // expected-warning {{'long long' is incompatible with C++98}}
+void intTestType(char a, short b, int c, long long d);
 void intTestTypeUnsigned(unsigned char a, unsigned short b, unsigned int c,
-                         unsigned long long d); // expected-warning {{'long long' is incompatible with C++98}}
-void uintTestType(char a, short b, int c, long long d); // expected-warning {{'long long' is incompatible with C++98}}
+                         unsigned long long d);
+void uintTestType(char a, short b, int c, long long d);
 void uintTestTypeUnsigned(unsigned char a, unsigned short b, unsigned int c,
-                          unsigned long long d); // expected-warning {{'long long' is incompatible with C++98}}
+                          unsigned long long d);
 void uintTestConstant(v2u64 v2u64_a, v2u32 v2u32_a, v2u16 v2u16_a, v2u8 v2u8_a);
 void intTestConstant(v2i64 v2i64_a, v2i32 v2i32_a, v2i16 v2i16_a, v2i8 v2i8_a);
 
@@ -120,7 +120,7 @@ void floatTestConstant(void) {
   v4f32 v4f32_a = {0.4f, 0.4f, 0.4f, 0.4f};
   v4f32_a = v4f32_a + 1;
   v4f32_a = v4f32_a + 0xFFFFFF;
-  v4f32_a = v4f32_a + (-1567563LL); // expected-warning {{'long long' is incompatible with C++98}}
+  v4f32_a = v4f32_a + (-1567563LL);
   v4f32_a = v4f32_a + (16777208);
   v4f32_a = v4f32_a + (16777219); // expected-error {{cannot convert between scalar type 'int' and vector type 'v4f32' (vector of 4 'float' values) as implicit conversion would cause truncation}}
 }
@@ -151,7 +151,7 @@ void doubleTestConstantComparison(void) {
 }
 
 void floatTestUnsignedType(unsigned char a, unsigned short b, unsigned int c,
-                           unsigned long long d) { // expected-warning {{'long long' is incompatible with C++98}}
+                           unsigned long long d) {
   v4f32 v4f32_a = {0.4f, 0.4f, 0.4f, 0.4f};
   v4f64 v4f64_b = {0.4, 0.4, 0.4, 0.4};
 
@@ -166,7 +166,7 @@ void floatTestUnsignedType(unsigned char a, unsigned short b, unsigned int c,
   v4f64_b = v4f64_b + d; // expected-error {{cannot convert between scalar type 'unsigned long long' and vector type 'v4f64' (vector of 4 'double' values) as implicit conversion would cause truncation}}
 }
 
-void floatTestSignedType(char a, short b, int c, long long d) { // expected-warning {{'long long' is incompatible with C++98}}
+void floatTestSignedType(char a, short b, int c, long long d) {
   v4f32 v4f32_a = {0.4f, 0.4f, 0.4f, 0.4f};
   v4f64 v4f64_b = {0.4, 0.4, 0.4, 0.4};
 
@@ -181,7 +181,7 @@ void floatTestSignedType(char a, short b, int c, long long d) { // expected-warn
   v4f64_b = v4f64_b + d; // expected-error {{cannot convert between scalar type 'long long' and vector type 'v4f64' (vector of 4 'double' values) as implicit conversion would cause truncation}}
 }
 
-void intTestType(char a, short b, int c, long long d) { // expected-warning {{'long long' is incompatible with C++98}}
+void intTestType(char a, short b, int c, long long d) {
   v2i64 v2i64_a = {1, 2};
   v2i32 v2i32_a = {1, 2};
   v2i16 v2i16_a = {1, 2};
@@ -209,7 +209,7 @@ void intTestType(char a, short b, int c, long long d) { // expected-warning {{'l
 }
 
 void intTestTypeUnsigned(unsigned char a, unsigned short b, unsigned int c,
-                         unsigned long long d) { // expected-warning {{'long long' is incompatible with C++98}}
+                         unsigned long long d) {
   v2i64 v2i64_a = {1, 2};
   v2i32 v2i32_a = {1, 2};
   v2i16 v2i16_a = {1, 2};
@@ -237,7 +237,7 @@ void intTestTypeUnsigned(unsigned char a, unsigned short b, unsigned int c,
   v2i8_a = v2i8_a + a; // expected-error {{cannot convert between scalar type 'unsigned char' and vector type 'v2i8' (vector of 2 'char' values) as implicit conversion would cause truncation}}
 }
 
-void uintTestType(char a, short b, int c, long long d) { // expected-warning {{'long long' is incompatible with C++98}}
+void uintTestType(char a, short b, int c, long long d) {
   v2u64 v2u64_a = {1, 2};
   v2u32 v2u32_a = {1, 2};
   v2u16 v2u16_a = {1, 2};
@@ -265,7 +265,7 @@ void uintTestType(char a, short b, int c, long long d) { // expected-warning {{'
 }
 
 void uintTestTypeUnsigned(unsigned char a, unsigned short b, unsigned int c,
-                          unsigned long long d) { // expected-warning {{'long long' is incompatible with C++98}}
+                          unsigned long long d) {
   v2u64 v2u64_a = {1, 2};
   v2u32 v2u32_a = {1, 2};
   v2u16 v2u16_a = {1, 2};
@@ -306,7 +306,7 @@ void uintTestConstant(v2u64 v2u64_a, v2u32 v2u32_a, v2u16 v2u16_a,
 
 void intTestConstant(v2i64 v2i64_a, v2i32 v2i32_a, v2i16 v2i16_a, v2i8 v2i8_a) {
   // Legal upper bounds.
-  v2i64_a = v2i64_a + static_cast<long long>(0x7FFFFFFFFFFFFFFF); // expected-warning {{'long long' is incompatible with C++98}}
+  v2i64_a = v2i64_a + static_cast<long long>(0x7FFFFFFFFFFFFFFF);
   v2i32_a = v2i32_a + static_cast<int>(0x7FFFFFFF);
   v2i16_a = v2i16_a + static_cast<short>(0x7FFF);
   v2i8_a = v2i8_a + static_cast<char>(0x7F);

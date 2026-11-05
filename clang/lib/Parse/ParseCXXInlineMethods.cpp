@@ -102,8 +102,6 @@ NamedDecl *Parser::ParseCXXInlineMethodDef(
     bool Delete = false;
     SourceLocation KWLoc;
     if (TryConsumeToken(tok::kw_delete, KWLoc)) {
-      DiagCompat(KWLoc, diag_compat::defaulted_deleted_function)
-          << 1 /* deleted */;
       StringLiteral *Message = ParseCXXDeletedFunctionMessage();
       Actions.SetDeclDeleted(FnD, KWLoc, Message);
       Delete = true;
@@ -111,8 +109,6 @@ NamedDecl *Parser::ParseCXXInlineMethodDef(
         DeclAsFunction->setRangeEnd(PrevTokLocation);
       }
     } else if (TryConsumeToken(tok::kw_default, KWLoc)) {
-      DiagCompat(KWLoc, diag_compat::defaulted_deleted_function)
-          << 0 /* defaulted */;
       Actions.SetDeclDefaulted(FnD, KWLoc);
       if (auto *DeclAsFunction = dyn_cast<FunctionDecl>(FnD)) {
         DeclAsFunction->setRangeEnd(PrevTokLocation);
@@ -422,10 +418,9 @@ void Parser::ParseLexedMethodDeclaration(LateParsedMethodDeclaration &LM) {
           Sema::ExpressionEvaluationContext::PotentiallyEvaluatedIfUsed, Param);
 
       ExprResult DefArgResult;
-      if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-        Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
+      if (Tok.is(tok::l_brace))
         DefArgResult = ParseBraceInitializer();
-      } else
+      else
         DefArgResult = ParseAssignmentExpression();
       if (DefArgResult.isInvalid()) {
         Actions.ActOnParamDefaultArgumentError(Param, EqualLoc,
@@ -512,7 +507,7 @@ void Parser::ParseLexedMethodDeclaration(LateParsedMethodDeclaration &LM) {
     Sema::CXXThisScopeRAII ThisScope(
         Actions, Method ? Method->getParent() : nullptr,
         Method ? Method->getMethodQualifiers() : Qualifiers{},
-        Method && getLangOpts().CPlusPlus11);
+        Method != nullptr);
 
     // Parse the exception-specification.
     SourceRange SpecificationRange;
@@ -1098,7 +1093,7 @@ bool Parser::ConsumeAndStoreFunctionPrologue(CachedTokens &Toks) {
       }
     } else if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_brace)) {
       // We found something weird in a mem-initializer-id.
-      if (getLangOpts().CPlusPlus11)
+      if (getLangOpts().CPlusPlus)
         return Diag(Tok.getLocation(), diag::err_expected_either)
                << tok::l_paren << tok::l_brace;
       else
@@ -1115,9 +1110,9 @@ bool Parser::ConsumeAndStoreFunctionPrologue(CachedTokens &Toks) {
     } else {
       assert(kind == tok::l_brace && "Must be left paren or brace here.");
       ConsumeBrace();
-      // In C++03, this has to be the start of the function body, which
+      // In C, this has to be the start of the function body, which
       // means the initializer is malformed; we'll diagnose it later.
-      if (!getLangOpts().CPlusPlus11)
+      if (!getLangOpts().CPlusPlus)
         return false;
 
       const Token &PreviousToken = Toks[Toks.size() - 2];
@@ -1304,13 +1299,13 @@ bool Parser::ConsumeAndStoreInitializer(CachedTokens &Toks,
       break;
 
     case tok::greatergreatergreater:
-      if (!getLangOpts().CPlusPlus11)
+      if (!getLangOpts().CPlusPlus)
         goto consume_token;
       if (AngleCount) --AngleCount;
       if (KnownTemplateCount) --KnownTemplateCount;
       [[fallthrough]];
     case tok::greatergreater:
-      if (!getLangOpts().CPlusPlus11)
+      if (!getLangOpts().CPlusPlus)
         goto consume_token;
       if (AngleCount) --AngleCount;
       if (KnownTemplateCount) --KnownTemplateCount;

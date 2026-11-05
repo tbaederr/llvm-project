@@ -644,37 +644,35 @@ static void InitializeCPlusPlusFeatureTestMacros(const LangOptions &LangOpts,
     Builder.defineMacro("__cpp_exceptions", "199711L");
 
   // C++11 features.
-  if (LangOpts.CPlusPlus11) {
-    Builder.defineMacro("__cpp_unicode_characters", "200704L");
-    Builder.defineMacro("__cpp_raw_strings", "200710L");
-    Builder.defineMacro("__cpp_unicode_literals", "200710L");
-    Builder.defineMacro("__cpp_user_defined_literals", "200809L");
-    Builder.defineMacro("__cpp_lambdas", "200907L");
-    Builder.defineMacro("__cpp_constexpr", LangOpts.CPlusPlus26   ? "202406L"
-                                           : LangOpts.CPlusPlus23 ? "202211L"
-                                           : LangOpts.CPlusPlus20 ? "202002L"
-                                           : LangOpts.CPlusPlus17 ? "201603L"
-                                           : LangOpts.CPlusPlus14 ? "201304L"
-                                                                  : "200704");
-    Builder.defineMacro("__cpp_constexpr_in_decltype", "201711L");
-    Builder.defineMacro("__cpp_range_based_for",
-                        LangOpts.CPlusPlus23   ? "202211L"
-                        : LangOpts.CPlusPlus17 ? "201603L"
-                                               : "200907");
-    // C++17 / C++26 static_assert supported as an extension in earlier language
-    // modes, so we use the C++26 value.
-    Builder.defineMacro("__cpp_static_assert", "202306L");
-    Builder.defineMacro("__cpp_decltype", "200707L");
-    Builder.defineMacro("__cpp_attributes", "200809L");
-    Builder.defineMacro("__cpp_rvalue_references", "200610L");
-    Builder.defineMacro("__cpp_variadic_templates", "200704L");
-    Builder.defineMacro("__cpp_initializer_lists", "200806L");
-    Builder.defineMacro("__cpp_delegating_constructors", "200604L");
-    Builder.defineMacro("__cpp_nsdmi", "200809L");
-    Builder.defineMacro("__cpp_inheriting_constructors", "201511L");
-    Builder.defineMacro("__cpp_ref_qualifiers", "200710L");
-    Builder.defineMacro("__cpp_alias_templates", "200704L");
-  }
+  Builder.defineMacro("__cpp_unicode_characters", "200704L");
+  Builder.defineMacro("__cpp_raw_strings", "200710L");
+  Builder.defineMacro("__cpp_unicode_literals", "200710L");
+  Builder.defineMacro("__cpp_user_defined_literals", "200809L");
+  Builder.defineMacro("__cpp_lambdas", "200907L");
+  Builder.defineMacro("__cpp_constexpr", LangOpts.CPlusPlus26   ? "202406L"
+                                         : LangOpts.CPlusPlus23 ? "202211L"
+                                         : LangOpts.CPlusPlus20 ? "202002L"
+                                         : LangOpts.CPlusPlus17 ? "201603L"
+                                         : LangOpts.CPlusPlus14 ? "201304L"
+                                                                : "200704");
+  Builder.defineMacro("__cpp_constexpr_in_decltype", "201711L");
+  Builder.defineMacro("__cpp_range_based_for",
+                      LangOpts.CPlusPlus23   ? "202211L"
+                      : LangOpts.CPlusPlus17 ? "201603L"
+                                             : "200907");
+  // C++17 / C++26 static_assert supported as an extension in earlier language
+  // modes, so we use the C++26 value.
+  Builder.defineMacro("__cpp_static_assert", "202306L");
+  Builder.defineMacro("__cpp_decltype", "200707L");
+  Builder.defineMacro("__cpp_attributes", "200809L");
+  Builder.defineMacro("__cpp_rvalue_references", "200610L");
+  Builder.defineMacro("__cpp_variadic_templates", "200704L");
+  Builder.defineMacro("__cpp_initializer_lists", "200806L");
+  Builder.defineMacro("__cpp_delegating_constructors", "200604L");
+  Builder.defineMacro("__cpp_nsdmi", "200809L");
+  Builder.defineMacro("__cpp_inheriting_constructors", "201511L");
+  Builder.defineMacro("__cpp_ref_qualifiers", "200710L");
+  Builder.defineMacro("__cpp_alias_templates", "200704L");
   if (LangOpts.ThreadsafeStatics)
     Builder.defineMacro("__cpp_threadsafe_static_init", "200806L");
 
@@ -754,8 +752,7 @@ static void InitializeCPlusPlusFeatureTestMacros(const LangOptions &LangOpts,
 
   // We provide those C++23 features as extensions in earlier language modes, so
   // we also define their feature test macros.
-  if (LangOpts.CPlusPlus11)
-    Builder.defineMacro("__cpp_static_call_operator", "202207L");
+  Builder.defineMacro("__cpp_static_call_operator", "202207L");
   Builder.defineMacro("__cpp_auto_cast", "202110L");
   Builder.defineMacro("__cpp_named_character_escapes", "202606L");
   Builder.defineMacro("__cpp_placeholder_variables", "202306L");
@@ -945,7 +942,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   if (!LangOpts.GNUMode && !LangOpts.MSVCCompat)
     Builder.defineMacro("__STRICT_ANSI__");
 
-  if (LangOpts.GNUCVersion && LangOpts.CPlusPlus11)
+  if (LangOpts.GNUCVersion && LangOpts.CPlusPlus)
     Builder.defineMacro("__GXX_EXPERIMENTAL_CXX0X__");
 
   if (TI.getTriple().isOSCygMing()) {

@@ -22,7 +22,7 @@ class RedundantQualifiedAliasCheck : public ClangTidyCheck {
 public:
   RedundantQualifiedAliasCheck(StringRef Name, ClangTidyContext *Context);
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   std::optional<TraversalKind> getCheckTraversalKind() const override {
     return TK_IgnoreUnlessSpelledInSource;

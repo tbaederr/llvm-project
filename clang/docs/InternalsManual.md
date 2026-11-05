@@ -3796,8 +3796,7 @@ consists of two types of files:
   or `cwg787.cpp`.
 
 C++ defect report tests are run in all language modes available via `-std=`,
-except for modes with GNU extensions and `c++03`, as it is synonymous to
-`c++98`. Exceptions, pedantic errors, and `-verify-directives` are enabled.
+except for modes with GNU extensions. Exceptions, pedantic errors, and `-verify-directives` are enabled.
 
 Big files are where most of the tests end up being placed to save on process
 startup cost during test runs. Big files also serve as an index of tests:

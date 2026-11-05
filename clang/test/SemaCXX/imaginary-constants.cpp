@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify %s -include %s -std=gnu++98
 // RUN: %clang_cc1 -fsyntax-only -verify %s -include %s -std=c++11
 // RUN: %clang_cc1 -fsyntax-only -verify %s -include %s -std=c++14 -DCXX14=1
 

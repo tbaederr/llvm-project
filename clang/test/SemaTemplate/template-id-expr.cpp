@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++03 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // PR5336
 template<typename FromCl>
@@ -181,15 +180,11 @@ class E {
   template<> class D<C>;  // expected-error {{cannot specialize a template template parameter}}
   friend class D<C>; // expected-error {{alias template 'D' cannot be referenced with the 'class' specifier}}
 };
-#if __cplusplus <= 199711L
-// expected-warning@+2 {{extension}}
-#endif
 template<typename T> using D = int; // expected-note {{declared here}}
 E<D> ed; // expected-note {{instantiation of}}
 
 namespace non_functions {
 
-#if __cplusplus >= 201103L
 namespace PR88832 {
 template <typename T> struct O {
   static const T v = 0;
@@ -212,7 +207,6 @@ int bar() {
 }
 
 } // namespace PR88832
-#endif
 
 namespace PR63243 {
 

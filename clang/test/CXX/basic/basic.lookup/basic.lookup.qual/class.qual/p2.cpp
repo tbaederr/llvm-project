@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 struct X0 {
   X0();
@@ -128,14 +127,9 @@ namespace InhCtor {
     // inheriting constructor declaration in C++11.
     using InhCtor::T::T;
   };
-#if __cplusplus < 201103L
-  B b(123);      // expected-error {{no matching constructor}}
-                 // expected-note@-7 2{{candidate constructor}}
-  int n = b.T(); // ok, accessible
-#else
   B b(123);      // ok, inheriting constructor
   int n = b.T(); // expected-error {{'T' is a protected member of 'InhCtor::A'}}
-                 // expected-note@-15 {{declared protected here}}
+                 // expected-note@-10 {{declared protected here}}
 
   // FIXME: EDG and GCC reject this too, but it's not clear why it would be
   // ill-formed.
@@ -218,5 +212,4 @@ namespace InhCtor {
     };
     A<int> ab = 0;
   }
-#endif
 }

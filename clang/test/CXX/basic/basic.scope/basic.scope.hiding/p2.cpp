@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // rdar4641403
@@ -37,9 +36,7 @@ namespace PR17731 {
     }
     {
       struct S { S() {} }; // expected-note {{candidate constructor (the implicit copy constructor) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-      // expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+      // expected-note@-1 {{candidate constructor (the implicit move constructor) not viable}}
       int a = S(); // expected-error {{no viable conversion from 'S'}}
       struct S c = b; // expected-error {{no viable conversion from 'struct S'}}
     }
@@ -56,9 +53,7 @@ namespace PR17731 {
     }
     {
       struct S { S() {} }; // expected-note {{candidate constructor (the implicit copy constructor) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-      // expected-note@-2 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+      // expected-note@-1 {{candidate constructor (the implicit move constructor) not viable}}
       int a = S(); // expected-error {{no viable conversion from 'S'}}
       struct S c = b; // expected-error {{no viable conversion from 'struct S'}}
     }

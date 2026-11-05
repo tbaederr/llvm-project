@@ -716,10 +716,8 @@ static llvm::dwarf::SourceLanguage GetSourceLanguage(const CodeGenModule &CGM) {
       LangTag = llvm::dwarf::DW_LANG_C_plus_plus;
     else if (LO.CPlusPlus14)
       LangTag = llvm::dwarf::DW_LANG_C_plus_plus_14;
-    else if (LO.CPlusPlus11)
-      LangTag = llvm::dwarf::DW_LANG_C_plus_plus_11;
     else
-      LangTag = llvm::dwarf::DW_LANG_C_plus_plus;
+      LangTag = llvm::dwarf::DW_LANG_C_plus_plus_11;
   } else if (LO.ObjC) {
     LangTag = llvm::dwarf::DW_LANG_ObjC;
   } else if (LO.OpenCL && (!CGO.DebugStrictDwarf || CGO.DwarfVersion >= 5)) {

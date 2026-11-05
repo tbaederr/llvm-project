@@ -366,7 +366,7 @@ SyntaxTree::Impl::getRelativeName(const NamedDecl *ND,
     ContextPrefix = Namespace->getQualifiedNameAsString();
   else if (auto *Record = dyn_cast<RecordDecl>(Context))
     ContextPrefix = Record->getQualifiedNameAsString();
-  else if (AST.getLangOpts().CPlusPlus11)
+  else if (AST.getLangOpts().CPlusPlus)
     if (auto *Tag = dyn_cast<TagDecl>(Context))
       ContextPrefix = Tag->getQualifiedNameAsString();
   // Strip the qualifier, if Val refers to something in the current scope.

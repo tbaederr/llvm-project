@@ -102,7 +102,7 @@ void InitVariablesCheck::check(const MatchFinder::MatchResult &Result) {
     InitializationString = " = NAN";
     AddMathInclude = true;
   } else if (TypePtr->isAnyPointerType() || TypePtr->isMemberPointerType()) {
-    if (getLangOpts().CPlusPlus11)
+    if (getLangOpts().CPlusPlus)
       InitializationString = " = nullptr";
     else
       InitializationString = " = NULL";

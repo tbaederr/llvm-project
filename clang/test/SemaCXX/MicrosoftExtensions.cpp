@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -std=c++17 %s -triple i686-pc-win32 -fsyntax-only -Wmicrosoft -Wc++11-extensions -Wno-long-long -verify=expected,ms-union-ext -fms-extensions -fexceptions -fcxx-exceptions -DTEST1
-// RUN: %clang_cc1 -std=c++98 %s -triple i686-pc-win32 -fsyntax-only -Wmicrosoft -Wc++11-extensions -Wno-long-long -verify=expected,precxx17,ms-union-ext -fms-extensions -fexceptions -fcxx-exceptions -DTEST1
 // RUN: %clang_cc1 -std=c++11 %s -triple i686-pc-win32 -fsyntax-only -Wmicrosoft -Wc++11-extensions -Wno-long-long -verify=expected,precxx17,ms-union-ext -fms-extensions -fexceptions -fcxx-exceptions -DTEST1
 // RUN: %clang_cc1 -std=c++14 %s -triple i686-pc-win32 -fsyntax-only -Wmicrosoft -Wc++11-extensions -Wno-long-long -verify=expected,precxx17,ms-union-ext-disabled -fexceptions -fcxx-exceptions -DTEST2
 // RUN: %clang_cc1 %s -triple i686-pc-win32 -fsyntax-only -std=c++11 -fms-compatibility -verify=expected,ms-union-ext -DTEST3
@@ -167,19 +166,11 @@ typedef int Int;
 
 struct X0 {
   enum E1 : Int { SomeOtherValue } field;
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{enumeration types with a fixed underlying type are a C++11 extension}}
-#endif
 
   enum E1 : seventeen;
-#if __cplusplus >= 201103L
-  // expected-error@-2 {{bit-field}}
-#endif
+  // expected-error@-1 {{bit-field}}
 };
 
-#if __cplusplus <= 199711L
-// expected-warning@+2 {{enumeration types with a fixed underlying type are a C++11 extension}}
-#endif
 enum : long long {
   SomeValue = 0x100000000
 };
@@ -461,9 +452,6 @@ struct SealedType sealed : SomeBase {
   // FIXME. warning can be suppressed if we're also issuing error for overriding a 'final' function.
   virtual void SealedFunction(); // expected-warning {{'SealedFunction' overrides a member function but is not marked 'override'}}
 
-#if __cplusplus <= 199711L
-  // expected-warning@+2 {{'override' keyword is a C++11 extension}}
-#endif
   virtual void OverrideMe() override;
 };
 
@@ -494,29 +482,15 @@ AbstractAndSealedClass abstractAndSealedInstance;
 // expected-error@+1 {{base 'AbstractAndSealedClass' is marked 'sealed'}}
 class InheritFromAbstractAndSealed : AbstractAndSealedClass {};
 
-#if __cplusplus <= 199711L
-// expected-warning@+4 {{'final' keyword is a C++11 extension}}
-// expected-warning@+3 {{'final' keyword is a C++11 extension}}
-#endif
 // expected-error@+1 {{class already marked 'final'}}
 class TooManyVirtSpecifiers1 final final {};
-#if __cplusplus <= 199711L
-// expected-warning@+4 {{'final' keyword is a C++11 extension}}
-#endif
 // expected-warning@+2 {{'sealed' keyword is a Microsoft extension}}
 // expected-error@+1 {{class already marked 'sealed'}}
 class TooManyVirtSpecifiers2 final sealed {};
-#if __cplusplus <= 199711L
-// expected-warning@+6 {{'final' keyword is a C++11 extension}}
-// expected-warning@+5 {{'final' keyword is a C++11 extension}}
-#endif
 // expected-warning@+3 {{abstract class is marked 'final'}}
 // expected-warning@+2 {{'abstract' keyword is a Microsoft extension}}
 // expected-error@+1 {{class already marked 'final'}}
 class TooManyVirtSpecifiers3 final abstract final {};
-#if __cplusplus <= 199711L
-// expected-warning@+6 {{'final' keyword is a C++11 extension}}
-#endif
 // expected-warning@+4 {{abstract class is marked 'final'}}
 // expected-warning@+3 {{'abstract' keyword is a Microsoft extension}}
 // expected-warning@+2 {{'abstract' keyword is a Microsoft extension}}
@@ -535,9 +509,6 @@ class AbstractFunctionInClass : public Base {
   // expected-note@+2 {{unimplemented pure virtual method 'h' in 'AbstractFunctionInClass'}}
   // expected-warning@+1 {{'abstract' keyword is a Microsoft extension}}
   virtual void h() abstract = 0; // expected-error {{class member already marked 'abstract'}}
-#if __cplusplus <= 199711L
-  // expected-warning@+4 {{'override' keyword is a C++11 extension}}
-#endif
   // expected-note@+2 {{unimplemented pure virtual method 'i' in 'AbstractFunctionInClass'}}
   // expected-warning@+1 {{'abstract' keyword is a Microsoft extension}}
   virtual void i() abstract override;

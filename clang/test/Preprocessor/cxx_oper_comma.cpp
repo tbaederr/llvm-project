@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -E -pedantic-errors %s -verify -std=c++98
 // RUN: %clang_cc1 -E -pedantic-errors %s -verify -std=c++11
 // RUN: %clang_cc1 -E -pedantic-errors %s -verify -std=c++14
 // RUN: %clang_cc1 -E -pedantic-errors %s -verify -std=c++17

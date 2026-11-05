@@ -440,7 +440,6 @@ bool Sema::LookupTemplateName(LookupResult &Found, Scope *S, CXXScopeSpec &SS,
       return true;
   }
 
-  bool ObjectTypeSearchedInScope = false;
   bool AllowFunctionTemplatesInLookup = true;
   if (LookupCtx) {
     // Perform "qualified" name lookup into the declaration context we
@@ -478,7 +477,6 @@ bool Sema::LookupTemplateName(LookupResult &Found, Scope *S, CXXScopeSpec &SS,
       //  variable templates and concepts. But the exclusion of alias templates
       //  and template template parameters is a wording defect.
       AllowFunctionTemplatesInLookup = false;
-      ObjectTypeSearchedInScope = true;
     }
 
     IsDependent |= Found.wasNotFoundInCurrentInstantiation();
@@ -599,56 +597,6 @@ bool Sema::LookupTemplateName(LookupResult &Found, Scope *S, CXXScopeSpec &SS,
     }
 
     return false;
-  }
-
-  if (S && !ObjectType.isNull() && !ObjectTypeSearchedInScope &&
-      !getLangOpts().CPlusPlus11) {
-    // C++03 [basic.lookup.classref]p1:
-    //   [...] If the lookup in the class of the object expression finds a
-    //   template, the name is also looked up in the context of the entire
-    //   postfix-expression and [...]
-    //
-    // Note: C++11 does not perform this second lookup.
-    LookupResult FoundOuter(*this, Found.getLookupName(), Found.getNameLoc(),
-                            LookupOrdinaryName);
-    FoundOuter.setTemplateNameLookup(true);
-    LookupName(FoundOuter, S);
-    // FIXME: We silently accept an ambiguous lookup here, in violation of
-    // [basic.lookup]/1.
-    FilterAcceptableTemplateNames(FoundOuter, /*AllowFunctionTemplates=*/false);
-
-    NamedDecl *OuterTemplate;
-    if (FoundOuter.empty()) {
-      //   - if the name is not found, the name found in the class of the
-      //     object expression is used, otherwise
-    } else if (FoundOuter.isAmbiguous() || !FoundOuter.isSingleResult() ||
-               !(OuterTemplate =
-                     getAsTemplateNameDecl(FoundOuter.getFoundDecl()))) {
-      //   - if the name is found in the context of the entire
-      //     postfix-expression and does not name a class template, the name
-      //     found in the class of the object expression is used, otherwise
-      FoundOuter.clear();
-    } else if (!Found.isSuppressingAmbiguousDiagnostics()) {
-      //   - if the name found is a class template, it must refer to the same
-      //     entity as the one found in the class of the object expression,
-      //     otherwise the program is ill-formed.
-      if (!Found.isSingleResult() ||
-          getAsTemplateNameDecl(Found.getFoundDecl())->getCanonicalDecl() !=
-              OuterTemplate->getCanonicalDecl()) {
-        Diag(Found.getNameLoc(),
-             diag::ext_nested_name_member_ref_lookup_ambiguous)
-          << Found.getLookupName()
-          << ObjectType;
-        Diag(Found.getRepresentativeDecl()->getLocation(),
-             diag::note_ambig_member_ref_object_type)
-          << ObjectType;
-        Diag(FoundOuter.getFoundDecl()->getLocation(),
-             diag::note_ambig_member_ref_scope);
-
-        // Recover by taking the template that we found in the object
-        // expression's type.
-      }
-    }
   }
 
   return false;
@@ -2365,9 +2313,6 @@ static bool DiagnoseDefaultTemplateArgument(Sema &S,
     //   If a friend function template declaration specifies a default
     //   template-argument, that declaration shall be a definition and shall be
     //   the only declaration of the function template in the translation unit.
-    // (C++98/03 doesn't have this wording; see DR226).
-    S.DiagCompat(ParamLoc, diag_compat::templ_default_in_function_templ)
-        << DefArgRange;
     return false;
 
   case Sema::TPC_ClassTemplateMember:
@@ -5098,10 +5043,6 @@ TemplateNameKind Sema::ActOnTemplateName(Scope *S,
                                          bool EnteringContext,
                                          TemplateTy &Result,
                                          bool AllowInjectedClassName) {
-  if (TemplateKWLoc.isValid() && S && !S->getTemplateParamParent())
-    DiagCompat(TemplateKWLoc, diag_compat::template_outside_of_template)
-        << FixItHint::CreateRemoval(TemplateKWLoc);
-
   if (SS.isInvalid())
     return TNK_Non_template;
 
@@ -5122,12 +5063,6 @@ TemplateNameKind Sema::ActOnTemplateName(Scope *S,
   //   nested-name-specifier or the expression on the left of the ->
   //   or . is not dependent on a template-parameter, or the use
   //   does not appear in the scope of a template. -end note]
-  //
-  // Note: C++03 was more strict here, because it banned the use of
-  // the "template" keyword prior to a template-name that was not a
-  // dependent name. C++ DR468 relaxed this requirement (the
-  // "template" keyword is now permitted). We follow the C++0x
-  // rules, even in C++03 mode with a warning, retroactively applying the DR.
   bool MemberOfUnknownSpecialization;
   TemplateNameKind TNK = isTemplateName(S, SS, TemplateKWLoc.isValid(), Name,
                                         ObjectType, EnteringContext, Result,
@@ -5859,7 +5794,7 @@ bool Sema::CheckTemplateArgument(NamedDecl *Param, TemplateArgumentLoc &ArgLoc,
     // We have a template template parameter but the template
     // argument does not refer to a template.
     Diag(ArgLoc.getLocation(), diag::err_template_arg_must_be_template)
-        << Kind << getLangOpts().CPlusPlus11;
+        << Kind << /*CPlusPlus11=*/1;
     return true;
   }
 
@@ -6296,310 +6231,6 @@ bool Sema::CheckTemplateArgumentList(
   return false;
 }
 
-namespace {
-  class UnnamedLocalNoLinkageFinder
-    : public TypeVisitor<UnnamedLocalNoLinkageFinder, bool>
-  {
-    Sema &S;
-    SourceRange SR;
-
-    typedef TypeVisitor<UnnamedLocalNoLinkageFinder, bool> inherited;
-
-  public:
-    UnnamedLocalNoLinkageFinder(Sema &S, SourceRange SR) : S(S), SR(SR) { }
-
-    bool Visit(QualType T) {
-      return T.isNull() ? false : inherited::Visit(T.getTypePtr());
-    }
-
-#define TYPE(Class, Parent) \
-    bool Visit##Class##Type(const Class##Type *);
-#define ABSTRACT_TYPE(Class, Parent) \
-    bool Visit##Class##Type(const Class##Type *) { return false; }
-#define NON_CANONICAL_TYPE(Class, Parent) \
-    bool Visit##Class##Type(const Class##Type *) { return false; }
-#include "clang/AST/TypeNodes.inc"
-
-    bool VisitTagDecl(const TagDecl *Tag);
-    bool VisitNestedNameSpecifier(NestedNameSpecifier NNS);
-  };
-} // end anonymous namespace
-
-bool UnnamedLocalNoLinkageFinder::VisitBuiltinType(const BuiltinType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitComplexType(const ComplexType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitPointerType(const PointerType* T) {
-  return Visit(T->getPointeeType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitBlockPointerType(
-                                                    const BlockPointerType* T) {
-  return Visit(T->getPointeeType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitLValueReferenceType(
-                                                const LValueReferenceType* T) {
-  return Visit(T->getPointeeType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitRValueReferenceType(
-                                                const RValueReferenceType* T) {
-  return Visit(T->getPointeeType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitMemberPointerType(
-    const MemberPointerType *T) {
-  if (Visit(T->getPointeeType()))
-    return true;
-  if (auto *RD = T->getMostRecentCXXRecordDecl())
-    return VisitTagDecl(RD);
-  return VisitNestedNameSpecifier(T->getQualifier());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitConstantArrayType(
-                                                  const ConstantArrayType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitIncompleteArrayType(
-                                                 const IncompleteArrayType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitVariableArrayType(
-                                                   const VariableArrayType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentSizedArrayType(
-                                            const DependentSizedArrayType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentSizedExtVectorType(
-                                         const DependentSizedExtVectorType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentSizedMatrixType(
-    const DependentSizedMatrixType *T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentAddressSpaceType(
-    const DependentAddressSpaceType *T) {
-  return Visit(T->getPointeeType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitVectorType(const VectorType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentVectorType(
-    const DependentVectorType *T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitExtVectorType(const ExtVectorType* T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitConstantMatrixType(
-    const ConstantMatrixType *T) {
-  return Visit(T->getElementType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitFunctionProtoType(
-                                                  const FunctionProtoType* T) {
-  for (const auto &A : T->param_types()) {
-    if (Visit(A))
-      return true;
-  }
-
-  return Visit(T->getReturnType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitFunctionNoProtoType(
-                                               const FunctionNoProtoType* T) {
-  return Visit(T->getReturnType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitUnresolvedUsingType(
-                                                  const UnresolvedUsingType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitTypeOfExprType(const TypeOfExprType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitTypeOfType(const TypeOfType* T) {
-  return Visit(T->getUnmodifiedType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDecltypeType(const DecltypeType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitPackIndexingType(
-    const PackIndexingType *) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitUnaryTransformType(
-                                                    const UnaryTransformType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitAutoType(const AutoType *T) {
-  return Visit(T->getDeducedType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDeducedTemplateSpecializationType(
-    const DeducedTemplateSpecializationType *T) {
-  return Visit(T->getDeducedType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitRecordType(const RecordType* T) {
-  return VisitTagDecl(T->getDecl()->getDefinitionOrSelf());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitEnumType(const EnumType* T) {
-  return VisitTagDecl(T->getDecl()->getDefinitionOrSelf());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitTemplateTypeParmType(
-                                                 const TemplateTypeParmType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitSubstTemplateTypeParmPackType(
-                                        const SubstTemplateTypeParmPackType *) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitSubstBuiltinTemplatePackType(
-    const SubstBuiltinTemplatePackType *) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitTemplateSpecializationType(
-                                            const TemplateSpecializationType*) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitInjectedClassNameType(
-                                              const InjectedClassNameType* T) {
-  return VisitTagDecl(T->getDecl()->getDefinitionOrSelf());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentNameType(
-                                                   const DependentNameType* T) {
-  return VisitNestedNameSpecifier(T->getQualifier());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitPackExpansionType(
-                                                   const PackExpansionType* T) {
-  return Visit(T->getPattern());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitObjCObjectType(const ObjCObjectType *) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitObjCInterfaceType(
-                                                   const ObjCInterfaceType *) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitObjCObjectPointerType(
-                                                const ObjCObjectPointerType *) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitAtomicType(const AtomicType* T) {
-  return Visit(T->getValueType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitOverflowBehaviorType(
-    const OverflowBehaviorType *T) {
-  return Visit(T->getUnderlyingType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitPipeType(const PipeType* T) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitBitIntType(const BitIntType *T) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitArrayParameterType(
-    const ArrayParameterType *T) {
-  return VisitConstantArrayType(T);
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitDependentBitIntType(
-    const DependentBitIntType *T) {
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitTagDecl(const TagDecl *Tag) {
-  if (Tag->getDeclContext()->isFunctionOrMethod()) {
-    S.Diag(SR.getBegin(), S.getLangOpts().CPlusPlus11
-                              ? diag::warn_cxx98_compat_template_arg_local_type
-                              : diag::ext_template_arg_local_type)
-        << S.Context.getCanonicalTagType(Tag) << SR;
-    return true;
-  }
-
-  if (!Tag->hasNameForLinkage()) {
-    S.Diag(SR.getBegin(),
-           S.getLangOpts().CPlusPlus11 ?
-             diag::warn_cxx98_compat_template_arg_unnamed_type :
-             diag::ext_template_arg_unnamed_type) << SR;
-    S.Diag(Tag->getLocation(), diag::note_template_unnamed_type_here);
-    return true;
-  }
-
-  return false;
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitNestedNameSpecifier(
-    NestedNameSpecifier NNS) {
-  switch (NNS.getKind()) {
-  case NestedNameSpecifier::Kind::Null:
-  case NestedNameSpecifier::Kind::Namespace:
-  case NestedNameSpecifier::Kind::Global:
-  case NestedNameSpecifier::Kind::MicrosoftSuper:
-    return false;
-  case NestedNameSpecifier::Kind::Type:
-    return Visit(QualType(NNS.getAsType(), 0));
-  }
-  llvm_unreachable("Invalid NestedNameSpecifier::Kind!");
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitHLSLAttributedResourceType(
-    const HLSLAttributedResourceType *T) {
-  if (T->hasContainedType() && Visit(T->getContainedType()))
-    return true;
-  return Visit(T->getWrappedType());
-}
-
-bool UnnamedLocalNoLinkageFinder::VisitHLSLInlineSpirvType(
-    const HLSLInlineSpirvType *T) {
-  for (auto &Operand : T->getOperands())
-    if (Operand.isConstant() && Operand.isLiteral())
-      if (Visit(Operand.getResultType()))
-        return true;
-  return false;
-}
-
 bool Sema::CheckTemplateArgument(TypeSourceInfo *ArgInfo) {
   assert(ArgInfo && "invalid TypeSourceInfo");
   QualType Arg = ArgInfo->getType();
@@ -6610,18 +6241,6 @@ bool Sema::CheckTemplateArgument(TypeSourceInfo *ArgInfo) {
     return Diag(SR.getBegin(), diag::err_variably_modified_template_arg) << Arg;
   } else if (Context.hasSameUnqualifiedType(Arg, Context.OverloadTy)) {
     return Diag(SR.getBegin(), diag::err_template_arg_overload_type) << SR;
-  }
-
-  // C++03 [temp.arg.type]p2:
-  //   A local type, a type with no linkage, an unnamed type or a type
-  //   compounded from any of these types shall not be used as a
-  //   template-argument for a template type-parameter.
-  //
-  // C++11 allows these, and even in C++03 we allow them as an extension with
-  // a warning.
-  if (LangOpts.CPlusPlus11 || CanonArg->hasUnnamedOrLocalType()) {
-    UnnamedLocalNoLinkageFinder Finder(*this, SR);
-    (void)Finder.Visit(CanonArg);
   }
 
   return false;
@@ -6650,9 +6269,6 @@ isNullPointerValueTemplateArgument(Sema &S, NamedDecl *Param,
   if (!S.isCompleteType(Arg->getExprLoc(), ParamType))
     llvm_unreachable(
         "Incomplete parameter type in isNullPointerValueTemplateArgument!");
-
-  if (!S.getLangOpts().CPlusPlus11)
-    return NPV_NotNullPointer;
 
   // Determine whether we have a constant expression.
   ExprResult ArgRV = S.DefaultFunctionArrayConversion(Arg);
@@ -6861,20 +6477,11 @@ static bool CheckTemplateArgumentAddressOfObjectOrFunction(
     //        the name refers to a function or array, or if the
     //        corresponding template-parameter is a reference; or
 
-    // In C++98/03 mode, give an extension warning on any extra parentheses.
+    // Extra parentheses are allowed since C++11.
     // See http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#773
     if (IsSpecified) {
-      bool ExtraParens = false;
-      while (ParenExpr *Parens = dyn_cast<ParenExpr>(Arg)) {
-        if (!ExtraParens) {
-          S.DiagCompat(Arg->getBeginLoc(),
-                       diag_compat::template_arg_extra_parens)
-              << Arg->getSourceRange();
-          ExtraParens = true;
-        }
-
+      while (ParenExpr *Parens = dyn_cast<ParenExpr>(Arg))
         Arg = Parens->getSubExpr();
-      }
     }
 
     while (SubstNonTypeTemplateParmExpr *subst =
@@ -6905,7 +6512,6 @@ static bool CheckTemplateArgumentAddressOfObjectOrFunction(
     switch (isNullPointerValueTemplateArgument(S, Param, ParamType, ArgIn,
                                                Entity)) {
     case NPV_NullPointer:
-      S.Diag(Arg->getExprLoc(), diag::warn_cxx98_compat_template_arg_null);
       SugaredConverted = TemplateArgument(ParamType,
                                           /*isNullPtr=*/true);
       CanonicalConverted =
@@ -6968,13 +6574,7 @@ static bool CheckTemplateArgumentAddressOfObjectOrFunction(
     return true;
   }
 
-  // Address / reference template args must have external linkage in C++98.
-  if (Entity->getFormalLinkage() == Linkage::Internal) {
-    S.DiagCompat(Arg->getBeginLoc(), diag_compat::template_arg_object_internal)
-        << !Func << Entity << Arg->getSourceRange();
-    S.Diag(Entity->getLocation(), diag::note_template_arg_internal_object)
-        << !Func;
-  } else if (!Entity->hasLinkage()) {
+  if (!Entity->hasLinkage()) {
     S.Diag(Arg->getBeginLoc(), diag::err_template_arg_object_no_linkage)
         << !Func << Entity << Arg->getSourceRange();
     S.Diag(Entity->getLocation(), diag::note_template_arg_internal_object)
@@ -7079,18 +6679,10 @@ static bool CheckTemplateArgumentPointerToMember(
   //     -- a pointer to member expressed as described in 5.3.1.
   DeclRefExpr *DRE = nullptr;
 
-  // In C++98/03 mode, give an extension warning on any extra parentheses.
+  // Extra parentheses are allowed since C++11.
   // See http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#773
-  bool ExtraParens = false;
-  while (ParenExpr *Parens = dyn_cast<ParenExpr>(Arg)) {
-    if (!Invalid && !ExtraParens) {
-      S.DiagCompat(Arg->getBeginLoc(), diag_compat::template_arg_extra_parens)
-          << Arg->getSourceRange();
-      ExtraParens = true;
-    }
-
+  while (ParenExpr *Parens = dyn_cast<ParenExpr>(Arg))
     Arg = Parens->getSubExpr();
-  }
 
   while (SubstNonTypeTemplateParmExpr *subst =
            dyn_cast<SubstNonTypeTemplateParmExpr>(Arg))
@@ -7134,7 +6726,6 @@ static bool CheckTemplateArgumentPointerToMember(
   case NPV_Error:
     return true;
   case NPV_NullPointer:
-    S.Diag(ResultArg->getExprLoc(), diag::warn_cxx98_compat_template_arg_null);
     SugaredConverted = TemplateArgument(ParamType,
                                         /*isNullPtr*/ true);
     CanonicalConverted = TemplateArgument(S.Context.getCanonicalType(ParamType),
@@ -7509,177 +7100,42 @@ ExprResult Sema::CheckTemplateArgument(NamedDecl *Param, QualType ParamType,
     //   -- for a non-type template-parameter of integral or
     //      enumeration type, conversions permitted in a converted
     //      constant expression are applied.
+
+    // C++ [temp.arg.nontype]p1:
+    //   A template-argument for a non-type, non-template template-parameter
+    //   shall be one of:
     //
-    // C++98:
-    //   -- for a non-type template-parameter of integral or
-    //      enumeration type, integral promotions (4.5) and integral
-    //      conversions (4.7) are applied.
-
-    if (getLangOpts().CPlusPlus11) {
-      // C++ [temp.arg.nontype]p1:
-      //   A template-argument for a non-type, non-template template-parameter
-      //   shall be one of:
-      //
-      //     -- for a non-type template-parameter of integral or enumeration
-      //        type, a converted constant expression of the type of the
-      //        template-parameter; or
-      llvm::APSInt Value;
-      ExprResult ArgResult = CheckConvertedConstantExpression(
-          Arg, ParamType, Value, CCEKind::TemplateArg);
-      if (ArgResult.isInvalid())
-        return ExprError();
-      Arg = ArgResult.get();
-
-      // We can't check arbitrary value-dependent arguments.
-      if (Arg->isValueDependent()) {
-        SugaredConverted = TemplateArgument(Arg, /*IsCanonical=*/false);
-        CanonicalConverted =
-            Context.getCanonicalTemplateArgument(SugaredConverted);
-        return Arg;
-      }
-
-      // Widen the argument value to sizeof(parameter type). This is almost
-      // always a no-op, except when the parameter type is bool. In
-      // that case, this may extend the argument from 1 bit to 8 bits.
-      QualType IntegerType = ParamType;
-      if (const auto *ED = IntegerType->getAsEnumDecl())
-        IntegerType = ED->getIntegerType();
-      Value = Value.extOrTrunc(IntegerType->isBitIntType()
-                                   ? Context.getIntWidth(IntegerType)
-                                   : Context.getTypeSize(IntegerType));
-
-      SugaredConverted = TemplateArgument(Context, Value, ParamType);
-      CanonicalConverted =
-          TemplateArgument(Context, Value, Context.getCanonicalType(ParamType));
-      return Arg;
-    }
-
-    ExprResult ArgResult = DefaultLvalueConversion(Arg);
+    //     -- for a non-type template-parameter of integral or enumeration
+    //        type, a converted constant expression of the type of the
+    //        template-parameter; or
+    llvm::APSInt Value;
+    ExprResult ArgResult = CheckConvertedConstantExpression(
+        Arg, ParamType, Value, CCEKind::TemplateArg);
     if (ArgResult.isInvalid())
       return ExprError();
     Arg = ArgResult.get();
 
-    QualType ArgType = Arg->getType();
-
-    // C++ [temp.arg.nontype]p1:
-    //   A template-argument for a non-type, non-template
-    //   template-parameter shall be one of:
-    //
-    //     -- an integral constant-expression of integral or enumeration
-    //        type; or
-    //     -- the name of a non-type template-parameter; or
-    llvm::APSInt Value;
-    if (!ArgType->isIntegralOrEnumerationType()) {
-      Diag(Arg->getBeginLoc(), diag::err_template_arg_not_integral_or_enumeral)
-          << ArgType << Arg->getSourceRange();
-      NoteTemplateParameterLocation(*Param);
-      return ExprError();
-    }
-    if (!Arg->isValueDependent()) {
-      class TmplArgICEDiagnoser : public VerifyICEDiagnoser {
-        QualType T;
-
-      public:
-        TmplArgICEDiagnoser(QualType T) : T(T) { }
-
-        SemaDiagnosticBuilder diagnoseNotICE(Sema &S,
-                                             SourceLocation Loc) override {
-          return S.Diag(Loc, diag::err_template_arg_not_ice) << T;
-        }
-      } Diagnoser(ArgType);
-
-      Arg = VerifyIntegerConstantExpression(Arg, &Value, Diagnoser).get();
-      if (!Arg)
-        return ExprError();
-    }
-
-    // From here on out, all we care about is the unqualified form
-    // of the argument type.
-    ArgType = ArgType.getUnqualifiedType();
-
-    // Try to convert the argument to the parameter's type.
-    if (Context.hasSameType(ParamType, ArgType)) {
-      // Okay: no conversion necessary
-    } else if (ParamType->isBooleanType()) {
-      // This is an integral-to-boolean conversion.
-      Arg = ImpCastExprToType(Arg, ParamType, CK_IntegralToBoolean).get();
-    } else if (IsIntegralPromotion(Arg, ArgType, ParamType) ||
-               !ParamType->isEnumeralType()) {
-      // This is an integral promotion or conversion.
-      Arg = ImpCastExprToType(Arg, ParamType, CK_IntegralCast).get();
-    } else {
-      // We can't perform this conversion.
-      Diag(StartLoc, diag::err_template_arg_not_convertible)
-          << Arg->getType() << ParamType << Arg->getSourceRange();
-      NoteTemplateParameterLocation(*Param);
-      return ExprError();
-    }
-
-    // Add the value of this argument to the list of converted
-    // arguments. We use the bitwidth and signedness of the template
-    // parameter.
+    // We can't check arbitrary value-dependent arguments.
     if (Arg->isValueDependent()) {
-      // The argument is value-dependent. Create a new
-      // TemplateArgument with the converted expression.
       SugaredConverted = TemplateArgument(Arg, /*IsCanonical=*/false);
       CanonicalConverted =
           Context.getCanonicalTemplateArgument(SugaredConverted);
       return Arg;
     }
 
+    // Widen the argument value to sizeof(parameter type). This is almost
+    // always a no-op, except when the parameter type is bool. In
+    // that case, this may extend the argument from 1 bit to 8 bits.
     QualType IntegerType = ParamType;
-    if (const auto *ED = IntegerType->getAsEnumDecl()) {
+    if (const auto *ED = IntegerType->getAsEnumDecl())
       IntegerType = ED->getIntegerType();
-    }
-
-    if (ParamType->isBooleanType()) {
-      // Value must be zero or one.
-      Value = Value != 0;
-      unsigned AllowedBits = Context.getTypeSize(IntegerType);
-      if (Value.getBitWidth() != AllowedBits)
-        Value = Value.extOrTrunc(AllowedBits);
-      Value.setIsSigned(IntegerType->isSignedIntegerOrEnumerationType());
-    } else {
-      llvm::APSInt OldValue = Value;
-
-      // Coerce the template argument's value to the value it will have
-      // based on the template parameter's type.
-      unsigned AllowedBits = IntegerType->isBitIntType()
+    Value = Value.extOrTrunc(IntegerType->isBitIntType()
                                  ? Context.getIntWidth(IntegerType)
-                                 : Context.getTypeSize(IntegerType);
-      if (Value.getBitWidth() != AllowedBits)
-        Value = Value.extOrTrunc(AllowedBits);
-      Value.setIsSigned(IntegerType->isSignedIntegerOrEnumerationType());
+                                 : Context.getTypeSize(IntegerType));
 
-      // Complain if an unsigned parameter received a negative value.
-      if (IntegerType->isUnsignedIntegerOrEnumerationType() &&
-          (OldValue.isSigned() && OldValue.isNegative())) {
-        Diag(Arg->getBeginLoc(), diag::warn_template_arg_negative)
-            << toString(OldValue, 10) << toString(Value, 10) << ParamType
-            << Arg->getSourceRange();
-        NoteTemplateParameterLocation(*Param);
-      }
-
-      // Complain if we overflowed the template parameter's type.
-      unsigned RequiredBits;
-      if (IntegerType->isUnsignedIntegerOrEnumerationType())
-        RequiredBits = OldValue.getActiveBits();
-      else if (OldValue.isUnsigned())
-        RequiredBits = OldValue.getActiveBits() + 1;
-      else
-        RequiredBits = OldValue.getSignificantBits();
-      if (RequiredBits > AllowedBits) {
-        Diag(Arg->getBeginLoc(), diag::warn_template_arg_too_large)
-            << toString(OldValue, 10) << toString(Value, 10) << ParamType
-            << Arg->getSourceRange();
-        NoteTemplateParameterLocation(*Param);
-      }
-    }
-
-    QualType T = ParamType->isEnumeralType() ? ParamType : IntegerType;
-    SugaredConverted = TemplateArgument(Context, Value, T);
+    SugaredConverted = TemplateArgument(Context, Value, ParamType);
     CanonicalConverted =
-        TemplateArgument(Context, Value, Context.getCanonicalType(T));
+        TemplateArgument(Context, Value, Context.getCanonicalType(ParamType));
     return Arg;
   }
 
@@ -7809,7 +7265,6 @@ ExprResult Sema::CheckTemplateArgument(NamedDecl *Param, QualType ParamType,
       return ExprError();
 
     case NPV_NullPointer:
-      Diag(Arg->getExprLoc(), diag::warn_cxx98_compat_template_arg_null);
       SugaredConverted = TemplateArgument(ParamType,
                                           /*isNullPtr=*/true);
       CanonicalConverted = TemplateArgument(Context.getCanonicalType(ParamType),
@@ -8647,11 +8102,10 @@ static bool CheckTemplateSpecializationScope(Sema &S,
     EntityKind = 6;
   else if (isa<RecordDecl>(Specialized))
     EntityKind = 7;
-  else if (isa<EnumDecl>(Specialized) && S.getLangOpts().CPlusPlus11)
+  else if (isa<EnumDecl>(Specialized))
     EntityKind = 8;
   else {
-    S.Diag(Loc, diag::err_template_spec_unknown_kind)
-      << S.getLangOpts().CPlusPlus11;
+    S.Diag(Loc, diag::err_template_spec_unknown_kind) << /*CPlusPlus11=*/1;
     S.Diag(Specialized->getLocation(), diag::note_specialized_entity);
     return true;
   }
@@ -10217,8 +9671,6 @@ static bool CheckExplicitInstantiationScope(Sema &S, NamedDecl *D,
   //   unqualified name, the explicit instantiation shall appear in the
   //   namespace where its template is declared or, if that namespace is inline
   //   (7.3.1), any namespace from its enclosing namespace set.
-  //
-  // This is DR275, which we do not retroactively apply to C++98/03.
   if (WasQualifiedName) {
     if (CurContext->Encloses(OrigContext))
       return false;
@@ -10229,23 +9681,13 @@ static bool CheckExplicitInstantiationScope(Sema &S, NamedDecl *D,
 
   if (NamespaceDecl *NS = dyn_cast<NamespaceDecl>(OrigContext)) {
     if (WasQualifiedName)
-      S.Diag(InstLoc,
-             S.getLangOpts().CPlusPlus11?
-               diag::err_explicit_instantiation_out_of_scope :
-               diag::warn_explicit_instantiation_out_of_scope_0x)
-        << D << NS;
+      S.Diag(InstLoc, diag::err_explicit_instantiation_out_of_scope) << D << NS;
     else
       S.Diag(InstLoc,
-             S.getLangOpts().CPlusPlus11?
-               diag::err_explicit_instantiation_unqualified_wrong_namespace :
-               diag::warn_explicit_instantiation_unqualified_wrong_namespace_0x)
-        << D << NS;
+             diag::err_explicit_instantiation_unqualified_wrong_namespace)
+          << D << NS;
   } else
-    S.Diag(InstLoc,
-           S.getLangOpts().CPlusPlus11?
-             diag::err_explicit_instantiation_must_be_global :
-             diag::warn_explicit_instantiation_must_be_global_0x)
-      << D;
+    S.Diag(InstLoc, diag::err_explicit_instantiation_must_be_global) << D;
   S.Diag(D->getLocation(), diag::note_explicit_instantiation_here);
   return false;
 }
@@ -10831,10 +10273,8 @@ DeclResult Sema::ActOnExplicitInstantiation(Scope *S,
   // well.
   if (D.getDeclSpec().isInlineSpecified())
     Diag(D.getDeclSpec().getInlineSpecLoc(),
-         getLangOpts().CPlusPlus11 ?
-           diag::err_explicit_instantiation_inline :
-           diag::warn_explicit_instantiation_inline_0x)
-      << FixItHint::CreateRemoval(D.getDeclSpec().getInlineSpecLoc());
+         diag::err_explicit_instantiation_inline)
+        << FixItHint::CreateRemoval(D.getDeclSpec().getInlineSpecLoc());
   if (D.getDeclSpec().hasConstexprSpecifier() && R->isFunctionType())
     // FIXME: Add a fix-it to remove the 'constexpr' and add a 'const' if one is
     // not already specified.
@@ -11311,10 +10751,6 @@ TypeResult Sema::ActOnTypenameType(Scope *S, SourceLocation TypenameLoc,
   if (SS.isInvalid())
     return true;
 
-  if (TypenameLoc.isValid() && S && !S->getTemplateParamParent())
-    DiagCompat(TypenameLoc, diag_compat::typename_outside_of_template)
-        << FixItHint::CreateRemoval(TypenameLoc);
-
   NestedNameSpecifierLoc QualifierLoc = SS.getWithLocInContext(Context);
   TypeSourceInfo *TSI = nullptr;
   QualType T =
@@ -11334,12 +10770,6 @@ Sema::ActOnTypenameType(Scope *S, SourceLocation TypenameLoc,
                         SourceLocation TemplateIILoc, SourceLocation LAngleLoc,
                         ASTTemplateArgsPtr TemplateArgsIn,
                         SourceLocation RAngleLoc) {
-  if (TypenameLoc.isValid() && S && !S->getTemplateParamParent())
-    Diag(TypenameLoc, getLangOpts().CPlusPlus11
-                          ? diag::compat_cxx11_typename_outside_of_template
-                          : diag::compat_pre_cxx11_typename_outside_of_template)
-        << FixItHint::CreateRemoval(TypenameLoc);
-
   // Strangely, non-type results are not ignored by this lookup, so the
   // program is ill-formed if it finds an injected-class-name.
   if (TypenameLoc.isValid()) {
@@ -11493,10 +10923,7 @@ Sema::CheckTypenameType(ElaboratedTypeKeyword Keyword,
     }
 
     // If the nested-name-specifier refers to the current instantiation,
-    // the "typename" keyword itself is superfluous. In C++03, the
-    // program is actually ill-formed. However, DR 382 (in C++0x CD1)
-    // allows such extraneous "typename" keywords, and we retroactively
-    // apply this DR to C++03 code with only a warning. In any case we continue.
+    // the "typename" keyword itself is superfluous (DR 382).
 
     if (RequireCompleteDeclContext(SS, Ctx))
       return QualType();

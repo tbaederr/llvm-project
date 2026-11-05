@@ -6818,7 +6818,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     A->render(Args, CmdArgs);
 
   // Handle -{std, ansi, trigraphs} -- take the last of -{std, ansi}
-  // (-ansi is equivalent to -std=c89 or -std=c++98).
+  // (-ansi is equivalent to -std=c89 or -std=c++11).
   //
   // If a std is supplied, only add -trigraphs if it follows the
   // option.
@@ -6828,7 +6828,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Std) {
     if (Std->getOption().matches(options::OPT_ansi))
       if (types::isCXX(InputType))
-        CmdArgs.push_back("-std=c++98");
+        CmdArgs.push_back("-std=c++11");
       else
         CmdArgs.push_back("-std=c89");
     else {

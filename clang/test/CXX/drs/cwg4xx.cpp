@@ -1,4 +1,3 @@
-// RUN: env ASAN_OPTIONS=detect_stack_use_after_return=0 %clang_cc1 -std=c++98 %s -triple x86_64-linux-gnu -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-17,cxx98
 // RUN: env ASAN_OPTIONS=detect_stack_use_after_return=0 %clang_cc1 -std=c++11 %s -triple x86_64-linux-gnu -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-17,since-cxx11
 // RUN: env ASAN_OPTIONS=detect_stack_use_after_return=0 %clang_cc1 -std=c++14 %s -triple x86_64-linux-gnu -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-14,cxx98-17,since-cxx11
 // RUN: env ASAN_OPTIONS=detect_stack_use_after_return=0 %clang_cc1 -std=c++17 %s -triple x86_64-linux-gnu -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx17,cxx98-17,since-cxx11
@@ -6,10 +5,6 @@
 // RUN: env ASAN_OPTIONS=detect_stack_use_after_return=0 %clang_cc1 -std=c++23 %s -triple x86_64-linux-gnu -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx20,since-cxx17,since-cxx11
 // RUN: env ASAN_OPTIONS=detect_stack_use_after_return=0 %clang_cc1 -std=c++2c %s -triple x86_64-linux-gnu -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx20,since-cxx17,since-cxx11
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 // FIXME: __SIZE_TYPE__ expands to 'long long' on some targets.
 __extension__ typedef __SIZE_TYPE__ size_t;
@@ -88,11 +83,6 @@ namespace cwg401 { // cwg401: 2.8
   // FIXME: Why do we get different diagnostics in C++11 onwards here? We seem
   // to not treat the default template argument as a SFINAE context in C++98.
   template<class T, class U = typename T::type> void f(T) {} // #cwg402-f
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
-  // cxx98-error@-2 {{'type' is a protected member of 'cwg401::B'}}
-  //   cxx98-note@-3 {{in instantiation of default argument for 'f<B>' required here}}
-  //   cxx98-note@#cwg402-f-b {{while substituting deduced template arguments into function template 'f' [with T = B, U = (no value)]}}
-  //   cxx98-note@#cwg402-B-type {{declared protected here}}
   void g(B b) { f(b); } // #cwg402-f-b
   // since-cxx11-error@-1 {{no matching function for call to 'f'}}
   //   since-cxx11-note@#cwg402-f {{candidate template ignored: substitution failure [with T = B, U = typename B::type]: 'type' is a protected member of 'cwg401::B'}}
@@ -458,7 +448,6 @@ namespace cwg420 { // cwg420: 9
     q->Int::~Int();
   }
 
-#if __cplusplus >= 201103L
   template<typename T> using id = T;
   struct A { template<typename T> using id = T; };
   void test4(int *p, ptr<int> q) {
@@ -471,14 +460,12 @@ namespace cwg420 { // cwg420: 9
     p->A::template id<int>::~id<int>();
     q->A::template id<int>::~id<int>();
   }
-#endif
 } // namespace cwg420
 
 namespace cwg421 { // cwg421: 2.7
   struct X { X(); int n; int &r; };
   int *p = &X().n;
-  // cxx98-error@-1 {{taking the address of a temporary object of type 'int'}}
-  // since-cxx11-error@-2 {{cannot take the address of an rvalue of type 'int'}}
+  // since-cxx11-error@-1 {{cannot take the address of an rvalue of type 'int'}}
   int *q = &X().r;
 } // namespace cwg421
 
@@ -549,19 +536,16 @@ namespace cwg425 { // cwg425: 2.7
   template<typename T> struct is_float;
   template<> struct is_float<float> { typedef void type; };
 
-#if __cplusplus >= 201103L
   struct B {
     template<typename T, typename U = typename is_float<T>::type> operator T() const;
   } b;
   float g = 1.0f * b; // ok
-#endif
 } // namespace cwg425
 
 namespace cwg427 { // cwg427: 2.7
   struct B {};
   struct D : public B {
     D(B &) = delete; // #cwg427-D
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
   };
 
   extern D d1;
@@ -619,7 +603,6 @@ namespace cwg430 { // cwg430: 2.7 c++11
   // FIXME: This should apply in C++98 too.
   void f(int n) {
     int a[] = { n++, n++, n++ };
-    // cxx98-warning@-1 {{multiple unsequenced modifications to 'n'}}
   }
 } // namespace cwg430
 
@@ -661,11 +644,9 @@ namespace cwg432 { // cwg432: 3.0
   // expected-error@-1 {{use of class template 'B' requires template arguments}}
   //   expected-note@-2 {{template is declared here}}
   template<typename T> struct C : A<C<T> > {};
-#if __cplusplus >= 201103L
   template<typename T> struct D : decltype(A<D>()) {};
   // since-cxx11-error@-1 {{use of class template 'D' requires template arguments}}
   //   since-cxx11-note@-2 {{template is declared here}}
-#endif
 } // namespace cwg432
 
 namespace cwg433 { // cwg433: 2.7
@@ -689,11 +670,9 @@ namespace cwg434 { // cwg434: sup 2352
     *pi = 1;
   }
 
-#if __cplusplus >= 201103L
   int *pi = 0;
   const int * const &rcpci = pi;
   static_assert(&rcpci == &pi, "");
-#endif
 } // namespace cwg434
 
 // cwg435: na
@@ -734,7 +713,6 @@ namespace cwg444 { // cwg444: 2.7
   struct D;
   struct B { // #cwg444-B
     D &operator=(D &) = delete; // #cwg444-deleted
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
   };
   struct D : B { // #cwg444-D
     using B::operator=;
@@ -764,7 +742,6 @@ namespace cwg446 { // cwg446: 2.8
   struct A {
     A();
     A(const A&) = delete; // #cwg446-deleted
-    // cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
     A(const C&);
   };
   struct C : A {};
@@ -823,7 +800,6 @@ namespace cwg447 { // cwg447: 2.8
 
 namespace cwg448 { // cwg448: 2.8
   template<typename T = int> void f(int); // #cwg448-f-int
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T> void g(T t) {
     f<T>(t);
     // expected-error@-1 {{call to function 'f' that is neither visible in the template definition nor found by argument-dependent lookup}}
@@ -852,14 +828,12 @@ namespace cwg450 { // cwg450: 3.2
     // expected-error@-1 {{no matching function for call to 'f2'}}}
     //   expected-note@#cwg450-f2 {{candidate function not viable: expects an lvalue for 1st argument}}
   }
-#if __cplusplus >= 201103L
   void h() {
     f1(A{});
     f2(A{});
     // since-cxx11-error@-1 {{no matching function for call to 'f2'}}}
     //   since-cxx11-note@#cwg450-f2 {{candidate function not viable: expects an lvalue for 1st argument}}
   }
-#endif
 } // namespace cwg450
 
 namespace cwg451 { // cwg451: 2.7
@@ -888,13 +862,11 @@ namespace cwg456 { // cwg456: 3.4
   // sup 903 c++11
   const int null = 0;
   void *p = null;
-  // cxx98-warning@-1 {{expression which evaluates to zero treated as a null pointer constant of type 'void *'}}
-  // since-cxx11-error@-2 {{cannot initialize a variable of type 'void *' with an lvalue of type 'const int'}}
+  // since-cxx11-error@-1 {{cannot initialize a variable of type 'void *' with an lvalue of type 'const int'}}
 
   const bool f = false;
   void *q = f;
-  // cxx98-warning@-1 {{initialization of pointer of type 'void *' to null from a constant boolean expression}}
-  // since-cxx11-error@-2 {{cannot initialize a variable of type 'void *' with an lvalue of type 'const bool'}}
+  // since-cxx11-error@-1 {{cannot initialize a variable of type 'void *' with an lvalue of type 'const bool'}}
 } // namespace cwg456
 
 namespace cwg457 { // cwg457: 2.7
@@ -1035,8 +1007,6 @@ namespace cwg468 { // cwg468: 2.7 c++11
     };
   };
   int k = cwg468::template A<int>::template B<char>::C;
-  // cxx98-error@-1 {{use of 'template' keyword outside of a template is a C++11 extension}}
-  // cxx98-error@-2 {{use of 'template' keyword outside of a template is a C++11 extension}}
 } // namespace cwg468
 
 namespace cwg469 { // cwg469: no
@@ -1156,9 +1126,7 @@ namespace cwg479 { // cwg479: 2.8
     //   expected-note@#cwg479-S-dtor {{declared private here}}
     // expected-error@-3 {{exception object of type 'S' has private destructor}}
     //   expected-note@#cwg479-S-dtor {{declared private here}}
-    // cxx98-error@-5 {{C++98 requires an accessible copy constructor for class 'cwg479::S' when binding a reference to a temporary; was private}}
-    //   cxx98-note@#cwg479-S-copy-ctor {{declared private here}}
-    // cxx98-14-error@-7 {{calling a private constructor of class 'cwg479::S'}}
+    // cxx98-14-error@-5 {{calling a private constructor of class 'cwg479::S'}}
     //   cxx98-14-note@#cwg479-S-copy-ctor {{declared private here}}
   }
   void g() {
@@ -1264,7 +1232,6 @@ namespace cwg482 { // cwg482: 3.5
   // expected-warning@-1 {{extra qualification on member 'f'}}
 
   inline namespace X {
-  // cxx98-error@-1 {{inline namespaces are a C++11 extension}}
     extern int b;
     void g();
     struct S;
@@ -1291,11 +1258,9 @@ namespace cwg482 { // cwg482: 3.5
     struct A::B {};
     // expected-error@-1 {{extra qualification on member 'B'}}
 
-#if __cplusplus >= 201103L
     enum class C;
     enum class A::C {};
     // since-cxx11-error@-1 {{extra qualification on member 'C'}}
-#endif
   };
 } // namespace cwg482
 
@@ -1405,8 +1370,6 @@ namespace cwg488 { // cwg488: 2.9 c++11
     // failure.
     enum E { e };
     f(e);
-    // cxx98-error@-1 {{template argument uses local type 'E'}}
-    //   cxx98-note@-2 {{while substituting deduced template arguments into function template 'f' [with T = E]}}
   }
 } // namespace cwg488
 

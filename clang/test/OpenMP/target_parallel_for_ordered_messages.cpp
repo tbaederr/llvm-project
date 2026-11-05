@@ -1,9 +1,7 @@
 // RUN: %clang_cc1 -verify -fopenmp %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp -std=c++11 %s -Wuninitialized
 
 // RUN: %clang_cc1 -verify -fopenmp-simd %s -Wuninitialized
-// RUN: %clang_cc1 -verify -fopenmp-simd -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fopenmp-simd -std=c++11 %s -Wuninitialized
 
 // expected-note@* 0+{{declared here}}
@@ -54,11 +52,7 @@ T tmain(T argc, S **argv) {
 #pragma omp target parallel for ordered(S) // expected-error {{'S' does not refer to a value}}
   for (int i = ST; i < N; i++)
     argv[0][i] = argv[0][i] - argv[0][i - ST];
-#if __cplusplus >= 201103L
-  // expected-error@+4 2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
-#else
-  // expected-error@+2 2 {{integral constant expression}} expected-note@+2 0+{{constant expression}}
-#endif
+  // expected-error@+1 2 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
 #pragma omp target parallel for ordered(argv[1] = 2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = ST; i < N; i++)
     argv[0][i] = argv[0][i] - argv[0][i - ST];
@@ -103,11 +97,7 @@ int main(int argc, char **argv) {
 #pragma omp target parallel for ordered(S1) // expected-error {{'S1' does not refer to a value}}
   for (int i = 4; i < 12; i++)
     argv[0][i] = argv[0][i] - argv[0][i - 4];
-#if __cplusplus >= 201103L
-  // expected-error@+4 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
-#else
-  // expected-error@+2 {{integral constant expression}} expected-note@+2 0+{{constant expression}}
-#endif
+  // expected-error@+1 {{integral constant expression must have integral or unscoped enumeration type, not 'char *'}}
 #pragma omp target parallel for ordered(argv[1] = 2) // expected-error {{expected ')'}} expected-note {{to match this '('}}
   for (int i = 4; i < 12; i++)
     argv[0][i] = argv[0][i] - argv[0][i - 4];

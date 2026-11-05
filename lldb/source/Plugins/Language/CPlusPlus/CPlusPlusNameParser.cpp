@@ -765,7 +765,6 @@ static const clang::LangOptions &GetLangOptions() {
     g_options.C99 = true;
     g_options.C11 = true;
     g_options.CPlusPlus = true;
-    g_options.CPlusPlus11 = true;
     g_options.CPlusPlus14 = true;
     g_options.CPlusPlus17 = true;
     g_options.CPlusPlus20 = true;

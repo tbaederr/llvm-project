@@ -31,14 +31,13 @@ class TestVisitorHelper {
 public:
   enum Language {
     Lang_C,
-    Lang_CXX98,
     Lang_CXX11,
     Lang_CXX14,
     Lang_CXX17,
     Lang_CXX2a,
     Lang_OBJC,
     Lang_OBJCXX11,
-    Lang_CXX = Lang_CXX98
+    Lang_CXX = Lang_CXX11
   };
 
   /// \brief Runs the current AST visitor over the given code.
@@ -48,9 +47,6 @@ public:
     case Lang_C:
       Args.push_back("-x");
       Args.push_back("c");
-      break;
-    case Lang_CXX98:
-      Args.push_back("-std=c++98");
       break;
     case Lang_CXX11:
       Args.push_back("-std=c++11");

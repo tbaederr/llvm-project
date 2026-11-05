@@ -1142,8 +1142,7 @@ TEST_P(ASTMatchersTest, Initializers_C99) {
 }
 
 TEST_P(ASTMatchersTest, Initializers_CXX) {
-  if (GetParam().Language != Lang_CXX03) {
-    // FIXME: Make this test pass with other C++ standard versions.
+  if (!GetParam().isCXX()) {
     return;
   }
   EXPECT_TRUE(matches(
@@ -1151,7 +1150,6 @@ TEST_P(ASTMatchersTest, Initializers_CXX) {
       "  struct point ptarray[10] = "
       "      { [2].y = 1.0, [2].x = 2.0, [0].x = 1.0 }; }",
       initListExpr(
-          has(cxxConstructExpr(requiresZeroInitialization())),
           has(initListExpr(
               hasType(asString("struct point")), has(floatLiteral(equals(1.0))),
               has(implicitValueInitExpr(hasType(asString("double")))))),

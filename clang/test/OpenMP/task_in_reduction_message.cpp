@@ -1,15 +1,11 @@
-// RUN: %clang_cc1 -verify=expected,omp-lt60 -fopenmp -std=c++98 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp-lt60 -fopenmp -std=c++11 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp52,omp-lt60 -fopenmp -fopenmp-version=52 -ferror-limit 150 -o - %s
-// RUN: %clang_cc1 -verify=expected,omp52,omp-lt60 -fopenmp -fopenmp-version=52 -std=c++98 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp52,omp-lt60 -fopenmp -fopenmp-version=52 -std=c++11 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp-ge60 -fopenmp -fopenmp-version=60 -ferror-limit 150 -o - %s
 
 // RUN: %clang_cc1 -verify=expected,omp-lt60 -fopenmp-simd -ferror-limit 150 -o - %s
-// RUN: %clang_cc1 -verify=expected,omp-lt60 -fopenmp-simd -std=c++98 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp-lt60 -fopenmp-simd -std=c++11 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp52,omp-lt60 -fopenmp-simd -fopenmp-version=52 -ferror-limit 150 -o - %s
-// RUN: %clang_cc1 -verify=expected,omp52,omp-lt60 -fopenmp-simd -fopenmp-version=52 -std=c++98 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp52,omp-lt60 -fopenmp-simd -fopenmp-version=52 -std=c++11 -ferror-limit 150 -o - %s
 // RUN: %clang_cc1 -verify=expected,omp-ge60 -fopenmp-simd -fopenmp-version=60 -std=c++11 -ferror-limit 150 -o - %s
 // SIMD-ONLY0-NOT: {{__kmpc|__tgt}}
@@ -111,9 +107,7 @@ public:
   S5(int v) : a(v) {}
 };
 class S6 { // expected-note 3 {{candidate function (the implicit copy assignment operator) not viable: no known conversion from 'int' to 'const S6' for 1st argument}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 3 {{candidate function (the implicit move assignment operator) not viable}}
-#endif
+// expected-note@-1 3 {{candidate function (the implicit move assignment operator) not viable}}
   int a;
 
 public:

@@ -1,8 +1,8 @@
 // RUN: %clang_cc1 -verify=omp50,expected,cxx17 -fopenmp -fopenmp-version=50 -ferror-limit 100 %std_cxx17- %s
-// RUN: %clang_cc1 -verify=omp50,expected,precxx17 -fopenmp-simd -fopenmp-version=50 -ferror-limit 100 %std_cxx98-14 %s
+// RUN: %clang_cc1 -verify=omp50,expected,precxx17 -fopenmp-simd -fopenmp-version=50 -ferror-limit 100 %std_cxx11-14 %s
 
 // RUN: %clang_cc1 -verify=omp51,expected,cxx17 -fopenmp -ferror-limit 100 %std_cxx17- %s
-// RUN: %clang_cc1 -verify=omp51,expected,precxx17 -fopenmp-simd -ferror-limit 100 %std_cxx98-14 %s
+// RUN: %clang_cc1 -verify=omp51,expected,precxx17 -fopenmp-simd -ferror-limit 100 %std_cxx11-14 %s
 
 int temp; // expected-note {{'temp' declared here}}
 
@@ -122,7 +122,6 @@ int fun(int arg) {
   return arg;
 }
 
-#if __cplusplus >= 201103L
 namespace GH223366 {
 struct HasType {
   typedef int type;
@@ -140,4 +139,3 @@ void g() {
   f<int>(); // expected-note {{in instantiation of function template specialization 'GH223366::f<int>' requested here}}
 }
 }
-#endif

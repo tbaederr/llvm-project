@@ -1523,7 +1523,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK-tokens: Punctuation: ";" [185:31 - 185:32] CompoundStmt=
 // CHECK-tokens: Punctuation: "}" [186:1 - 186:2] CompoundStmt=
 
-// RUN: c-index-test -test-load-source all %s -std=c++98 -target x86_64-unknown-unknown 2>&1 | FileCheck %s
+// RUN: c-index-test -test-load-source all %s -std=c++11 -target x86_64-unknown-unknown 2>&1 | FileCheck %s
 // CHECK: 1:27: TypedefDecl=__darwin_size_t:1:27 (Definition) Extent=[1:1 - 1:42]
 // CHECK: 2:25: TypedefDecl=size_t:2:25 (Definition) Extent=[2:1 - 2:31]
 // CHECK: 2:9: TypeRef=__darwin_size_t:1:27 Extent=[2:9 - 2:24]
@@ -1750,7 +1750,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK: 60:57: CompoundStmt= Extent=[60:57 - 62:4]
 // CHECK: 61:5: ReturnStmt= Extent=[61:5 - 61:59]
 // CHECK: 61:12: CallExpr= Extent=[61:12 - 61:59]
-// CHECK: 61:12: UnexposedExpr=StringRef:49:3 Extent=[61:12 - 61:59]
+// CHECK: 61:12: UnexposedExpr= Extent=[61:12 - 61:59]
 // CHECK: 61:12: CallExpr=StringRef:49:3 Extent=[61:12 - 61:59]
 // CHECK: 61:12: TypeRef=class llvm::StringRef:38:7 Extent=[61:12 - 61:21]
 // CHECK: 61:22: BinaryOperator=+ Extent=[61:22 - 61:34]
@@ -1824,7 +1824,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK: 77:35: CompoundStmt= Extent=[77:35 - 79:4]
 // CHECK: 78:5: ReturnStmt= Extent=[78:5 - 78:56]
 // CHECK: 78:12: CallExpr= Extent=[78:12 - 78:56]
-// CHECK: 78:12: UnexposedExpr=StringRef:49:3 Extent=[78:12 - 78:56]
+// CHECK: 78:12: UnexposedExpr= Extent=[78:12 - 78:56]
 // CHECK: 78:12: CallExpr=StringRef:49:3 Extent=[78:12 - 78:56]
 // CHECK: 78:28: CallExpr=getNameStart:68:15 Extent=[78:28 - 78:42]
 // CHECK: 78:28: MemberRefExpr=getNameStart:68:15 Extent=[78:28 - 78:40]
@@ -1873,7 +1873,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK: 101:3: DeclStmt= Extent=[101:3 - 101:46]
 // CHECK: 101:19: VarDecl=AttrName:101:19 (Definition) Extent=[101:3 - 101:45]
 // CHECK: 101:30: CallExpr= Extent=[101:30 - 101:45]
-// CHECK: 101:30: UnexposedExpr=getName:77:19 Extent=[101:30 - 101:45]
+// CHECK: 101:30: UnexposedExpr= Extent=[101:30 - 101:45]
 // CHECK: 101:30: CallExpr=getName:77:19 Extent=[101:30 - 101:45]
 // CHECK: 101:36: MemberRefExpr=getName:77:19 SingleRefName=[101:36 - 101:43] RefName=[101:36 - 101:43] Extent=[101:30 - 101:43]
 // CHECK: 101:30: DeclRefExpr=Name:100:67 Extent=[101:30 - 101:34]
@@ -1884,7 +1884,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK: 102:7: UnexposedExpr=AttrName:101:19 Extent=[102:7 - 102:15]
 // CHECK: 102:7: DeclRefExpr=AttrName:101:19 Extent=[102:7 - 102:15]
 // CHECK: 102:27: CallExpr= Extent=[102:27 - 102:31]
-// CHECK: 102:27: UnexposedExpr=StringRef:48:3 Extent=[102:27 - 102:31]
+// CHECK: 102:27: UnexposedExpr= Extent=[102:27 - 102:31]
 // CHECK: 102:27: UnexposedExpr=StringRef:48:3 Extent=[102:27 - 102:31]
 // CHECK: 102:27: CallExpr=StringRef:48:3 Extent=[102:27 - 102:31]
 // CHECK: 102:27: UnexposedExpr= Extent=[102:27 - 102:31]
@@ -1894,7 +1894,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK: 102:36: UnexposedExpr=AttrName:101:19 Extent=[102:36 - 102:44]
 // CHECK: 102:36: DeclRefExpr=AttrName:101:19 Extent=[102:36 - 102:44]
 // CHECK: 102:54: CallExpr= Extent=[102:54 - 102:58]
-// CHECK: 102:54: UnexposedExpr=StringRef:48:3 Extent=[102:54 - 102:58]
+// CHECK: 102:54: UnexposedExpr= Extent=[102:54 - 102:58]
 // CHECK: 102:54: UnexposedExpr=StringRef:48:3 Extent=[102:54 - 102:58]
 // CHECK: 102:54: CallExpr=StringRef:48:3 Extent=[102:54 - 102:58]
 // CHECK: 102:54: UnexposedExpr= Extent=[102:54 - 102:58]
@@ -1903,7 +1903,7 @@ AttributeList::Kind AttributeList::getKind(const IdentifierInfo * Name) {
 // CHECK: 103:5: DeclRefExpr=AttrName:101:19 Extent=[103:5 - 103:13]
 // CHECK: 103:14: UnexposedExpr=operator=:38:7
 // CHECK: 103:14: DeclRefExpr=operator=:38:7
-// CHECK: 103:16: UnexposedExpr=substr:60:13 Extent=[103:16 - 103:55]
+// CHECK: 103:16: UnexposedExpr= Extent=[103:16 - 103:55]
 // CHECK: 103:16: CallExpr=substr:60:13 Extent=[103:16 - 103:55]
 // CHECK: 103:25: MemberRefExpr=substr:60:13 SingleRefName=[103:25 - 103:31] RefName=[103:25 - 103:31] Extent=[103:16 - 103:31]
 // CHECK: 103:16: UnexposedExpr=AttrName:101:19 Extent=[103:16 - 103:24]

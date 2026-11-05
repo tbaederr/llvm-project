@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -verify=expected -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -verify=expected -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -verify=expected -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -verify=expected -fexceptions -fcxx-exceptions -pedantic-errors -ast-dump | FileCheck %s

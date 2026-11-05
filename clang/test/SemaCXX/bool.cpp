@@ -1,9 +1,9 @@
-// RUN: %clang_cc1 %std_cxx98-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion %s
-// RUN: %clang_cc1 %std_cxx98-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion -Wno-deprecated -Wdeprecated-increment-bool %s
+// RUN: %clang_cc1 %std_cxx11-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion %s
+// RUN: %clang_cc1 %std_cxx11-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion -Wno-deprecated -Wdeprecated-increment-bool %s
 // RUN: %clang_cc1 %std_cxx17- -fsyntax-only -verify=expected,cxx17 -Wno-constant-conversion -Wno-deprecated -Wdeprecated-increment-bool %s
 
-// RUN: %clang_cc1 %std_cxx98-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion %s -fexperimental-new-constant-interpreter
-// RUN: %clang_cc1 %std_cxx98-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion -Wno-deprecated -Wdeprecated-increment-bool %s -fexperimental-new-constant-interpreter
+// RUN: %clang_cc1 %std_cxx11-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion %s -fexperimental-new-constant-interpreter
+// RUN: %clang_cc1 %std_cxx11-14 -fsyntax-only -verify=expected,precxx17 -Wno-constant-conversion -Wno-deprecated -Wdeprecated-increment-bool %s -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 %std_cxx17- -fsyntax-only -verify=expected,cxx17 -Wno-constant-conversion -Wno-deprecated -Wdeprecated-increment-bool %s -fexperimental-new-constant-interpreter
 
 

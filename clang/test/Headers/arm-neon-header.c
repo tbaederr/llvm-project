@@ -10,12 +10,10 @@
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding --target=aarch64_be-none-elf -march=armv8.2-a+fp16 -std=c99 -xc --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding --target=aarch64_be-none-elf -march=armv8.2-a+fp16 -std=c11 -xc --sysroot=%S/Inputs %s
 
-// RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64-none-elf -march=armv8.2-a+fp16 -std=c++98 -xc++ --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64-none-elf -march=armv8.2-a+fp16 -std=c++11 -xc++ --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64-none-elf -march=armv8.2-a+fp16 -std=c++14 -xc++ --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64-none-elf -march=armv8.2-a+fp16 -std=c++17 -xc++ --sysroot=%S/Inputs %s
 
-// RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64_be-none-elf -march=armv8.2-a+fp16 -std=c++98 -xc++ --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64_be-none-elf -march=armv8.2-a+fp16 -std=c++11 -xc++ --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64_be-none-elf -march=armv8.2-a+fp16 -std=c++14 -xc++ --sysroot=%S/Inputs %s
 // RUN: %clang -fsyntax-only -Wall -Werror -ffreestanding -nostdinc++ --target=aarch64_be-none-elf -march=armv8.2-a+fp16 -std=c++17 -xc++ --sysroot=%S/Inputs %s

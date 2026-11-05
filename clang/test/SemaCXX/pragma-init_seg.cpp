@@ -1,8 +1,6 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions %s -triple x86_64-pc-win32
-// RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions -std=c++98 %s -triple x86_64-pc-win32
 // RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions -std=c++11 %s -triple x86_64-pc-win32
 // RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions %s -triple i386-apple-darwin13.3.0
-// RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions -std=c++98 %s -triple i386-apple-darwin13.3.0
 // RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions -std=c++11 %s -triple i386-apple-darwin13.3.0
 
 #ifndef __APPLE__
@@ -23,6 +21,4 @@
 
 int f();
 int __declspec(thread) x = f(); // expected-error {{initializer for thread-local variable must be a constant expression}}
-#if __cplusplus >= 201103L
-// expected-note@-2 {{use 'thread_local' to allow this}}
-#endif
+// expected-note@-1 {{use 'thread_local' to allow this}}

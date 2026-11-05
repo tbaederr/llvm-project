@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -fcxx-exceptions -verify %s
 // RUN: %clang_cc1 -std=c++11 -fcxx-exceptions -verify %s
 // RUN: %clang_cc1 -std=c++14 -fcxx-exceptions -verify %s
 // RUN: %clang_cc1 -std=c++17 -fcxx-exceptions -verify %s
@@ -20,9 +19,7 @@
 // expected-no-diagnostics
 
 // FIXME using `defined` in a macro has undefined behavior.
-#if __cplusplus < 201103L
-#define check(macro, cxx98, cxx11, cxx14, cxx17, cxx20, cxx23, cxx26) (cxx98 == 0 ? defined(__cpp_##macro) : __cpp_##macro != cxx98)
-#elif __cplusplus < 201402L
+#if __cplusplus < 201402L
 #define check(macro, cxx98, cxx11, cxx14, cxx17, cxx20, cxx23, cxx26) (cxx11 == 0 ? defined(__cpp_##macro) : __cpp_##macro != cxx11)
 #elif __cplusplus < 201703L
 #define check(macro, cxx98, cxx11, cxx14, cxx17, cxx20, cxx23, cxx26) (cxx14 == 0 ? defined(__cpp_##macro) : __cpp_##macro != cxx14)

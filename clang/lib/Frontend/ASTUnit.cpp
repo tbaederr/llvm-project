@@ -310,8 +310,8 @@ static uint64_t getDeclShowContexts(const NamedDecl *ND,
     if (isa<EnumDecl>(ND)) {
       Contexts |= (1LL << CodeCompletionContext::CCC_EnumTag);
 
-      // Part of the nested-name-specifier in C++0x.
-      if (LangOpts.CPlusPlus11)
+      // Part of the nested-name-specifier in C++.
+      if (LangOpts.CPlusPlus)
         IsNestedNameSpecifier = true;
     } else if (const auto *Record = dyn_cast<RecordDecl>(ND)) {
       if (Record->isUnion())

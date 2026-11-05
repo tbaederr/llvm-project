@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -triple x86_64-linux -std=c++98 %s -O3 -disable-llvm-passes -fexceptions -fcxx-exceptions -pedantic-errors -emit-llvm -o - | FileCheck --check-prefixes=CHECK %s
 // RUN: %clang_cc1 -triple x86_64-linux -std=c++11 %s -O3 -disable-llvm-passes -fexceptions -fcxx-exceptions -pedantic-errors -emit-llvm -o - | FileCheck --check-prefixes=CHECK %s
 // RUN: %clang_cc1 -triple x86_64-linux -std=c++14 %s -O3 -disable-llvm-passes -fexceptions -fcxx-exceptions -pedantic-errors -emit-llvm -o - | FileCheck --check-prefixes=CHECK %s
 // RUN: %clang_cc1 -triple x86_64-linux -std=c++17 %s -O3 -disable-llvm-passes -fexceptions -fcxx-exceptions -pedantic-errors -emit-llvm -o - | FileCheck --check-prefixes=CHECK %s

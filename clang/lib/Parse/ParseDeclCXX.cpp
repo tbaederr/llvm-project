@@ -56,9 +56,8 @@ Parser::DeclGroupPtrTy Parser::ParseNamespace(DeclaratorContext Context,
 
   while (MaybeParseGNUAttributes(attrs) || isAllowedCXX11AttributeSpecifier()) {
     if (isAllowedCXX11AttributeSpecifier()) {
-      if (getLangOpts().CPlusPlus11)
-        DiagCompat(Tok.getLocation(), diag_compat::ns_enum_attribute)
-            << 0 /*namespace*/;
+      DiagCompat(Tok.getLocation(), diag_compat::ns_enum_attribute)
+          << 0 /*namespace*/;
       ParseCXX11Attributes(attrs);
     }
   }
@@ -189,10 +188,6 @@ Parser::DeclGroupPtrTy Parser::ParseNamespace(DeclaratorContext Context,
     if (FirstNestedInlineLoc.isValid())
       Diag(FirstNestedInlineLoc, diag::ext_inline_nested_namespace_definition);
   }
-
-  // If we're still good, complain about inline namespaces in non-C++0x now.
-  if (InlineLoc.isValid())
-    DiagCompat(InlineLoc, diag_compat::inline_namespace);
 
   // Enter a scope for the namespace.
   ParseScope NamespaceScope(this, Scope::DeclScope);
@@ -580,8 +575,7 @@ bool Parser::ParseUsingDeclarator(DeclaratorContext Context,
   //   or the simple-template-id's template-name in the last component of the
   //   nested-name-specifier, the name is [...] considered to name the
   //   constructor.
-  if (getLangOpts().CPlusPlus11 && Context == DeclaratorContext::Member &&
-      Tok.is(tok::identifier) &&
+  if (Context == DeclaratorContext::Member && Tok.is(tok::identifier) &&
       (NextToken().is(tok::semi) || NextToken().is(tok::comma) ||
        NextToken().is(tok::ellipsis) || NextToken().is(tok::l_square) ||
        NextToken().isRegularKeywordAttribute() ||
@@ -832,8 +826,6 @@ Decl *Parser::ParseAliasDeclarationAfterDeclarator(
     return nullptr;
   }
 
-  DiagCompat(Tok.getLocation(), diag_compat::alias_declaration);
-
   // Type alias templates cannot be specialized.
   int SpecKind = -1;
   if (TemplateInfo.Kind == ParsedTemplateKind::Template &&
@@ -918,13 +910,9 @@ Decl *Parser::ParseStaticAssertDeclaration(SourceLocation &DeclEnd) {
 
   if (Tok.is(tok::kw__Static_assert))
     diagnoseUseOfC11Keyword(Tok);
-  else if (Tok.is(tok::kw_static_assert)) {
-    if (!getLangOpts().CPlusPlus) {
-      if (getLangOpts().C23)
-        Diag(Tok, diag::warn_c23_compat_keyword) << Tok.getName();
-    } else
-      Diag(Tok, diag::warn_cxx98_compat_static_assert);
-  }
+  else if (Tok.is(tok::kw_static_assert) && !getLangOpts().CPlusPlus &&
+           getLangOpts().C23)
+    Diag(Tok, diag::warn_c23_compat_keyword) << Tok.getName();
 
   SourceLocation StaticAssertLoc = ConsumeToken();
 
@@ -957,7 +945,7 @@ Decl *Parser::ParseStaticAssertDeclaration(SourceLocation &DeclEnd) {
     }
 
     bool ParseAsExpression = false;
-    if (getLangOpts().CPlusPlus11) {
+    if (getLangOpts().CPlusPlus) {
       for (unsigned I = 0;; ++I) {
         const Token &T = GetLookAheadToken(I);
         if (T.is(tok::r_paren))
@@ -1022,9 +1010,6 @@ SourceLocation Parser::ParseDecltypeSpecifier(DeclSpec &DS) {
       return EndLoc;
     }
   } else {
-    if (Tok.getIdentifierInfo()->isStr("decltype"))
-      Diag(Tok, diag::warn_cxx98_compat_decltype);
-
     ConsumeToken();
 
     BalancedDelimiterTracker T(*this, tok::l_paren);
@@ -2542,9 +2527,6 @@ void Parser::ParseOptionalCXX11VirtSpecifierSeq(VirtSpecifiers &VS,
       Diag(Tok.getLocation(), diag::ext_ms_abstract_keyword);
     } else if (Specifier == VirtSpecifiers::VS_GNU_Final) {
       Diag(Tok.getLocation(), diag::ext_warn_gnu_final);
-    } else {
-      DiagCompat(Tok.getLocation(), diag_compat::override_control_keyword)
-          << VirtSpecifiers::getSpecifierName(Specifier);
     }
     ConsumeToken();
   }
@@ -3061,12 +3043,10 @@ Parser::DeclGroupPtrTy Parser::ParseCXXClassMemberDeclaration(
     FunctionDefinitionKind DefinitionKind = FunctionDefinitionKind::Declaration;
     // function-definition:
     //
-    // In C++11, a non-function declarator followed by an open brace is a
+    // A non-function declarator followed by an open brace is a
     // braced-init-list for an in-class member initialization, not an
     // erroneous function definition.
-    if (Tok.is(tok::l_brace) && !getLangOpts().CPlusPlus11) {
-      DefinitionKind = FunctionDefinitionKind::Definition;
-    } else if (DeclaratorInfo.isFunctionDeclarator()) {
+    if (DeclaratorInfo.isFunctionDeclarator()) {
       if (Tok.isOneOf(tok::l_brace, tok::colon, tok::kw_try)) {
         DefinitionKind = FunctionDefinitionKind::Definition;
       } else if (Tok.is(tok::equal)) {
@@ -3226,8 +3206,6 @@ Parser::DeclGroupPtrTy Parser::ParseCXXClassMemberDeclaration(
     // Handle the initializer.
     if (HasInClassInit != ICIS_NoInit) {
       // The initializer was deferred; parse it and cache the tokens.
-      DiagCompat(Tok, diag_compat::nonstatic_member_init);
-
       if (DeclaratorInfo.isArrayOfUnknownBound()) {
         // C++11 [dcl.array]p3: An array bound may also be omitted when the
         // declarator is followed by an initializer.
@@ -3650,9 +3628,6 @@ void Parser::ParseCXXMemberSpecification(SourceLocation RecordLoc,
       if (TagType == DeclSpec::TST_interface)
         Diag(FinalLoc, diag::err_override_control_interface)
             << VirtSpecifiers::getSpecifierName(Specifier);
-      else if (Specifier == VirtSpecifiers::VS_Final)
-        DiagCompat(FinalLoc, diag_compat::override_control_keyword)
-            << VirtSpecifiers::getSpecifierName(Specifier);
       else if (Specifier == VirtSpecifiers::VS_Sealed)
         Diag(FinalLoc, diag::ext_ms_sealed_keyword);
       else if (Specifier == VirtSpecifiers::VS_Abstract)
@@ -3923,9 +3898,7 @@ MemInitResult Parser::ParseMemInitializer(Decl *ConstructorDecl) {
   }
 
   // Parse the '('.
-  if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-    Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
-
+  if (Tok.is(tok::l_brace)) {
     // FIXME: Add support for signature help inside initializer lists.
     ExprResult InitList = ParseBraceInitializer();
     if (InitList.isInvalid())
@@ -3980,10 +3953,7 @@ MemInitResult Parser::ParseMemInitializer(Decl *ConstructorDecl) {
   if (TemplateTypeTy.isInvalid())
     return true;
 
-  if (getLangOpts().CPlusPlus11)
-    return Diag(Tok, diag::err_expected_either) << tok::l_paren << tok::l_brace;
-  else
-    return Diag(Tok, diag::err_expected) << tok::l_paren;
+  return Diag(Tok, diag::err_expected_either) << tok::l_paren << tok::l_brace;
 }
 
 ExceptionSpecificationType Parser::tryParseExceptionSpecification(
@@ -4008,7 +3978,6 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
     if (!Tok.is(tok::l_paren)) {
       // If this is a bare 'noexcept', we're done.
       if (IsNoexcept) {
-        Diag(Tok, diag::warn_cxx98_compat_noexcept_decl);
         NoexceptExpr = nullptr;
         return EST_BasicNoexcept;
       }
@@ -4042,8 +4011,6 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
   // If there's no noexcept specification, we're done.
   if (Tok.isNot(tok::kw_noexcept))
     return Result;
-
-  Diag(Tok, diag::warn_cxx98_compat_noexcept_decl);
 
   // If we already had a dynamic specification, parse the noexcept for,
   // recovery, but emit a diagnostic and don't store the results.
@@ -4094,15 +4061,13 @@ ExceptionSpecificationType Parser::tryParseExceptionSpecification(
 
 static void diagnoseDynamicExceptionSpecification(Parser &P, SourceRange Range,
                                                   bool IsNoexcept) {
-  if (P.getLangOpts().CPlusPlus11) {
-    const char *Replacement = IsNoexcept ? "noexcept" : "noexcept(false)";
-    P.Diag(Range.getBegin(), P.getLangOpts().CPlusPlus17 && !IsNoexcept
-                                 ? diag::ext_dynamic_exception_spec
-                                 : diag::warn_exception_spec_deprecated)
-        << Range;
-    P.Diag(Range.getBegin(), diag::note_exception_spec_deprecated)
-        << Replacement << FixItHint::CreateReplacement(Range, Replacement);
-  }
+  const char *Replacement = IsNoexcept ? "noexcept" : "noexcept(false)";
+  P.Diag(Range.getBegin(), P.getLangOpts().CPlusPlus17 && !IsNoexcept
+                               ? diag::ext_dynamic_exception_spec
+                               : diag::warn_exception_spec_deprecated)
+      << Range;
+  P.Diag(Range.getBegin(), diag::note_exception_spec_deprecated)
+      << Replacement << FixItHint::CreateReplacement(Range, Replacement);
 }
 
 ExceptionSpecificationType Parser::ParseDynamicExceptionSpecification(
@@ -4633,7 +4598,6 @@ void Parser::ParseCXX11AttributeSpecifierInternal(ParsedAttributes &Attrs,
     // handle this in ParseDeclarationSpecifiers() instead of here in C. We
     // should not get here for C any longer.
     assert(getLangOpts().CPlusPlus && "'alignas' is not an attribute in C");
-    Diag(Tok.getLocation(), diag::warn_cxx98_compat_alignas);
     ParseAlignmentSpecifier(Attrs, EndLoc);
     return;
   }
@@ -4660,8 +4624,8 @@ void Parser::ParseCXX11AttributeSpecifierInternal(ParsedAttributes &Attrs,
          "Not a double square bracket attribute list");
 
   SourceLocation OpenLoc = Tok.getLocation();
-  DiagCompat(OpenLoc, getLangOpts().CPlusPlus ? diag_compat::cxx11_attributes
-                                              : diag_compat::c23_attributes);
+  if (!getLangOpts().CPlusPlus)
+    DiagCompat(OpenLoc, diag_compat::c23_attributes);
 
   ConsumeBracket();
   checkCompoundToken(OpenLoc, tok::l_square, CompoundToken::AttrBegin);

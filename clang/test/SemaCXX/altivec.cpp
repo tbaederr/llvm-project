@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -target-feature +altivec -flax-vector-conversions=none -triple powerpc-unknown-unknown -fcxx-exceptions -verify=expected,precxx17 %std_cxx98-14 %s
+// RUN: %clang_cc1 -target-feature +altivec -flax-vector-conversions=none -triple powerpc-unknown-unknown -fcxx-exceptions -verify=expected,precxx17 %std_cxx11-14 %s
 // RUN: %clang_cc1 -target-feature +altivec -flax-vector-conversions=none -triple powerpc-unknown-unknown -fcxx-exceptions -verify %std_cxx17- %s
 
 typedef int V4i __attribute__((vector_size(16)));

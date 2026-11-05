@@ -1,7 +1,5 @@
 // RUN: %clang_cc1 -triple x86_64-apple-darwin12 -emit-llvm -o - %s | FileCheck %s --check-prefixes=CHECK,64BIT
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -triple x86_64-apple-darwin12 -emit-llvm -o - %s | FileCheck %s --check-prefixes=CHECK,64BIT %}
-// RUN: %clang_cc1 -triple x86_64-apple-darwin12 -emit-llvm -std=c++98 -o - %s | FileCheck %s --check-prefixes=CHECK,64BIT
-// RUN: %if cir-enabled %{ %clang_cc1 -fclangir -triple x86_64-apple-darwin12 -emit-llvm -std=c++98 -o - %s | FileCheck %s --check-prefixes=CHECK,64BIT %}
 // RUN: %clang_cc1 -triple x86_64-apple-darwin12 -emit-llvm -std=c++11 -o - %s | FileCheck %s --check-prefixes=CHECK,64BIT
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -triple x86_64-apple-darwin12 -emit-llvm -std=c++11 -o - %s | FileCheck %s --check-prefixes=CHECK,64BIT %}
 // RUN: %clang_cc1 -triple i686-apple-darwin12 -emit-llvm -o - %s | FileCheck %s --check-prefixes=CHECK,32BIT

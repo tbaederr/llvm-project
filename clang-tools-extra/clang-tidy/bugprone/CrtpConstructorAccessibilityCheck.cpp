@@ -180,6 +180,6 @@ void CrtpConstructorAccessibilityCheck::check(
 
 bool CrtpConstructorAccessibilityCheck::isLanguageVersionSupported(
     const LangOptions &LangOpts) const {
-  return LangOpts.CPlusPlus11;
+  return LangOpts.CPlusPlus;
 }
 } // namespace clang::tidy::bugprone

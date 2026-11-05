@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK
-// RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++98 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK %}
 // RUN: %clang_cc1 -std=c++11 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++11 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK %}
 // RUN: %clang_cc1 -std=c++14 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK
@@ -13,13 +11,8 @@
 // RUN: %clang_cc1 -std=c++2c %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++2c %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | FileCheck %s --check-prefixes CHECK %}
 
-#if __cplusplus == 199711L
-#define static_assert(expr) __extension__ _Static_assert(expr)
-#define noexcept throw()
-#endif
 
 namespace cwg6 { // cwg6: 2.7
-#if __cplusplus >= 201103L
 struct Counter {
   int copies;
   constexpr Counter(int copies) : copies(copies) {}
@@ -33,7 +26,6 @@ constexpr int PassByValue3(Counter c) { return PassByValue2(c); }
 static_assert(PassByValue(Counter(0)) == 0, "expect no copies");
 static_assert(PassByValue2(Counter(0)) == 1, "expect 1 copy");
 static_assert(PassByValue3(Counter(0)) == 2, "expect 2 copies");
-#endif
 
 struct A {
   A() noexcept;

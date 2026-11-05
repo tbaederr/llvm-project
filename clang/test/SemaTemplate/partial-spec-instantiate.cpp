@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // PR4607
@@ -48,9 +47,7 @@ namespace rdar9169404 {
   };
 
   X<bool, -1>::type value;
-#if __cplusplus >= 201103L
-  // expected-error@-2 {{non-type template argument evaluates to -1, which cannot be narrowed to type 'bool'}}
-#endif
+  // expected-error@-1 {{non-type template argument evaluates to -1, which cannot be narrowed to type 'bool'}}
 }
 
 namespace rdar39524996 {
@@ -152,7 +149,6 @@ namespace GH60778 {
     ClassTemplate<>::Nested<int> instantiation;
   }
 }
-#if __cplusplus >= 201103L
 namespace GH162855 {
   template <class...> using A = int;
   template <class, int> struct B;
@@ -164,7 +160,6 @@ namespace GH162855 {
   template <class> struct D;
   template struct C<D<int>>;
 } // namespace GH162855
-#endif
 
 namespace DependentWithQualifier {
   template <class> struct A;

@@ -20,11 +20,9 @@
 // Test that -std=c++14 or earlier produces an error
 // RUN: not %clangxx -fsycl -std=c++14 -c %s 2>&1 | FileCheck %s --check-prefix=CHECK-CXX14-ERROR
 // RUN: not %clangxx -fsycl -std=c++11 -c %s 2>&1 | FileCheck %s --check-prefix=CHECK-CXX11-ERROR
-// RUN: not %clangxx -fsycl -std=c++98 -c %s 2>&1 | FileCheck %s --check-prefix=CHECK-CXX98-ERROR
 
 // CHECK-CXX14-ERROR: error: SYCL requires C++17 or later; '-std=c++14' is not supported
 // CHECK-CXX11-ERROR: error: SYCL requires C++17 or later; '-std=c++11' is not supported
-// CHECK-CXX98-ERROR: error: SYCL requires C++17 or later; '-std=c++98' is not supported
 
 // Test that C standards produce an error with SYCL
 // RUN: not %clangxx -fsycl -std=c11 -c %s 2>&1 | FileCheck %s --check-prefix=CHECK-C11-ERROR

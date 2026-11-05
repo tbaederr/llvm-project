@@ -9,10 +9,6 @@
 // RUN: %clang_analyze_cc1 -triple x86_64-linux-gnu -analyzer-checker=core,unix,debug.ExprInspection %s -verify -std=c17 \
 // RUN:    -fstrict-flex-arrays=2
 
-// RUN: %clang_analyze_cc1 -triple x86_64-linux-gnu -analyzer-checker=core,unix,debug.ExprInspection %s -verify -std=c++98 -x c++ \
-// RUN:    -fstrict-flex-arrays=2
-// RUN: %clang_analyze_cc1 -triple x86_64-linux-gnu -analyzer-checker=core,unix,debug.ExprInspection %s -verify -std=c++03 -x c++ \
-// RUN:    -fstrict-flex-arrays=2
 // RUN: %clang_analyze_cc1 -triple x86_64-linux-gnu -analyzer-checker=core,unix,debug.ExprInspection %s -verify -std=c++11 -x c++ \
 // RUN:    -fstrict-flex-arrays=2
 // RUN: %clang_analyze_cc1 -triple x86_64-linux-gnu -analyzer-checker=core,unix,debug.ExprInspection %s -verify -std=c++14 -x c++ \

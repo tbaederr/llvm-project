@@ -256,7 +256,7 @@ public:
   }
 
   // Data fields.
-  std::string LangStandard = "-std=c++03";
+  std::string LangStandard = "-std=c++11";
   bool AllowErrors = false;
   DiagnosticOptions DiagOpts;
   llvm::IntrusiveRefCntPtr<DiagnosticsEngine> Diags =

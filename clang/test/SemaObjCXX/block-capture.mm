@@ -1,7 +1,6 @@
 // RUN: %clang_cc1 -std=c++23 -fsyntax-only -fobjc-arc -fblocks                       -verify=cxx98_23,cxx11_23,cxx23 %s
 // RUN: %clang_cc1 -std=c++20 -fsyntax-only -fobjc-arc -fblocks                       -verify=cxx98_23,cxx11_23       %s
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -fobjc-arc -fblocks                       -verify=cxx98_23,cxx11_23       %s
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -fobjc-arc -fblocks -Wno-c++11-extensions -verify=cxx98_23,cxx98          %s
 
 #define TEST(T) void test_##T() { \
   __block T x;                    \
@@ -20,10 +19,10 @@ TEST(CopyOnly); // cxx23-error {{no matching constructor}}
 // results in these are not changed.
 struct ConstCopyOnly {
   ConstCopyOnly();
-  ConstCopyOnly(ConstCopyOnly &) = delete; // cxx98-note {{marked deleted here}}
+  ConstCopyOnly(ConstCopyOnly &) = delete;
   ConstCopyOnly(const ConstCopyOnly &);
 };
-TEST(ConstCopyOnly); // cxx98-error {{call to deleted constructor}}
+TEST(ConstCopyOnly);
 
 struct NonConstCopyOnly {
   NonConstCopyOnly();

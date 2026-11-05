@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11-17
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11-17
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11-17
@@ -19,7 +18,6 @@ template <typename T> struct D4 : T::B<int>::C<int> {};
 } // namespace cwg1710
 
 namespace cwg1715 { // cwg1715: 3.9
-#if __cplusplus >= 201103L
   struct B {
     template<class T> B(T, typename T::Q);
   };
@@ -43,11 +41,9 @@ namespace cwg1715 { // cwg1715: 3.9
   //   since-cxx11-note@#cwg1715-E-ctor {{candidate template ignored: substitution failure [with T = S]: 'Q' is a private member of 'cwg1715::S'}}
   //   since-cxx11-note@#cwg1715-E {{candidate constructor (the implicit copy constructor) not viable: requires 1 argument, but 2 were provided}}
   //   since-cxx11-note@#cwg1715-E {{candidate constructor (the implicit move constructor) not viable: requires 1 argument, but 2 were provided}}
-#endif
 } // namespace cwg1715
 
 namespace cwg1719 { // cwg1719: 19
-#if __cplusplus >= 201103L
 struct CStruct {
   int one;
   int two;
@@ -71,11 +67,9 @@ static_assert(__is_layout_compatible(int, volatile int), "");
 static_assert(__is_layout_compatible(const int, volatile int), "");
 static_assert(__is_layout_compatible(CStruct, CStructWithQualifiers), "");
 static_assert(__is_layout_compatible(int[], const volatile int[]), "");
-#endif
 } // namespace cwg1719
 
 namespace cwg1722 { // cwg1722: 9
-#if __cplusplus >= 201103L
 void f() {
   const auto lambda = [](int x) { return x + 1; };
   // Without the DR applied, this static_assert would fail.
@@ -83,11 +77,9 @@ void f() {
       noexcept((int (*)(int))(lambda)),
       "Lambda-to-function-pointer conversion is expected to be noexcept");
 }
-#endif
 } // namespace cwg1722
 
 namespace cwg1734 { // cwg1734: no
-#if __cplusplus >= 201103L
 struct A {
     A(const A&) = delete;
 };
@@ -95,13 +87,11 @@ struct A {
 // one non-deleted copy constructor, move constructor, copy assignment
 // operator, or move assignment operator.
 static_assert(__is_trivially_copyable(A), "");
-#endif
 } // namespace cwg1734
 
 // cwg1736 is in cwg1736.cpp
 
 namespace cwg1738 { // cwg1738: sup P0136R1
-#if __cplusplus >= 201103L
 struct A {
   template <typename T>
   A(int, T) {}
@@ -114,13 +104,11 @@ struct B : A {
 // FIXME: this is well-formed since P0136R1
 template B::B(int, double);
 // since-cxx11-error@-1 {{explicit instantiation of 'B' does not refer to a function template, variable template, member function, member class, or static data member}}
-#endif
 } // namespace cwg1738
 
 // cwg1739: na
 
 namespace cwg1742 { // cwg1742: 13
-#if __cplusplus >= 201103L
 enum struct E {
   one
 };
@@ -131,7 +119,6 @@ struct S {
   // cxx11-17-error@-1 {{using declaration naming a scoped enumerator is a C++20 extension}}
   // cxx11-17-error@-2 {{using declaration in class refers into 'E', which is not a class}}
 };
-#endif
 } // namespace cwg1742
 
 // cwg1748 is in cwg1748.cpp
@@ -157,29 +144,24 @@ namespace cwg1753 { // cwg1753: 11
     // expected-error@-1 {{'B' does not refer to a type name in pseudo-destructor expression; expected the name of type 'T' (aka 'int')}}
     n.B::T::~T();
 
-  #if __cplusplus >= 201103L
     n.decltype(n)::~T();
     // since-cxx11-error@-1 {{'decltype(n)' (aka 'int') is not a class, namespace, or enumeration}}
     n.T::~decltype(n)();
     // since-cxx11-error@-1 {{expected a class name after '~' to name a destructor}}
     n.~decltype(n)(); // OK
-  #endif
   }
 } // namespace cwg1753
 
 namespace cwg1756 { // cwg1756: 3.7
-#if __cplusplus >= 201103L
   // Direct-list-initialization of a non-class object
   
   int a{0};
   
   struct X { operator int(); } x;
   int b{x};
-#endif
 } // namespace cwg1756
 
 namespace cwg1758 { // cwg1758: 3.7
-#if __cplusplus >= 201103L
   // Explicit conversion in copy/move list initialization
 
   struct X { X(); };
@@ -194,23 +176,19 @@ namespace cwg1758 { // cwg1758: 3.7
     operator A() { return A(); }
   } b;
   A a{b};
-#endif
 } // namespace cwg1758
 
 namespace cwg1762 { // cwg1762: 14
-#if __cplusplus >= 201103L
   float operator ""_E(const char *);
   float operator ""E(const char *);
   // since-cxx11-error@-1 {{invalid suffix on literal; C++11 requires a space between literal and identifier}}
   // since-cxx11-warning@-2 {{user-defined literal suffixes not starting with '_' are reserved; no literal will invoke this operator}}
-#endif
 } // namespace cwg1762
 
 // cwg1772 is in cwg177x.cpp
 
 namespace cwg1778 { // cwg1778: 9
   // Superseded by P1286R2.
-#if __cplusplus >= 201103L
   struct A { A() noexcept(true) = default; };
   struct B { B() noexcept(false) = default; };
   static_assert(noexcept(A()), "");
@@ -220,14 +198,12 @@ namespace cwg1778 { // cwg1778: 9
   struct D { B b; D() noexcept(true) = default; };
   static_assert(!noexcept(C()), "");
   static_assert(noexcept(D()), "");
-#endif
 } // namespace cwg1778
 
 // cwg1779 is in cwg177x.cpp
 
 namespace cwg1794 { // cwg1794: 2.7
                     // NB: dup 1710
-#if __cplusplus >= 201103L
 template <template <typename> class Template> struct Internal {
   template <typename Arg> using Bind = Template<Arg>;
 };
@@ -237,15 +213,13 @@ using Instantiate = Template<Arg>;
 
 template <template <typename> class Template, typename Argument>
 using Bind = Instantiate<Internal<Template>::template Bind, Argument>;
-#endif
 } // namespace cwg1794
 
 namespace cwg1780 { // cwg1780: 23
-#if __cplusplus >= 201103L
 
 #if __cplusplus >= 201703L
 #define CONSTEXPR constexpr
-#elif __cplusplus >= 201103L
+#else
 #define CONSTEXPR
 #endif
 
@@ -277,7 +251,6 @@ template auto GLL::operator()<int>(int a) const -> int;
 //   since-cxx11-note-re@#cwg1780-inst {{{{'\(lambda at .+\)'}} defined here}}
 #endif
 
-#endif
 } // namespace cwg1780
 
 namespace cwg1795 { // cwg1975: 2.7

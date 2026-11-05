@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fcxx-exceptions -fexceptions -fsyntax-only -verify -std=c++11 %s
 
 // ---------------------------------------------------------------------
@@ -24,9 +23,7 @@ struct FunctionalCast0 {
 template struct FunctionalCast0<5>;
 
 struct X { // expected-note 3 {{candidate constructor (the implicit copy constructor)}}
-#if __cplusplus >= 201103L
-// expected-note@-2 3 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 3 {{candidate constructor (the implicit move constructor) not viable}}
   X(int, int); // expected-note 3 {{candidate constructor}}
 };
 
@@ -227,10 +224,8 @@ template<typename T, typename Val1>
 struct InitList1 {
   void f(Val1 val1) { 
     T x = { val1 };
-#if __cplusplus >= 201103L
-    // expected-error@-2 {{type 'float' cannot be narrowed to 'int' in initializer list}}
-    // expected-note@-3 {{insert an explicit cast to silence this issue}}
-#endif
+    // expected-error@-1 {{type 'float' cannot be narrowed to 'int' in initializer list}}
+    // expected-note@-2 {{insert an explicit cast to silence this issue}}
   }
 };
 
@@ -240,9 +235,7 @@ struct APair {
 };
 
 template struct InitList1<int[1], float>;
-#if __cplusplus >= 201103L
-// expected-note@-2 {{instantiation of member function}}
-#endif
+// expected-note@-1 {{instantiation of member function}}
 template struct InitList1<APair, int*>;
 
 template<typename T, typename Val1, typename Val2>

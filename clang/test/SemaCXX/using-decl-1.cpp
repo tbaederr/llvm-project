@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 extern "C" { void f(bool); }
@@ -205,9 +204,6 @@ namespace PR19171 {
 
   struct Y : S {
     using S::S;
-#if __cplusplus < 201103L
-    // expected-error@-2 {{no member named 'S' in 'PR19171::S'}}
-#endif
   };
 
   // [namespace.udecl]p3: In a using-declaration used as a member-declaration,
@@ -228,15 +224,9 @@ namespace PR19171 {
   };
   struct D3 : C_blah {
     using C_blah::D_blah;
-#if __cplusplus < 201103L
-    // expected-error-re@-2 {{no member named 'D_blah' in 'PR19171::C_blah'{{$}}}}
-#else
-    // expected-error@-4 {{no member named 'D_blah' in 'PR19171::C_blah'; did you mean 'C_blah'?}}
-#endif
+    // expected-error@-1 {{no member named 'D_blah' in 'PR19171::C_blah'; did you mean 'C_blah'?}}
   };
-#if __cplusplus >= 201103L
   D3 d3(0); // ok
-#endif
 
   struct E { };
   struct EE { int EE; };
@@ -249,34 +239,26 @@ namespace PR19171 {
     void foobar(); // expected-note 2{{here}}
   };
   struct TypoDuplicateDerived1 : TypoDuplicate {
-#if __cplusplus >= 201103L
     using TypoDuplicate::TypoFuplicate; // expected-error {{did you mean 'TypoDuplicate'}} expected-note {{previous}}
     using TypoDuplicate::TypoDuplicate; // expected-error {{redeclaration}}
-#endif
     using TypoDuplicate::goobar; // expected-error {{did you mean 'foobar'}} expected-note {{previous}}
     using TypoDuplicate::foobar; // expected-error {{redeclaration}}
   };
   struct TypoDuplicateDerived2 : TypoDuplicate {
-#if __cplusplus >= 201103L
     using TypoFuplicate::TypoDuplicate; // expected-error {{did you mean 'TypoDuplicate'}} expected-note {{previous}}
     using TypoDuplicate::TypoDuplicate; // expected-error {{redeclaration}}
-#endif
   };
   struct TypoDuplicateDerived3 : TypoDuplicate {
-#if __cplusplus >= 201103L
     // FIXME: Don't suggest a correction that would lead to a redeclaration
     // error here... or at least diagnose the error.
     using TypoDuplicate::TypoDuplicate;
     using TypoDuplicate::TypoFuplicate; // expected-error {{did you mean 'TypoDuplicate'}}
-#endif
     using TypoDuplicate::foobar;
     using TypoDuplicate::goobar; // expected-error {{did you mean 'foobar'}}
   };
   struct TypoDuplicateDerived4 : TypoDuplicate {
-#if __cplusplus >= 201103L
     using TypoDuplicate::TypoDuplicate; // expected-note {{previous}}
     using TypoFuplicate::TypoDuplicate; // expected-error {{did you mean 'TypoDuplicate'}} expected-error {{redeclaration}}
-#endif
   };
 }
 
@@ -367,9 +349,6 @@ struct B : A {
   // Previously Clang rejected this valid C++11 code because it didn't look
   // through the UsingShadowDecl.
   using A::field;
-#if __cplusplus < 201103L
-  // expected-error@+2 {{invalid use of non-static data member 'field'}}
-#endif
   enum { X = sizeof(field) };
 };
 }

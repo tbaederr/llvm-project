@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++11
-// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++98 -Wno-c++11-extensions
 
 template<typename T>
 struct only {

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,since-cxx11,cxx11-14
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,since-cxx11,cxx11-14,cxx14-17
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-20,since-cxx11,since-cxx17
@@ -6,19 +5,13 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx23,since-cxx20,since-cxx11,since-cxx17
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx23,since-cxx20,since-cxx11,since-cxx17
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace cwg1512 { // cwg1512: 4
   void f(char *p) {
     if (p > 0) {}
     // expected-error@-1 {{ordered comparison between pointer and zero ('char *' and 'int')}}
-#if __cplusplus >= 201103L
     if (p > nullptr) {}
     // since-cxx11-error@-1 {{invalid operands to binary expression ('char *' and 'std::nullptr_t')}}
-#endif
   }
   bool g(int **x, const int **y) {
     return x < y;
@@ -96,14 +89,12 @@ namespace cwg1512 { // cwg1512: 4
   struct C {};
 
   void test() {
-#if __cplusplus >= 201103L
     using nullptr_t = decltype(nullptr);
     composite_pointer_type_is_unord<nullptr_t, nullptr_t, nullptr_t>();
     no_composite_pointer_type<nullptr_t, int>();
 
     composite_pointer_type_is_unord<nullptr_t, const char**, const char**>();
     composite_pointer_type_is_unord<const char**, nullptr_t, const char**>();
-#endif
 
     composite_pointer_type_is_ord<const int *, volatile void *, const volatile void*>();
     composite_pointer_type_is_ord<const void *, volatile int *, const volatile void*>();
@@ -149,7 +140,6 @@ namespace cwg1512 { // cwg1512: 4
 #endif
   }
 
-#if __cplusplus >= 201103L
   template<typename T> struct Wrap { operator T(); }; // #cwg1512-Wrap
   void test_overload() {
     using nullptr_t = decltype(nullptr);
@@ -185,11 +175,9 @@ namespace cwg1512 { // cwg1512: 4
     //   since-cxx11-note@#cwg1512-Wrap {{first operand was implicitly converted to type 'std::nullptr_t'}}
     //   since-cxx11-note@#cwg1512-Wrap {{second operand was implicitly converted to type 'int *'}}
   }
-#endif
 } // namespace cwg1512
 
 namespace cwg1514 { // cwg1514: 11
-#if __cplusplus >= 201103L
   struct S {
     enum E : int {}; // #cwg1514-E
     enum E : int {};
@@ -199,11 +187,9 @@ namespace cwg1514 { // cwg1514: 11
   S::E se; // OK, complete type, not zero-width bitfield.
 
   // The behavior in other contexts is superseded by CWG1966.
-#endif
 } // namespace cwg1514
 
 namespace cwg1518 { // cwg1518: 4
-#if __cplusplus >= 201103L
 struct Z0 { // #cwg1518-Z0
   explicit Z0() = default; // #cwg1518-Z0-ctor
 };
@@ -334,7 +320,6 @@ namespace std_example {
   template void g<C>(); // #cwg1518-g-C
   template void g<D>(); // #cwg1518-g-D
 }
-#endif // __cplusplus >= 201103L
 } // namespace cwg1518
 
 namespace cwg1550 { // cwg1550: 3.4
@@ -344,7 +329,6 @@ namespace cwg1550 { // cwg1550: 3.4
 } // namespace cwg1550
 
 namespace cwg1558 { // cwg1558: 12
-#if __cplusplus >= 201103L
   template<class T, class...> using first_of = T;
   template<class T> first_of<void, typename T::type> f(int); // #cwg1558-f
   template<class T> void f(...) = delete; // #cwg1558-f-deleted
@@ -357,7 +341,6 @@ namespace cwg1558 { // cwg1558: 12
     //   since-cxx11-note@#cwg1558-f-deleted {{candidate function [with T = int] has been explicitly deleted}}
     //   since-cxx11-note@#cwg1558-f {{candidate template ignored: substitution failure [with T = int]: type 'int' cannot be used prior to '::' because it has no members}}
   }
-#endif
 } // namespace cwg1558
 
 namespace cwg1560 { // cwg1560: 3.5
@@ -370,17 +353,14 @@ namespace cwg1560 { // cwg1560: 3.5
 } // namespace cwg1560
 
 namespace cwg1563 { // cwg1563: 3.1
-#if __cplusplus >= 201103L
   double bar(double) { return 0.0; }
   float bar(float) { return 0.0f; }
 
   using fun = double(double);
   fun &foo{bar}; // ok
-#endif
 } // namespace cwg1563
 
 namespace cwg1567 { // cwg1567: 3.3
-#if __cplusplus >= 201103L
 struct B;
 struct A {
   A(const A&);
@@ -415,11 +395,9 @@ B b5{A{0}};
 //   since-cxx11-note@#cwg1567-B {{candidate constructor (the implicit copy constructor) not viable: no known conversion from 'A' to 'const B' for 1st argument}}
 //   since-cxx11-note@#cwg1567-B {{candidate constructor (the implicit move constructor) not viable: no known conversion from 'A' to 'B' for 1st argument}}
 //   since-cxx11-note@#cwg1567-B-double {{candidate constructor not viable: no known conversion from 'A' to 'double' for 1st argument}}
-#endif
 } // namespace cwg1567
 
 namespace cwg1573 { // cwg1573: 3.9
-#if __cplusplus >= 201103L
   // ellipsis is inherited (p0136r1 supersedes this part).
   struct A { A(); A(int, char, ...); };
   struct B : A { using A::A; };
@@ -458,10 +436,8 @@ namespace cwg1573 { // cwg1573: 3.9
   J j(0);
   // since-cxx11-error@-1 {{call to deleted constructor of 'J'}}
   //   since-cxx11-note@#cwg1573-I {{'I' has been explicitly marked deleted here}}
-#endif
 } // namespace cwg1573
 
-#if __cplusplus >= 201103L
 namespace std {
   typedef decltype(sizeof(int)) size_t;
 
@@ -500,10 +476,8 @@ namespace std {
   typedef basic_string<char> string;
 
 } // namespace std
-#endif
 
 namespace cwg1579 { // cwg1579: 3.9
-#if __cplusplus >= 201103L
 template<class T>
 struct GenericMoveOnly {
   GenericMoveOnly();
@@ -571,7 +545,6 @@ auto CWG1579_lambda_invalid = []() -> GenericMoveOnly<char> {
   // since-cxx11-error@-1 {{conversion function from 'GenericMoveOnly<float>' to 'GenericMoveOnly<char>' invokes a deleted function}}
   //   since-cxx11-note@#cwg1579-deleted-U {{'GenericMoveOnly<float>' has been explicitly marked deleted here}}
 };
-#endif
 } // namespace cwg1579
 
 namespace cwg1584 { // cwg1584: 7 drafting 2015-05
@@ -579,7 +552,6 @@ namespace cwg1584 { // cwg1584: 7 drafting 2015-05
 template<typename T> void f(const T *); // #cwg1584-f
 template<typename T> void g(T *, const T * = 0);
 template<typename T> void h(T *) = delete; // #cwg1584-h-T
-// cxx98-error@-1 {{deleted function definitions are a C++11 extension}}
 template<typename T> void h(const T *);  // #cwg1584-h-const-T
 void i() {
   f(&i);
@@ -605,7 +577,6 @@ static_assert(tuple_size<void()const>::is_primary, "");
 } // namespace cwg1584
 
 namespace cwg1589 {   // cwg1589: 3.7 c++11
-#if __cplusplus >= 201103L
   // Ambiguous ranking of list-initialization sequences
 
   void f0(long, int=0);                 // Would makes selection of #0 ambiguous
@@ -648,11 +619,9 @@ namespace cwg1589 {   // cwg1589: 3.7 c++11
     //   since-cxx11-note@#cwg1589-f2-ilist {{candidate function}}
     //   since-cxx11-note@#cwg1589-f2-ilist-int {{candidate function}}
   }
-#endif
 } // namespace cwg1589
 
 namespace cwg1591 {  //cwg1591. Deducing array bound and element type from initializer list
-#if __cplusplus >= 201103L
   template<class T, int N> int h(T const(&)[N]);
   int X = h({1,2,3});              // T deduced to int, N deduced to 3
 
@@ -733,5 +702,4 @@ namespace cwg1591 {  //cwg1591. Deducing array bound and element type from initi
 
     short *ps = i(Arr<int>{1, 2});  // OK #5
   }
-#endif
 } // namespace cwg1591

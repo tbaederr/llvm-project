@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -triple %itanium_abi_triple -pedantic -verify %s
-// RUN: %clang_cc1 -triple %itanium_abi_triple -pedantic -verify -std=c++98 %s
 // RUN: %clang_cc1 -triple %itanium_abi_triple -pedantic -verify -std=c++11 %s
 
 int* f(int) { return 0; }
@@ -57,18 +56,10 @@ double* k(bool);
 
 void test_k() {
   int* ip1 = k("foo");
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{conversion from string literal to 'char *' is deprecated}}
-#else
-  // expected-error@-4 {{cannot initialize a variable of type 'int *' with an rvalue of type 'double *'}}
-#endif
+  // expected-error@-1 {{cannot initialize a variable of type 'int *' with an rvalue of type 'double *'}}
 
   int* ip2 = k(("foo"));
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{conversion from string literal to 'char *' is deprecated}}
-#else
-  // expected-error@-4 {{cannot initialize a variable of type 'int *' with an rvalue of type 'double *'}}
-#endif
+  // expected-error@-1 {{cannot initialize a variable of type 'int *' with an rvalue of type 'double *'}}
   double* dp1 = k(L"foo");
 }
 
@@ -77,11 +68,7 @@ double* l(bool);
 
 void test_l() {
   int* ip1 = l(L"foo");
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{conversion from string literal to 'wchar_t *' is deprecated}}
-#else
-  // expected-error@-4 {{cannot initialize a variable of type 'int *' with an rvalue of type 'double *'}}
-#endif
+  // expected-error@-1 {{cannot initialize a variable of type 'int *' with an rvalue of type 'double *'}}
   double* dp1 = l("foo");
 }
 
@@ -100,11 +87,7 @@ void test_n(E* e) {
   char ca[7];
   int* ip1 = n(ca);
   int* ip2 = n("foo");
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{conversion from string literal to 'char *' is deprecated}}
-#else
-  // expected-warning@-4 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
-#endif
+  // expected-warning@-1 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
   float fa[7];
   double* dp1 = n(fa);
 
@@ -625,15 +608,7 @@ void test5() {
 namespace PR20218 {
   void f(void (*const &)()); // expected-note 2{{candidate}}
   void f(void (&&)()) = delete; // expected-note 2{{candidate}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{rvalue references are a C++11 extension}}
-  // expected-warning@-3 {{deleted function definitions are a C++11 extension}}
-#endif
   void g(void (&&)()) = delete; // expected-note 2{{candidate}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{rvalue references are a C++11 extension}}
-  // expected-warning@-3 {{deleted function definitions are a C++11 extension}}
-#endif
   void g(void (*const &)()); // expected-note 2{{candidate}}
 
   void x();
@@ -652,11 +627,6 @@ namespace StringLiteralToCharAmbiguity {
   void f(char *, int);
   void f(const char *, unsigned);
   void g() { f("foo", 0); }
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{call to 'f' is ambiguous}}
-  // expected-note@-5 {{candidate function}}
-  // expected-note@-5 {{candidate function}}
-#endif
 }
 
 namespace ProduceNotesAfterSFINAEFailure {

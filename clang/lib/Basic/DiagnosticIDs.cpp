@@ -957,9 +957,7 @@ unsigned DiagnosticIDs::getCompatDiagId(const LangOptions &LangOpts,
       return 2017;
     if (LangOpts.CPlusPlus14)
       return 2014;
-    if (LangOpts.CPlusPlus11)
-      return 2011;
-    return 1998;
+    return 2011;
   }();
 
   const CompatDiag &D = Diags[CompatDiagId];

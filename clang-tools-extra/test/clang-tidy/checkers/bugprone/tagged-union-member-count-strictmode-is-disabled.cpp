@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s bugprone-tagged-union-member-count %t \
+// RUN: %check_clang_tidy -std=c++11-or-later %s bugprone-tagged-union-member-count %t \
 // RUN:   -config='{CheckOptions: { \
 // RUN:     bugprone-tagged-union-member-count.StrictMode: false, \
 // RUN:  }}' --

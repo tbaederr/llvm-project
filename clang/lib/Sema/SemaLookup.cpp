@@ -1036,15 +1036,13 @@ void Sema::ForceDeclarationOfImplicitMembers(CXXRecordDecl *Class) {
   if (Class->needsImplicitCopyAssignment())
     DeclareImplicitCopyAssignment(Class);
 
-  if (getLangOpts().CPlusPlus11) {
-    // If the move constructor has not yet been declared, do so now.
-    if (Class->needsImplicitMoveConstructor())
-      DeclareImplicitMoveConstructor(Class);
+  // If the move constructor has not yet been declared, do so now.
+  if (Class->needsImplicitMoveConstructor())
+    DeclareImplicitMoveConstructor(Class);
 
-    // If the move assignment operator has not yet been declared, do so now.
-    if (Class->needsImplicitMoveAssignment())
-      DeclareImplicitMoveAssignment(Class);
-  }
+  // If the move assignment operator has not yet been declared, do so now.
+  if (Class->needsImplicitMoveAssignment())
+    DeclareImplicitMoveAssignment(Class);
 
   // If the destructor has not yet been declared, do so now.
   if (Class->needsImplicitDestructor())
@@ -1087,8 +1085,7 @@ static void DeclareImplicitMemberFunctionsWithName(Sema &S,
           S.DeclareImplicitDefaultConstructor(Class);
         if (Record->needsImplicitCopyConstructor())
           S.DeclareImplicitCopyConstructor(Class);
-        if (S.getLangOpts().CPlusPlus11 &&
-            Record->needsImplicitMoveConstructor())
+        if (Record->needsImplicitMoveConstructor())
           S.DeclareImplicitMoveConstructor(Class);
       }
     break;
@@ -1109,8 +1106,7 @@ static void DeclareImplicitMemberFunctionsWithName(Sema &S,
         CXXRecordDecl *Class = const_cast<CXXRecordDecl *>(Record);
         if (Record->needsImplicitCopyAssignment())
           S.DeclareImplicitCopyAssignment(Class);
-        if (S.getLangOpts().CPlusPlus11 &&
-            Record->needsImplicitMoveAssignment())
+        if (Record->needsImplicitMoveAssignment())
           S.DeclareImplicitMoveAssignment(Class);
       }
     }
@@ -3470,7 +3466,7 @@ Sema::LookupSpecialMember(CXXRecordDecl *RD, CXXSpecialMemberKind SM,
           DeclareImplicitCopyConstructor(RD);
         });
       }
-      if (getLangOpts().CPlusPlus11 && RD->needsImplicitMoveConstructor()) {
+      if (RD->needsImplicitMoveConstructor()) {
         runWithSufficientStackSpace(RD->getLocation(), [&] {
           DeclareImplicitMoveConstructor(RD);
         });
@@ -3482,7 +3478,7 @@ Sema::LookupSpecialMember(CXXRecordDecl *RD, CXXSpecialMemberKind SM,
           DeclareImplicitCopyAssignment(RD);
         });
       }
-      if (getLangOpts().CPlusPlus11 && RD->needsImplicitMoveAssignment()) {
+      if (RD->needsImplicitMoveAssignment()) {
         runWithSufficientStackSpace(RD->getLocation(), [&] {
           DeclareImplicitMoveAssignment(RD);
         });
@@ -3647,7 +3643,7 @@ DeclContext::lookup_result Sema::LookupConstructors(CXXRecordDecl *Class) {
         DeclareImplicitDefaultConstructor(Class);
       if (Class->needsImplicitCopyConstructor())
         DeclareImplicitCopyConstructor(Class);
-      if (getLangOpts().CPlusPlus11 && Class->needsImplicitMoveConstructor())
+      if (Class->needsImplicitMoveConstructor())
         DeclareImplicitMoveConstructor(Class);
     });
   }
@@ -5212,13 +5208,11 @@ static void AddKeywordsToConsumer(Sema &SemaRef,
       Consumer.addKeywordResult("typename");
       Consumer.addKeywordResult("wchar_t");
 
-      if (SemaRef.getLangOpts().CPlusPlus11) {
-        Consumer.addKeywordResult("char16_t");
-        Consumer.addKeywordResult("char32_t");
-        Consumer.addKeywordResult("constexpr");
-        Consumer.addKeywordResult("decltype");
-        Consumer.addKeywordResult("thread_local");
-      }
+      Consumer.addKeywordResult("char16_t");
+      Consumer.addKeywordResult("char32_t");
+      Consumer.addKeywordResult("constexpr");
+      Consumer.addKeywordResult("decltype");
+      Consumer.addKeywordResult("thread_local");
     }
 
     if (SemaRef.getLangOpts().GNUKeywords)
@@ -5257,10 +5251,8 @@ static void AddKeywordsToConsumer(Sema &SemaRef,
           cast<CXXMethodDecl>(SemaRef.CurContext)->isInstance())
         Consumer.addKeywordResult("this");
 
-      if (SemaRef.getLangOpts().CPlusPlus11) {
-        Consumer.addKeywordResult("alignof");
-        Consumer.addKeywordResult("nullptr");
-      }
+      Consumer.addKeywordResult("alignof");
+      Consumer.addKeywordResult("nullptr");
     }
 
     if (SemaRef.getLangOpts().C11) {
@@ -5313,9 +5305,7 @@ static void AddKeywordsToConsumer(Sema &SemaRef,
 
     if (SemaRef.getLangOpts().CPlusPlus) {
       Consumer.addKeywordResult("using");
-
-      if (SemaRef.getLangOpts().CPlusPlus11)
-        Consumer.addKeywordResult("static_assert");
+      Consumer.addKeywordResult("static_assert");
     }
   }
 }

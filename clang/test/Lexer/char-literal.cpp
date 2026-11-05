@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -triple x86_64-apple-darwin -std=c++03 -Wfour-char-constants -fsyntax-only -verify=cxx03,expected %s
 // RUN: %clang_cc1 -triple x86_64-apple-darwin -std=c++11 -Wfour-char-constants -fsyntax-only -verify=cxx,expected %s
 // RUN: %clang_cc1 -triple x86_64-apple-darwin -std=c++17 -Wfour-char-constants -fsyntax-only -verify=cxx,expected %s
 // RUN: %clang_cc1 -triple x86_64-apple-darwin -std=c++20 -Wfour-char-constants -fsyntax-only -verify=cxx,expected %s
@@ -18,7 +17,6 @@ int c = 'APPS'; // expected-warning {{multi-character character constant}}
 char d = '⌘'; // expected-error {{character too large for enclosing character literal type}}
 char e = '\u2318'; // expected-error {{character too large for enclosing character literal type}}
 
-#if !defined(__cplusplus) || __cplusplus > 201100L
 #ifdef __cplusplus
 auto f = '\xE2\x8C\x98'; // expected-warning {{multi-character character constant}}
 #endif
@@ -123,13 +121,10 @@ _Static_assert(U"\U0000DFFF"[0], ""); // expected-error {{invalid universal char
 _Static_assert(U"\U0010FFFF"[0] == 0x0010FFFF, "");
 _Static_assert(U"\U00110000"[0], ""); // expected-error {{invalid universal character}}
 
-#endif // !defined(__cplusplus) || __cplusplus > 201100L
 
 _Static_assert('\u0024' == '$', "");
 _Static_assert('\u0040' == '@', "");
 _Static_assert('\u0060' == '`', "");
 
-_Static_assert('\u0061' == 'a', "");  // c11-error {{character 'a' cannot be specified by a universal character name}} \
-                                      // cxx03-error {{character 'a' cannot be specified by a universal character name}}
-_Static_assert('\u0000' == '\0', ""); // c11-error {{universal character name refers to a control character}} \
-                                      // cxx03-error {{universal character name refers to a control character}}
+_Static_assert('\u0061' == 'a', "");  // c11-error {{character 'a' cannot be specified by a universal character name}}
+_Static_assert('\u0000' == '\0', ""); // c11-error {{universal character name refers to a control character}}

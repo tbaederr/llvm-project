@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s readability-redundant-nested-if %t -- -- \
+// RUN: %check_clang_tidy -std=c++11-or-later %s readability-redundant-nested-if %t -- -- \
 // RUN:   -I %S -fno-delayed-template-parsing
 
 #include "Inputs/redundant-nested-if/common.h"

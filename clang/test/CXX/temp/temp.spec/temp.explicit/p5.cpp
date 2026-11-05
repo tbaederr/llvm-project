@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wc++11-compat %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 -Wc++11-compat %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 namespace N {
@@ -17,11 +16,7 @@ template class Q<int>; // expected-error{{explicit instantiation of non-template
 // on 10/27/2009
 using N::Y; 
 template class Y<int>;
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{explicit instantiation of 'N::Y' must occur in namespace 'N'}}
-#else
-// expected-error@-4 {{explicit instantiation of 'N::Y' must occur in namespace 'N'}}
-#endif
+// expected-error@-1 {{explicit instantiation of 'N::Y' must occur in namespace 'N'}}
 
 template class N::Y<char*>; 
 template void N::Y<double>::mf();

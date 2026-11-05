@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -flax-vector-conversions=all -triple x86_64-apple-darwin10 -fsyntax-only -verify %s
 // RUN: %clang_cc1 -flax-vector-conversions=all -triple x86_64-apple-darwin10 -fsyntax-only -verify -fexperimental-new-constant-interpreter %s
-// RUN: %clang_cc1 -flax-vector-conversions=all -triple x86_64-apple-darwin10 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -flax-vector-conversions=all -triple x86_64-apple-darwin10 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -flax-vector-conversions=all -triple x86_64-apple-darwin10 -fsyntax-only -verify -std=c++20 %s
 // RUN: %clang_cc1 -flax-vector-conversions=integer -triple x86_64-apple-darwin10 -fsyntax-only -verify %s -DNO_LAX_FLOAT
@@ -129,9 +128,7 @@ void casts(longlong16 ll16, longlong16_e ll16e) {
 
 template<typename T>
 struct convertible_to { // expected-note 3 {{candidate function (the implicit copy assignment operator) not viable}}
-#if __cplusplus >= 201103L // C++11 or later
-// expected-note@-2 3 {{candidate function (the implicit move assignment operator) not viable}}
-#endif
+// expected-note@-1 3 {{candidate function (the implicit move assignment operator) not viable}}
   operator T() const;
 };
 
@@ -339,11 +336,9 @@ typedef bool bad __attribute__((__vector_size__(16)));  // expected-error {{inva
 namespace GH225037 {
 enum E { A };
 
-#if __cplusplus >= 201103L
 enum class ScopedE { A };
 typedef ScopedE ScopedEnumVector __attribute__((ext_vector_type(4))); // expected-error {{invalid vector element type 'ScopedE'}}
 typedef ScopedE ScopedEnumSizeVector __attribute__((vector_size(16))); // expected-error {{invalid vector element type 'ScopedE'}}
-#endif
 
 template <typename T> struct Vector {
   // Rebuilding a fixed-size extended vector currently loses the attribute location.
@@ -444,7 +439,6 @@ struct NormalMember {
   float k;
 };
 
-#if __cplusplus >= 201103L
 // This should not diagnose, since the constant evaluator (during instantiation)
 // can tell that this isn't a truncation.
 template <typename T>
@@ -503,12 +497,10 @@ struct PR45298Consumer {
 
   PR45298<T> s;
 };
-#endif // __cplusplus >= 201103L
 
 void use() {
   float4 theFloat4;
   NormalMember<double>().f(theFloat4);
-#if __cplusplus >= 201103L
   ConstantValueNoDiag<double>().f(theFloat4);
   ConstantValueNoDiagDependentValue<double, 1>().f(theFloat4);
   DiagTrunc<double>().f(theFloat4);
@@ -517,7 +509,6 @@ void use() {
   // expected-note@+1{{in instantiation of member function}}
   DiagTruncDependentType<double>().f(theFloat4);
   PR45298Consumer<double>().f(theFloat4);
-#endif // __cplusplus >= 201103L
 }
 }
 
@@ -797,7 +788,6 @@ void test_enum_vector_scalar(Enum ea, v2u v2ua) {
   // ea <<= v2ua; // not-expected-error{{assigning to 'enum Enum' from incompatible type 'v2u'}}
 }
 
-#if __cplusplus >= 201103L // C++11 or later
 enum class EnumClass { ENUM };
 
 void test_scoped_enum_vector(EnumClass ea, v2u v2ua) {
@@ -805,7 +795,6 @@ void test_scoped_enum_vector(EnumClass ea, v2u v2ua) {
   (void)(v2ua + ea); // expected-error{{cannot convert between vector and non-scalar values}}
   (void)(ea + v2ua); // expected-error{{cannot convert between vector and non-scalar values}}
 }
-#endif
 }
 
 namespace GH105486 {
@@ -828,12 +817,10 @@ typedef int v_ext_neg_size __attribute__((ext_vector_type(-8))); // expected-err
 typedef int v_ext_neg_size2 __attribute__((ext_vector_type(-1 * 8))); // expected-error{{vector must have non-negative size}}
 
 
-#if __cplusplus >= 201103L
 
 template <int N> using templated_v_size = int  __attribute__((vector_size(N))); // expected-error{{vector must have non-negative size}}
 templated_v_size<-8> templated_v_neg_size; //expected-note{{in instantiation of template type alias 'templated_v_size' requested here}}
 
-#endif
 
 namespace GH173347 {
 typedef short __attribute__((__vector_size__(8))) V;

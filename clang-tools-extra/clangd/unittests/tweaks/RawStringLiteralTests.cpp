@@ -43,13 +43,6 @@ TEST_F(RawStringLiteralTest, TestC) {
   EXPECT_UNAVAILABLE(R"c(const char *a = ^"^f^o^o^\^n^";)c");
 }
 
-TEST_F(RawStringLiteralTest, TestCpp98) {
-  Context = File;
-  ExtraArgs = {"-std=c++98"}; // raw strings are unavailable
-                              // in versions prior to C++11
-  EXPECT_UNAVAILABLE(R"cpp(const char *a = ^"^f^o^o^\^n^";)cpp");
-}
-
 } // namespace
 } // namespace clangd
 } // namespace clang

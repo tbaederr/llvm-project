@@ -686,7 +686,7 @@ public:
     //  - perform a synchronization operation or an atomic operation.
     //
     // Hence each function is 'mustprogress' in C++11 or later.
-    return getLangOpts().CPlusPlus11;
+    return getLangOpts().CPlusPlus;
   }
 
   /// Returns true if a loop must make progress, which means the mustprogress

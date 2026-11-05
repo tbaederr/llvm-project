@@ -92,8 +92,8 @@ void UnconventionalAssignOperatorCheck::check(
           << Method->getParent()->getName();
     if (Result.Nodes.getNodeAs<CXXMethodDecl>("ArgumentType"))
       diag(Method->getBeginLoc(),
-           "operator=() should take '%0 const&'%select{|, '%0&&'}1 or '%0'")
-          << Method->getParent()->getName() << getLangOpts().CPlusPlus11;
+           "operator=() should take '%0 const&', '%0&&' or '%0'")
+          << Method->getParent()->getName();
     if (Result.Nodes.getNodeAs<CXXMethodDecl>("cv"))
       diag(Method->getBeginLoc(),
            "operator=() should not be marked '%select{const|virtual}0'")

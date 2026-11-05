@@ -1,21 +1,20 @@
-// RUN: %clang_cc1 -std=c++03 -fsyntax-only %s
 // RUN: %clang_cc1 -std=c++11 -DCXX11 -fsyntax-only %s
 // RUN: %clang_cc1 -std=c++20 -DCXX11 -DCXX20 -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fdeclspec -DDECLSPEC -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fms-extensions -DDECLSPEC -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fborland-extensions -DDECLSPEC -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fms-extensions -fno-declspec -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fborland-extensions -fno-declspec -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fno-declspec -fdeclspec -DDECLSPEC -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fdeclspec -fno-declspec -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fms-extensions -fno-declspec -fdeclspec -DDECLSPEC -fsyntax-only %s
-// RUN: %clang_cc1 -std=c++03 -fms-extensions -fdeclspec -fno-declspec -fsyntax-only %s
-// RUN: %clang -std=c++03 -target i686-windows-msvc -DMS -DDECLSPEC -fsyntax-only %s
-// RUN: %clang -std=c++03 -target x86_64-scei-ps4 -DDECLSPEC -fsyntax-only %s
-// RUN: %clang -std=c++03 -target i686-windows-msvc -DMS -fno-declspec -fsyntax-only %s
-// RUN: %clang -std=c++03 -target x86_64-scei-ps4 -fno-declspec -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fdeclspec -DDECLSPEC -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fms-extensions -DDECLSPEC -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fborland-extensions -DDECLSPEC -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fms-extensions -fno-declspec -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fborland-extensions -fno-declspec -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fno-declspec -fdeclspec -DDECLSPEC -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fdeclspec -fno-declspec -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fms-extensions -fno-declspec -fdeclspec -DDECLSPEC -fsyntax-only %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -fms-extensions -fdeclspec -fno-declspec -fsyntax-only %s
+// RUN: %clang -std=c++11 -DCXX11 -target i686-windows-msvc -DMS -DDECLSPEC -fsyntax-only %s
+// RUN: %clang -std=c++11 -DCXX11 -target x86_64-scei-ps4 -DDECLSPEC -fsyntax-only %s
+// RUN: %clang -std=c++11 -DCXX11 -target i686-windows-msvc -DMS -fno-declspec -fsyntax-only %s
+// RUN: %clang -std=c++11 -DCXX11 -target x86_64-scei-ps4 -fno-declspec -fsyntax-only %s
 
-// RUN: %clang_cc1 -std=c++98 -DFutureKeyword -fsyntax-only -Wc++11-compat -Wc++20-compat -verify=cxx98 %s
+// RUN: %clang_cc1 -std=c++11 -DCXX11 -DFutureKeyword -fsyntax-only -Wc++20-compat -verify=cxx11 %s
 
 #define IS_KEYWORD(NAME) _Static_assert(!__is_identifier(NAME), #NAME)
 #define NOT_KEYWORD(NAME) _Static_assert(__is_identifier(NAME), #NAME)
@@ -82,23 +81,12 @@ IS_TYPE(__char32_t);
 
 #ifdef FutureKeyword
 
-int nullptr; // cxx98-warning {{'nullptr' is a keyword in C++11}}
-int decltype;  // cxx98-warning {{'decltype' is a keyword in C++11}}
-int alignof;  // cxx98-warning {{'alignof' is a keyword in C++11}}
-int alignas;  // cxx98-warning {{'alignas' is a keyword in C++11}}
-int char16_t;  // cxx98-warning {{'char16_t' is a keyword in C++11}}
-int char32_t;  // cxx98-warning {{'char32_t' is a keyword in C++11}}
-int constexpr;  // cxx98-warning {{'constexpr' is a keyword in C++11}}
-int noexcept;  // cxx98-warning {{'noexcept' is a keyword in C++11}}
-int static_assert; // cxx98-warning {{'static_assert' is a keyword in C++11}}
-char thread_local; // cxx98-warning {{'thread_local' is a keyword in C++11}}
-
-int co_await; // cxx98-warning {{'co_await' is a keyword in C++20}}
-char co_return; // cxx98-warning {{'co_return' is a keyword in C++20}}
-char co_yield; // cxx98-warning {{'co_yield' is a keyword in C++20}}
-int constinit; // cxx98-warning {{'constinit' is a keyword in C++20}}
-int consteval; // cxx98-warning {{'consteval' is a keyword in C++20}}
-int requires; // cxx98-warning {{'requires' is a keyword in C++20}}
-int concept; // cxx98-warning {{'concept' is a keyword in C++20}}
+int co_await; // cxx11-warning {{'co_await' is a keyword in C++20}}
+char co_return; // cxx11-warning {{'co_return' is a keyword in C++20}}
+char co_yield; // cxx11-warning {{'co_yield' is a keyword in C++20}}
+int constinit; // cxx11-warning {{'constinit' is a keyword in C++20}}
+int consteval; // cxx11-warning {{'consteval' is a keyword in C++20}}
+int requires; // cxx11-warning {{'requires' is a keyword in C++20}}
+int concept; // cxx11-warning {{'concept' is a keyword in C++20}}
 
 #endif

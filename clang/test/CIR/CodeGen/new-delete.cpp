@@ -1,8 +1,8 @@
-// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -fclangir -emit-cir -std=c++98 -fcxx-exceptions -fexceptions -o %t.cir
+// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -fclangir -emit-cir -std=c++11 -fcxx-exceptions -fexceptions -o %t.cir
 // RUN: FileCheck -check-prefixes=CIR --input-file=%t.cir %s
-// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -fclangir -emit-llvm -std=c++98 -fcxx-exceptions -fexceptions -o %t-cir.ll
+// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -fclangir -emit-llvm -std=c++11 -fcxx-exceptions -fexceptions -o %t-cir.ll
 // RUN: FileCheck -check-prefixes=LLVM --input-file=%t-cir.ll %s
-// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -emit-llvm -std=c++98 -fcxx-exceptions -fexceptions -o %t.ll
+// RUN: %clang_cc1 -no-enable-noundef-analysis %s -triple=x86_64-linux-gnu -emit-llvm -std=c++11 -fcxx-exceptions -fexceptions -o %t.ll
 // RUN: FileCheck -check-prefixes=OGCG --input-file=%t.ll %s
 
 
@@ -389,7 +389,7 @@ C *test_new_delete_conditional_with_placement(bool cond, int tag) {
 // LLVM: [[PL_DO_DEL]]:
 // LLVM:   %[[PL_LOAD_PTR:.*]] = load ptr, ptr %[[PL_SAVE_PTR]], align 8
 // LLVM:   %[[PL_LOAD_TAG:.*]] = load i32, ptr %[[PL_SAVE_TAG]], align 4
-// LLVM:   invoke void @_ZdlPvi(ptr %[[PL_LOAD_PTR]], i32 %[[PL_LOAD_TAG]])
+// LLVM:   call void @_ZdlPvi(ptr %[[PL_LOAD_PTR]], i32 %[[PL_LOAD_TAG]])
 
 // OGCG-LABEL: @_Z42test_new_delete_conditional_with_placementbi
 // OGCG:   store i1 false, ptr %[[OGP_FLAG:.*]], align 1
@@ -410,7 +410,7 @@ C *test_new_delete_conditional_with_placement(bool cond, int tag) {
 // OGCG: [[OGP_DO_DEL]]:
 // OGCG:   %[[OGP_LOAD_PTR:.*]] = load ptr, ptr %[[OGP_SAVE_PTR]], align 8
 // OGCG:   %[[OGP_LOAD_TAG:.*]] = load i32, ptr %[[OGP_SAVE_TAG]], align 4
-// OGCG:   invoke void @_ZdlPvi(ptr %[[OGP_LOAD_PTR]], i32 %[[OGP_LOAD_TAG]])
+// OGCG:   call void @_ZdlPvi(ptr %[[OGP_LOAD_PTR]], i32 %[[OGP_LOAD_TAG]])
 
 struct D {
   D();
@@ -473,7 +473,7 @@ D *test_new_delete_conditional_with_size(bool cond) {
 // LLVM: [[SD_DO_DEL]]:
 // LLVM:   %[[SD_LOAD_PTR:.*]] = load ptr, ptr %[[SD_SAVE_PTR]], align 8
 // LLVM:   %[[SD_LOAD_SIZE:.*]] = load i64, ptr %[[SD_SAVE_SIZE]], align 8
-// LLVM:   invoke void @_ZN1DdlEPvm(ptr %[[SD_LOAD_PTR]], i64 %[[SD_LOAD_SIZE]])
+// LLVM:   call void @_ZN1DdlEPvm(ptr %[[SD_LOAD_PTR]], i64 %[[SD_LOAD_SIZE]])
 
 // OGCG-LABEL: @_Z37test_new_delete_conditional_with_sizeb
 // OGCG:   store i1 false, ptr %[[OGS_FLAG:.*]], align 1
@@ -491,7 +491,7 @@ D *test_new_delete_conditional_with_size(bool cond) {
 // OGCG:   br i1 %[[OGS_ACTIVE]], label %[[OGS_DO_DEL:.*]], label %[[OGS_SKIP_DEL:.*]]
 // OGCG: [[OGS_DO_DEL]]:
 // OGCG:   %[[OGS_LOAD_PTR:.*]] = load ptr, ptr %[[OGS_SAVE]], align 8
-// OGCG:   invoke void @_ZN1DdlEPvm(ptr %[[OGS_LOAD_PTR]], i64 1)
+// OGCG:   call void @_ZN1DdlEPvm(ptr %[[OGS_LOAD_PTR]], i64 1)
 
 D *test_new_delete_conditional_array(bool cond, int n) {
   return cond ? new D[n] : 0;
@@ -551,7 +551,7 @@ D *test_new_delete_conditional_array(bool cond, int n) {
 // LLVM: [[ARR_DO_DEL]]:
 // LLVM:   %[[ARR_LOAD_PTR:.*]] = load ptr, ptr %[[ARR_SAVE_PTR]], align 8
 // LLVM:   %[[ARR_LOAD_SIZE:.*]] = load i64, ptr %[[ARR_SAVE_SIZE]], align 8
-// LLVM:   invoke void @_ZN1DdaEPvm(ptr %[[ARR_LOAD_PTR]], i64 %[[ARR_LOAD_SIZE]])
+// LLVM:   call void @_ZN1DdaEPvm(ptr %[[ARR_LOAD_PTR]], i64 %[[ARR_LOAD_SIZE]])
 
 // OGCG-LABEL: @_Z33test_new_delete_conditional_arraybi
 // OGCG:   store i1 false, ptr %[[OGA_FLAG:.*]], align 1
@@ -571,7 +571,7 @@ D *test_new_delete_conditional_array(bool cond, int n) {
 // OGCG: [[OGA_DO_DEL]]:
 // OGCG:   %[[OGA_LOAD_PTR:.*]] = load ptr, ptr %[[OGA_SAVE_PTR]], align 8
 // OGCG:   %[[OGA_LOAD_SIZE:.*]] = load i64, ptr %[[OGA_SAVE_SIZE]], align 8
-// OGCG:   invoke void @_ZN1DdaEPvm(ptr %[[OGA_LOAD_PTR]], i64 %[[OGA_LOAD_SIZE]])
+// OGCG:   call void @_ZN1DdaEPvm(ptr %[[OGA_LOAD_PTR]], i64 %[[OGA_LOAD_SIZE]])
 
 // LLVM-DAG: attributes #[[ATTR_BUILTIN_NEW]] = {{{.*}}builtin{{.*}}memory(inaccessiblemem: readwrite, errnomem: write){{.*}}}
 // LLVM-DAG: attributes #[[ATTR_BUILTIN_DEL]] = {{{.*}}builtin{{.*}}}

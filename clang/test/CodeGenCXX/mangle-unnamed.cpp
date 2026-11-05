@@ -1,5 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -emit-llvm %s -o - -triple=x86_64-apple-darwin10 | FileCheck %s
-// RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++98 -emit-llvm %s -o - -triple=x86_64-apple-darwin10 | FileCheck %s %}
 // RUN: %clang_cc1 -std=c++11 -emit-llvm %s -o - -triple=x86_64-apple-darwin10 | FileCheck %s
 // RUN: %if cir-enabled %{ %clang_cc1 -fclangir -std=c++11 -emit-llvm %s -o - -triple=x86_64-apple-darwin10 | FileCheck %s %}
 
@@ -49,20 +47,6 @@ int f5() {
   // CHECK: _ZZ2f5vE1a
   return a;
 }
-
-#if __cplusplus <= 199711L
-int f6() {
-  static union {
-    union {
-      int : 1;
-    };
-    int b;
-  };
-  
-  // CXX98: _ZZ2f6vE1b
-  return b;
-}
-#endif
 
 int f7() {
   static union {

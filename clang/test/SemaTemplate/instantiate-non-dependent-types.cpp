@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx98-14 %s
+// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx17 %std_cxx11-14 %s
 // RUN: %clang_cc1 -fsyntax-only -verify %std_cxx17- %s
 template<typename T>
 struct X1 {

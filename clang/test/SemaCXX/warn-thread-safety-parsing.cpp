@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wthread-safety %s
-// RUN: %clang_cc1 -fsyntax-only -verify -Wthread-safety -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wthread-safety -std=c++11 %s
 
 #define LOCKABLE            __attribute__ ((lockable))
@@ -660,7 +659,6 @@ template int elf_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int elf_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int elf_variadic_template(Mus&... mus) EXCLUSIVE_LOCK_FUNCTION(mus...) {}
@@ -669,7 +667,6 @@ template int elf_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int elf_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -754,7 +751,6 @@ template int slf_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int slf_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int slf_variadic_template(Mus&... mus) SHARED_LOCK_FUNCTION(mus...) {}
@@ -763,7 +759,6 @@ template int slf_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int slf_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -849,7 +844,6 @@ template int etf_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int etf_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int etf_variadic_template(Mus&... mus) EXCLUSIVE_TRYLOCK_FUNCTION(1, mus...) {}
@@ -858,7 +852,6 @@ template int etf_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int etf_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -945,7 +938,6 @@ template int stf_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int stf_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int stf_variadic_template(Mus&... mus) SHARED_TRYLOCK_FUNCTION(1, mus...) {}
@@ -954,7 +946,6 @@ template int stf_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int stf_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -1042,7 +1033,6 @@ template int uf_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int uf_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int uf_variadic_template(Mus&... mus) UNLOCK_FUNCTION(mus...) {}
@@ -1051,7 +1041,6 @@ template int uf_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int uf_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -1204,7 +1193,6 @@ template int le_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int le_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int le_variadic_template(Mus&... mus) LOCKS_EXCLUDED(mus...) {}
@@ -1213,7 +1201,6 @@ template int le_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int le_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -1289,7 +1276,6 @@ template int elr_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int elr_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int elr_variadic_template(Mus&... mus) EXCLUSIVE_LOCKS_REQUIRED(mus...) {}
@@ -1298,7 +1284,6 @@ template int elr_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int elr_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 
@@ -1376,7 +1361,6 @@ template int slr_template<Mutex>(Mutex&);
 // FIXME: warn on template instantiation.
 template int slr_template<UnlockableMu>(UnlockableMu&);
 
-#if __cplusplus >= 201103
 
 template<typename... Mus>
 int slr_variadic_template(Mus&... mus) SHARED_LOCKS_REQUIRED(mus...) {}
@@ -1385,7 +1369,6 @@ template int slr_variadic_template<Mutex, Mutex>(Mutex&, Mutex&);
 // FIXME: warn on template instantiation.
 template int slr_variadic_template<Mutex, UnlockableMu>(Mutex&, UnlockableMu&);
 
-#endif
 
 
 //-----------------------------------------//
@@ -1500,9 +1483,6 @@ public:
 
   static void foo5()    EXCLUSIVE_LOCKS_REQUIRED(mu);
 //FIXME: Bug 32066 - Error should be emitted irrespective of C++ dialect
-#if __cplusplus <= 199711L
-  // expected-error@-3 {{invalid use of member 'mu' in static member function}}
-#endif
 
   template <class T>
   void foo6() EXCLUSIVE_LOCKS_REQUIRED(T::statmu) { }
@@ -1698,22 +1678,13 @@ class Foo {
 
   static int si GUARDED_BY(mu);
 //FIXME: Bug 32066 - Error should be emitted irrespective of C++ dialect
-#if __cplusplus <= 199711L
-  // expected-error@-3 {{invalid use of non-static data member 'mu'}}
-#endif
 
   static void foo() EXCLUSIVE_LOCKS_REQUIRED(mu);
 //FIXME: Bug 32066 - Error should be emitted irrespective of C++ dialect
-#if __cplusplus <= 199711L
-  // expected-error@-3 {{invalid use of member 'mu' in static member function}}
-#endif
 
   friend FooStream& operator<<(FooStream& s, const Foo& f)
     EXCLUSIVE_LOCKS_REQUIRED(mu);
 //FIXME: Bug 32066 - Error should be emitted irrespective of C++ dialect
-#if __cplusplus <= 199711L
-    // expected-error@-3 {{invalid use of non-static data member 'mu'}}
-#endif
 };
 
 
@@ -1744,7 +1715,6 @@ public:
 }  // end namespace FunctionAttributesInsideClass_ICE_Test
 
 
-#if __cplusplus >= 201103
 namespace CRASH_POST_R301735 {
   class SomeClass {
    public:
@@ -1754,7 +1724,6 @@ namespace CRASH_POST_R301735 {
      Mutex mu_;
    };
 }
-#endif
 
 //-----------------------------------------//
 //  Function pointer attributes

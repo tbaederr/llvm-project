@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++98-or-later %s readability-inconsistent-ifelse-braces %t
+// RUN: %check_clang_tidy -std=c++11-or-later %s readability-inconsistent-ifelse-braces %t
 
 #define MACRO_COND(x) cond(x)
 #define MACRO_FUN (void)0

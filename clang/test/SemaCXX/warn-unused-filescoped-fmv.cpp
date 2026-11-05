@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -triple arm64-apple-darwin -fsyntax-only -verify -Wunused -std=c++98 %s
 // RUN: %clang_cc1 -triple arm64-apple-darwin -fsyntax-only -verify -Wunused -std=c++14 %s
 
 __attribute__((target_version("fp16")))

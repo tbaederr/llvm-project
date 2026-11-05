@@ -1,13 +1,11 @@
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx11 %s
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98 -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx11 -std=c++11 %s
 
 template<typename T, T Divisor>
 class X {
 public:
   static const T value = 10 / Divisor; // expected-error{{in-class initializer for static data member is not a constant expression}} \
-  // cxx11-note {{division by zero}} \
-  // cxx98-note {{subexpression not valid}}
+  // cxx11-note {{division by zero}}
 };
 
 int array1[X<int, 2>::value == 5? 1 : -1];
@@ -17,12 +15,8 @@ X<int, 0> xi0; // expected-note{{in instantiation of template class 'X<int, 0>' 
 template<typename T>
 class Y {
   static const T value = 0; 
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{in-class initializer for static data member of type 'const float' is a GNU extension}}
-#else
-// expected-error@-4 {{in-class initializer for static data member of type 'const float' requires 'constexpr' specifier}}
-// expected-note@-5 {{add 'constexpr'}}
-#endif
+// expected-error@-1 {{in-class initializer for static data member of type 'const float' requires 'constexpr' specifier}}
+// expected-note@-2 {{add 'constexpr'}}
 };
 
 Y<float> fy; // expected-note{{in instantiation of template class 'Y<float>' requested here}}
@@ -139,7 +133,6 @@ void testStaticVarWithTypedefString() {
 }
 
 namespace ArrayBound {
-#if __cplusplus >= 201103L
   template<typename T> void make_unique(T &&);
 
   template<typename> struct Foo {
@@ -150,7 +143,6 @@ namespace ArrayBound {
     static void g2() { const char (&ref)[5] = kMessage; } // expected-error {{could not bind}}
   };
   template void Foo<int>::f();
-#endif
 
   template<typename> struct Bar {
     static const char kMessage[];

@@ -3695,8 +3695,7 @@ TemplateDeductionResult Sema::SubstituteExplicitTemplateArguments(
       ThisTypeQuals = Method->getMethodQualifiers();
     }
 
-    CXXThisScopeRAII ThisScope(*this, ThisContext, ThisTypeQuals,
-                               getLangOpts().CPlusPlus11);
+    CXXThisScopeRAII ThisScope(*this, ThisContext, ThisTypeQuals);
 
     ResultType =
         SubstType(Proto->getReturnType(), MLTAL,

@@ -16,10 +16,6 @@ defm c23_pp_directive : C23Compat<
   "use of a '#%select{<BUG IF SEEN>|elifdef|elifndef}0' directive is", /*ext_warn*/true>;
 defm c23_pp_embed_directive : C23Compat<"#embed is", /*ext_warn*/true>;
 
-// C++11 compatibility with C++98.
-defm empty_fnmacro_arg : CXX11Compat<
-  "empty macro arguments are", /*ext_warn*/false>;
-
 // C++17 compatibility with C++14 and earlier.
 defm hex_literal : CXX17Compat<
   "hexadecimal floating literals are", /*ext_warn*/false>;
@@ -47,9 +43,6 @@ def backslash_newline_space : Warning<
   InGroup<DiagGroup<"backslash-newline-escape">>;
 
 // Digraphs.
-def warn_cxx98_compat_less_colon_colon : Warning<
-  "'<::' is treated as digraph '<:' (aka '[') followed by ':' in C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 
 def warn_cxx17_compat_spaceship : Warning<
   "'<=>' operator is incompatible with C++ standards before C++20">,
@@ -131,9 +124,6 @@ def err_invalid_newline_raw_delim : Error<
   "; use PREFIX( )PREFIX to delimit raw string">;
 def err_unterminated_raw_string : Error<
   "raw string missing terminating delimiter )%0\"">;
-def warn_cxx98_compat_raw_string_literal : Warning<
-  "raw string literals are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 
 def warn_multichar_character_literal : Warning<
   "multi-character character constant">, InGroup<MultiChar>;
@@ -213,21 +203,12 @@ def err_ucn_escape_basic_scs : Error<
 def err_ucn_control_character : Error<
   "universal character name refers to a control character">;
 def err_ucn_escape_invalid : Error<"invalid universal character">;
-def warn_ucn_escape_surrogate : Warning<
-  "universal character name refers to a surrogate character">,
-  InGroup<Unicode>;
 
 def warn_c99_compat_unicode_id : Warning<
   "%select{using this character in an identifier|starting an identifier with "
   "this character}0 is incompatible with C99">,
   InGroup<C99Compat>, DefaultIgnore;
 
-def warn_cxx98_compat_literal_ucn_escape_basic_scs : Warning<
-  "specifying character '%0' with a universal character name "
-  "is incompatible with C++98">, InGroup<CXX98Compat>, DefaultIgnore;
-def warn_cxx98_compat_literal_ucn_control_character : Warning<
-  "universal character name referring to a control character "
-  "is incompatible with C++98">, InGroup<CXX98Compat>, DefaultIgnore;
 def warn_c23_compat_literal_ucn_escape_basic_scs : Warning<
   "specifying character '%0' with a universal character name is "
   "incompatible with C standards before C23">,
@@ -305,22 +286,12 @@ def err_exec_charset_conversion_failed
 def warn_c99_compat_unicode_literal : Warning<
   "unicode literals are incompatible with C99">,
   InGroup<C99Compat>, DefaultIgnore;
-def warn_cxx98_compat_unicode_literal : Warning<
-  "unicode literals are incompatible with C++98">,
-  InGroup<CXX98Compat>, DefaultIgnore;
 def warn_cxx14_compat_u8_character_literal : Warning<
   "unicode literals are incompatible with C++ standards before C++17">,
   InGroup<CXXPre17Compat>, DefaultIgnore;
 def warn_c17_compat_u8_character_literal : Warning<
   "unicode literals are incompatible with C standards before C23">,
   InGroup<CPre23Compat>, DefaultIgnore;
-def warn_cxx11_compat_user_defined_literal : Warning<
-  "identifier after literal will be treated as a user-defined literal suffix "
-  "in C++11">, InGroup<CXX11Compat>, DefaultIgnore;
-def warn_cxx11_compat_reserved_user_defined_literal : Warning<
-  "identifier after literal will be treated as a reserved user-defined literal "
-  "suffix in C++11">,
-  InGroup<CXX11CompatReservedUserDefinedLiteral>, DefaultIgnore;
 def ext_reserved_user_defined_literal : ExtWarn<
   "invalid suffix on literal; C++11 requires a space between literal and "
   "identifier">, InGroup<ReservedUserDefinedLiteral>, DefaultError;
@@ -518,9 +489,6 @@ def err_vaopt_paste_at_end
 def ext_pp_macro_redef : ExtWarn<"%0 macro redefined">, InGroup<MacroRedefined>;
 def ext_variadic_macro : Extension<"variadic macros are a C99 feature">,
   InGroup<VariadicMacros>;
-def warn_cxx98_compat_variadic_macro : Warning<
-  "variadic macros are incompatible with C++98">,
-  InGroup<CXX98CompatPedantic>, DefaultIgnore;
 def ext_named_variadic_macro : Extension<
   "named variadic macros are a GNU extension">, InGroup<VariadicMacros>;
 def err_embedded_directive : Error<"embedding a %select{|#}0%1 directive "
@@ -832,9 +800,6 @@ def err_pp_linemarker_invalid_pop : Error<
   "invalid line marker flag '2': cannot pop empty include stack">;
 def ext_pp_line_too_big : Extension<
   "C requires #line number to be less than %0, allowed as extension">;
-def warn_cxx98_compat_pp_line_too_big : Warning<
-  "#line number greater than 32767 is incompatible with C++98">,
-  InGroup<CXX98CompatPedantic>, DefaultIgnore;
 
 def err_pp_visibility_non_macro : Error<"no macro named %0">;
 

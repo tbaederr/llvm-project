@@ -1,13 +1,8 @@
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx11 -Wc++11-compat %s
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx98 -Wc++11-compat %s -std=c++98
 class C {
 public:
   auto int errx; // expected-error {{storage class specified for a member declaration}}
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{'auto' storage class specifier is redundant}}
-#else
-  // expected-warning@-4 {{'auto' storage class specifier is not permitted in C++11, and will not be supported in future releases}}
-#endif
+  // expected-warning@-1 {{'auto' storage class specifier is not permitted in C++11, and will not be supported in future releases}}
   register int erry; // expected-error {{storage class specified for a member declaration}}
   extern int errz; // expected-error {{storage class specified for a member declaration}}
 
@@ -43,19 +38,13 @@ public:
   enum E1 { en1, en2 };
 
   int i = 0;
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{default member initializer for non-static data member is a C++11 extension}}
-#endif
   static int si = 0; // expected-error {{non-const static data member must be initialized out of line}}
   static const NestedC ci = 0; // expected-error {{static data member of type 'const NestedC' must be initialized out of line}}
   static const int nci = vs; // expected-error {{in-class initializer for static data member is not a constant expression}} \
-  // cxx11-note {{read of non-const variable 'vs' is not allowed in a constant expression}} \
-  // cxx98-note {{subexpression not valid in a constant expression}}
+  // cxx11-note {{read of non-const variable 'vs' is not allowed in a constant expression}}
   static const int vi = 0;
   static const volatile int cvi = 0; // ok, illegal in C++11
-#if __cplusplus >= 201103L
-  // expected-error@-2 {{static const volatile data member must be initialized out of line}}
-#endif
+  // expected-error@-1 {{static const volatile data member must be initialized out of line}}
   static const E evi = 0;
   static const int overflow = 1000000*1000000; // cxx11-error {{in-class initializer for static data member is not a constant expression}} \
                                                // cxx11-note {{value 1000000000000 is outside the range of representable values of type 'int'}} \
@@ -196,18 +185,11 @@ namespace rdar8066414 {
 
 namespace rdar8367341 {
   float foo();
-#if __cplusplus >= 201103L
-  // expected-note@-2 {{declared here}}
-#endif
+  // expected-note@-1 {{declared here}}
 
   struct A {
-#if __cplusplus <= 199711L
-    static const float x = 5.0f; // expected-warning {{in-class initializer for static data member of type 'const float' is a GNU extension}}
-    static const float y = foo(); // expected-warning {{in-class initializer for static data member of type 'const float' is a GNU extension}} expected-error {{in-class initializer for static data member is not a constant expression}}
-#else
     static constexpr float x = 5.0f;
     static constexpr float y = foo(); // expected-error {{constexpr variable 'y' must be initialized by a constant expression}} expected-note {{non-constexpr function 'foo' cannot be used in a constant expression}}
-#endif
   };
 }
 

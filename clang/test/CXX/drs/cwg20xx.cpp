@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14
@@ -6,10 +5,6 @@
 // RUN: %clang_cc1 -std=c++23 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx20
 // RUN: %clang_cc1 -std=c++2c -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11,since-cxx14,since-cxx20
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 namespace std { class type_info; }
 namespace cwg2006 { // cwg2006: 2.7
@@ -33,24 +28,18 @@ namespace cwg2006 { // cwg2006: 2.7
   }
 
   const void get_const_void()
-#if __cplusplus >= 201103L
     noexcept
-#endif
   {}
 
   volatile void get_volatile_void()
-#if __cplusplus >= 201103L
     noexcept
-#endif
   {}
-  // since-cxx20-warning@-5 {{volatile-qualified return type 'volatile void' is deprecated}}
+  // since-cxx20-warning@-3 {{volatile-qualified return type 'volatile void' is deprecated}}
 
   const volatile void get_cv_void()
-#if __cplusplus >= 201103L
     noexcept
-#endif
   {}
-  // since-cxx20-warning@-5 {{volatile-qualified return type 'const volatile void' is deprecated}}
+  // since-cxx20-warning@-3 {{volatile-qualified return type 'const volatile void' is deprecated}}
 
   void test_return() {
     return get_const_void();
@@ -86,7 +75,6 @@ namespace cwg2006 { // cwg2006: 2.7
     static_assert(!__is_object(const volatile void), "");
   }
 
-#if __cplusplus >= 201103L
   void test_cxx11() {
     decltype(get_const_void()) *p = nullptr;
     static_assert(noexcept(get_const_void()), "");
@@ -94,7 +82,6 @@ namespace cwg2006 { // cwg2006: 2.7
     using CommonType = decltype(true ? get_const_void() : get_volatile_void());
     static_assert(__is_same(CommonType, void), "");
   }
-#endif
 } // namespace cwg2006
 
 namespace cwg2007 { // cwg2007: 3.4
@@ -103,11 +90,9 @@ template<typename T> struct B { };
 B<A<void> > b1;
 B<A<void> > b2 = b1;
 int a = b2[0];
-// cxx98-error@-1 {{type 'B<A<void> >' does not provide a subscript operator}}
-// since-cxx11-error@-2 {{type 'B<A<void>>' does not provide a subscript operator}}
+// since-cxx11-error@-1 {{type 'B<A<void>>' does not provide a subscript operator}}
 int b = __builtin_addressof(b2)->foo;
-// cxx98-error@-1 {{no member named 'foo' in 'cwg2007::B<cwg2007::A<void> >'}}
-// since-cxx11-error@-2 {{no member named 'foo' in 'cwg2007::B<cwg2007::A<void>>'}}
+// since-cxx11-error@-1 {{no member named 'foo' in 'cwg2007::B<cwg2007::A<void>>'}}
 } // namespace cwg2007
 
 // cwg2009: na
@@ -123,7 +108,6 @@ static_assert(__is_same(decltype(a), decltype(b)));
 } // namespace cwg2049
 
 namespace cwg2061 { // cwg2061: 2.7
-#if __cplusplus >= 201103L
   namespace A {
     inline namespace b {
       namespace C {
@@ -147,11 +131,9 @@ namespace cwg2061 { // cwg2061: 2.7
     A::C::f<int>();
     A::C::S<int> s;
   }
-#endif // C++11
 } // namespace cwg2061
 
 namespace cwg2076 { // cwg2076: 13
-#if __cplusplus >= 201103L
   namespace std_example {
     struct A { A(int); };
     struct B { B(A); };
@@ -194,18 +176,14 @@ namespace cwg2076 { // cwg2076: 13
     // since-cxx11-error@-1 {{no matching function for call to 'bar'}}
     //   since-cxx11-note@#cwg2076-bar {{candidate function not viable: cannot convert initializer list argument to 'string_view'}}
   }
-#endif
 } // namespace cwg2076
 
 namespace cwg2082 { // cwg2082: 11
   void test1(int x, int = sizeof(x)); // ok
-#if __cplusplus >= 201103L
   void test2(int x, int = decltype(x){}); // ok
-#endif
 } // namespace cwg2082
 
 namespace cwg2083 { // cwg2083: partial
-#if __cplusplus >= 201103L
   void non_const_mem_ptr() {
     struct A {
       int x;
@@ -222,7 +200,6 @@ namespace cwg2083 { // cwg2083: partial
     static_assert(B{&A::x}.g() == 1, "");
     static_assert(B{&A::y}.g() == 2, "");
   }
-#endif
 
   const int a = 1;
   int b;
@@ -236,11 +213,7 @@ namespace cwg2083 { // cwg2083: partial
     struct A {
       int f() {
         int a = ra;
-        // cxx98-error@-1 {{reference to local variable 'ra' declared in enclosing function 'cwg2083::ref_to_non_const'}}
-        //   cxx98-note@#cwg2083-ra {{'ra' declared here}}
         int b = rb;
-        // cxx98-error@-1 {{reference to local variable 'rb' declared in enclosing function 'cwg2083::ref_to_non_const'}}
-        //   cxx98-note@#cwg2083-rb {{'rb' declared here}}
         int c = rc;
         // expected-error@-1 {{reference to local variable 'rc' declared in enclosing function 'cwg2083::ref_to_non_const'}}
         //   expected-note@#cwg2083-rc {{'rc' declared here}}
@@ -249,7 +222,6 @@ namespace cwg2083 { // cwg2083: partial
     };
   }
 
-#if __cplusplus >= 201103L
   struct NoMut1 { int a, b; };
   struct NoMut2 { NoMut1 m; };
   struct NoMut3 : NoMut1 {
@@ -288,15 +260,12 @@ namespace cwg2083 { // cwg2083: partial
       }
     };
   }
-#endif
 
   void ellipsis() {
     void ellipsis(...);
     struct A {};
     const int n = 0;
-#if __cplusplus >= 201103L
     constexpr
-#endif
       A a = {}; // #cwg2083-a
     struct B {
       void f() {
@@ -311,7 +280,6 @@ namespace cwg2083 { // cwg2083: partial
     };
   }
 
-#if __cplusplus >= 201103L
   void volatile_lval() {
     struct A { int n; };
     constexpr A a = {0}; // #cwg2083-a2
@@ -328,7 +296,6 @@ namespace cwg2083 { // cwg2083: partial
       }
     };
   }
-#endif
 
   void discarded_lval() {
     struct A { int x; mutable int y; volatile int z; };
@@ -376,14 +343,11 @@ namespace cwg2083 { // cwg2083: partial
       const int &x = globx; // #cwg2083-x
       struct A {
         const int *foo() { return &x; }
-        // cxx98-error@-1 {{reference to local variable 'x' declared in enclosing function 'cwg2083::dr_example_1::main'}}
-        //   cxx98-note@#cwg2083-x {{'x' declared here}}
       } a;
       return *a.foo();
     }
   }
 
-#if __cplusplus >= 201103L
   namespace dr_example_2 {
     struct A {
       int q;
@@ -415,7 +379,6 @@ namespace cwg2083 { // cwg2083: partial
       static_assert(Q().foo() == 42, "");
     }
   }
-#endif
 } // namespace cwg2083
 
 namespace cwg2084 { // cwg2084: 3.1
@@ -423,7 +386,7 @@ struct S {
   S();
 };
 union U {
-  S s{}; // cxx98-error {{function definition does not declare parameters}}
+  S s{};
 } u;
 } // namespace cwg2084
 

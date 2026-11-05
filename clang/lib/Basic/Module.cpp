@@ -100,7 +100,7 @@ static bool hasFeature(StringRef Feature, const LangOptions &LangOpts,
                         .Case("blocks", LangOpts.Blocks)
                         .Case("coroutines", LangOpts.Coroutines)
                         .Case("cplusplus", LangOpts.CPlusPlus)
-                        .Case("cplusplus11", LangOpts.CPlusPlus11)
+                        .Case("cplusplus11", LangOpts.CPlusPlus)
                         .Case("cplusplus14", LangOpts.CPlusPlus14)
                         .Case("cplusplus17", LangOpts.CPlusPlus17)
                         .Case("cplusplus20", LangOpts.CPlusPlus20)

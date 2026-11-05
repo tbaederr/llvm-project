@@ -1,10 +1,8 @@
 // RUN: %clang_cc1 -std=c++11 -Wno-unused-value -fsyntax-only -verify=expected,not-cxx03,cxx03-cxx11,cxx11,expected-cxx14 -fblocks %s
-// RUN: %clang_cc1 -std=c++03 -Wno-unused-value -fsyntax-only -verify=expected,cxx03,cxx03-cxx11,expected-cxx14 -fblocks %s -Ddecltype=__decltype -Dstatic_assert=_Static_assert -Wno-c++11-extensions
 // RUN: %clang_cc1 -std=c++14 -Wno-unused-value -fsyntax-only -verify=expected,not-cxx03,expected-cxx14 -fblocks %s
 // RUN: %clang_cc1 -std=c++17 -Wno-unused-value -verify=expected,not-cxx03 -ast-dump -fblocks %s | FileCheck %s
 
 // RUN: %clang_cc1 -std=c++11 -Wno-unused-value -fsyntax-only -verify=expected,not-cxx03,cxx03-cxx11,cxx11,expected-cxx14 -fblocks %s -fexperimental-new-constant-interpreter
-// RUN: %clang_cc1 -std=c++03 -Wno-unused-value -fsyntax-only -verify=expected,cxx03,cxx03-cxx11,expected-cxx14 -fblocks %s -Ddecltype=__decltype -Dstatic_assert=_Static_assert -Wno-c++11-extensions -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -std=c++14 -Wno-unused-value -fsyntax-only -verify=expected,not-cxx03,expected-cxx14 -fblocks %s -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -std=c++17 -Wno-unused-value -verify=expected,not-cxx03 -ast-dump -fblocks %s -fexperimental-new-constant-interpreter| FileCheck %s
 
@@ -99,8 +97,8 @@ namespace ImplicitCapture {
     [] { return ref_i; }; // expected-error {{variable 'ref_i' cannot be implicitly captured in a lambda with no capture-default specified}} expected-note {{lambda expression begins here}} expected-note 2 {{capture 'ref_i' by}} expected-note 2 {{default capture by}}
 
     static int j;
-    int &ref_j = j; // cxx03-note {{declared here}}
-    [] { return ref_j; }; // cxx03-error {{variable 'ref_j' cannot be implicitly captured in a lambda with no capture-default specified}} cxx03-note 4 {{capture}} cxx03-note {{lambda expression begins here}}
+    int &ref_j = j;
+    [] { return ref_j; };
   }
 }
 
@@ -149,8 +147,7 @@ namespace PR12031 {
   void f(int i, X x);
   void g() {
     const int v = 10;
-    f(v, [](){}); // cxx03-warning {{template argument uses local type}} \
-                         // cxx03-note {{while substituting}}
+    f(v, [](){});
   }
 }
 
@@ -357,7 +354,6 @@ namespace CaptureIncomplete {
   }
 }
 
-#if __cplusplus >= 201103L
 namespace CaptureAbstract {
   struct S {
     virtual void f() = 0; // expected-note {{unimplemented}}
@@ -375,7 +371,6 @@ namespace CaptureAbstract {
     [=] { return s.n; }; // expected-error {{abstract}}
   }
 }
-#endif
 
 namespace PR18128 {
   auto l = [=]{}; // expected-error {{non-local lambda expression cannot have a capture-default}}
@@ -386,8 +381,6 @@ namespace PR18128 {
     // expected-error@-1 {{non-local lambda expression cannot have a capture-default}}
     // expected-error@-2 {{invalid use of non-static data member 'n'}}
     // expected-cxx14-error@-3 {{a lambda expression may not appear inside of a constant expression}}
-    // cxx03-error@-4 {{function declaration cannot have variably modified type}}
-    // cxx03-warning@-5 {{variable length arrays in C++ are a Clang extension}}
     int g(int k = ([=]{ return n; }(), 0));
     // expected-error@-1 {{non-local lambda expression cannot have a capture-default}}
     // expected-error@-2 {{invalid use of non-static data member 'n'}}
@@ -456,9 +449,8 @@ void g(F f) {
   int x = sizeof(xf);
 };
 void f() {
-  g([] {}); // cxx03-warning {{template argument uses local type}}
+  g([] {});
   // expected-note-re@-1 {{in instantiation of function template specialization 'PR20731::g<(lambda at {{.*}}>' requested here}}
-  // cxx03-note@-2 {{while substituting deduced template arguments}}
 }
 
 template <class _Rp> struct function {
@@ -508,9 +500,8 @@ namespace PR21857 {
     fun() = default;
     using Fn::operator();
   };
-  template<typename Fn> fun<Fn> wrap(Fn fn); // cxx03-warning {{template argument uses unnamed type}}
-  auto x = wrap([](){}); // cxx03-warning {{template argument uses unnamed type}} cxx03-note 2 {{unnamed type used in template argument was declared here}}
-                         // cxx03-note@-1 {{while substituting deduced template arguments into function template}}
+  template<typename Fn> fun<Fn> wrap(Fn fn);
+  auto x = wrap([](){});
 }
 
 namespace PR13987 {
@@ -575,35 +566,24 @@ struct A { template <class T> A(T); };
 template <class T>
 struct B { // #PR27994_B
   int x;
-  A a = [&] { int y = x; }; // cxx03-warning {{template argument uses unnamed type}} \
-                            //   cxx03-note {{while substituting}} cxx03-note {{unnamed type used}}
-  A b = [&] { [&] { [&] { int y = x; }; }; }; // cxx03-warning {{template argument uses unnamed type}} \
-                                              //   cxx03-note {{while substituting}} cxx03-note {{unnamed type used}}
-  A d = [&](auto param) { int y = x; }; // cxx03-cxx11-error {{'auto' not allowed in lambda parameter}} \
-                                        // cxx03-warning {{template argument uses unnamed type}} \
-                                        //  cxx03-note {{while substituting}} cxx03-note {{unnamed type used}}
-  A e = [&](auto param) { [&] { [&](auto param2) { int y = x; }; }; }; // cxx03-cxx11-error 2 {{'auto' not allowed in lambda parameter}} \
-                                                                       // cxx03-warning {{template argument uses unnamed type}} \
-                                                                       //  cxx03-note {{while substituting}} cxx03-note {{unnamed type used}}
+  A a = [&] { int y = x; };
+  A b = [&] { [&] { [&] { int y = x; }; }; };
+  A d = [&](auto param) { int y = x; }; // cxx03-cxx11-error {{'auto' not allowed in lambda parameter}}
+  A e = [&](auto param) { [&] { [&](auto param2) { int y = x; }; }; }; // cxx03-cxx11-error 2 {{'auto' not allowed in lambda parameter}}
 };
 
 B<int> b;
-// cxx03-note@#PR27994_B 4{{in instantiation of default member initializer}}
-// cxx03-note@-2 4{{in evaluation of exception}}
 
 template <class T> struct C {
   struct D {
-    // cxx03-note@-1 {{in instantiation of default member initializer}}
     int x;
-    A f = [&] { int y = x; }; // cxx03-warning {{template argument uses unnamed type}} \
-                              // cxx03-note {{while substituting}} cxx03-note {{unnamed type used}}
+    A f = [&] { int y = x; };
   };
 };
 
 int func() {
   C<int> a;
   decltype(a)::D b;
-  // cxx03-note@-1 {{in evaluation of exception}}
 }
 }
 
@@ -618,12 +598,8 @@ struct S1 {
 
 void foo1() {
   auto s0 = S1([name=]() {}); // expected-error {{expected expression}}
-                                     // cxx03-warning@-1 {{template argument uses local type}} \
-                                     // cxx03-note@-1 {{while substituting deduced template arguments}}
   auto s1 = S1([name=name]() {}); // expected-error {{use of undeclared identifier 'name'; did you mean 'name1'?}}
                                   // cxx03-cxx11-warning@-1 {{initialized lambda captures are a C++14 extension}}
-                                  // cxx03-warning@-2 {{template argument uses local type}} \
-                                  // cxx03-note@-2 {{while substituting deduced template arguments}}
 }
 }
 
@@ -669,7 +645,6 @@ namespace ConversionOperatorDoesNotHaveDeducedReturnType {
       friend constexpr U::operator ExpectedTypeU<T>() const noexcept; // expected-error {{a member of a lambda should not be the target of a friend declaration}}
 #else
     friend auto T::operator()(int) const; // cxx11-error {{'auto' return without trailing return type; deduced return types are a C++14 extension}} \
-                                             cxx03-error {{'auto' not allowed in function return type}} \
                                              expected-error {{a member of a lambda should not be the target of a friend declaration}}
     friend T::operator ExpectedTypeT() const; // expected-error {{a member of a lambda should not be the target of a friend declaration}}
 
@@ -728,8 +703,8 @@ namespace GH60518 {
 // function parameters that are used in enable_if
 struct StringLiteral {
 template <int N>
-StringLiteral(const char (&array)[N]) // cxx03-note {{declared here}}
-    __attribute__((enable_if(__builtin_strlen(array) == 2, // cxx03-error {{'enable_if' attribute expression never produces a constant expression}} cxx03-note {{read of variable}}
+StringLiteral(const char (&array)[N])
+    __attribute__((enable_if(__builtin_strlen(array) == 2,
                               "invalid string literal")));
 };
 
@@ -741,7 +716,7 @@ StringLiteral(const char (&array)[N]) [[clang::annotate_type("test", array)]];
 }
 
 void Func1() {
-  [[maybe_unused]] auto y = [&](decltype(StringLiteral("xx"))) {}; // cxx03-note {{in instantiation of function template specialization}}
+  [[maybe_unused]] auto y = [&](decltype(StringLiteral("xx"))) {};
   [[maybe_unused]] auto z = [&](decltype(cpp_attribute::StringLiteral("xx"))) {};
 }
 
@@ -764,7 +739,6 @@ static_assert([]() constexpr {
 
 // Call operator attributes refering to a variable should
 // be properly handled after D124351
-#if __cplusplus >= 201103L
 constexpr int i = 2;
 void foo() {
   (void)[=][[gnu::aligned(i)]] () {}; // expected-warning{{C++23 extension}}
@@ -772,18 +746,15 @@ void foo() {
   // CHECK-NEXT: ConstantExpr
   // CHECK-NEXT: value: Int 2
 }
-#endif
 
 void GH48527() {
   auto a = []()__attribute__((b(({ return 0; })))){}; // expected-warning {{unknown attribute 'b' ignored}}
 }
 
-#if __cplusplus >= 201103L
 void GH67492() {
   constexpr auto test = 42;
   auto lambda = (test, []() noexcept(true) {});
 }
-#endif
 
 // FIXME: This currently causes clang to crash in C++11 mode.
 #if __cplusplus >= 201402L

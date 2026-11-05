@@ -18,7 +18,7 @@ class UseNullptrCheck : public ClangTidyCheck {
 public:
   UseNullptrCheck(StringRef Name, ClangTidyContext *Context);
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11 || LangOpts.C23;
+    return LangOpts.CPlusPlus || LangOpts.C23;
   }
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
                            Preprocessor *ModuleExpanderPP) override;

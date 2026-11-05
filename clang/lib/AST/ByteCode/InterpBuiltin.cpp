@@ -209,7 +209,7 @@ static void diagnoseNonConstexprBuiltin(InterpState &S, CodePtr OpPC,
     return;
 
   auto Loc = S.Current->getSource(OpPC);
-  if (S.getLangOpts().CPlusPlus11)
+  if (S.getLangOpts().CPlusPlus)
     S.CCEDiag(Loc, diag::note_constexpr_invalid_function)
         << /*isConstexpr=*/0 << /*isConstructor=*/0
         << S.getASTContext().BuiltinInfo.getQuotedName(ID);

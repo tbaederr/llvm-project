@@ -1,5 +1,5 @@
 // RUN: cp %s %t
-// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++98
+// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++11
 // RUN: not %clang_cc1 -x c++ -std=c++14 -fixit %t -Werror -DFIXIT
 // RUN: %clang_cc1 -x c++ -std=c++14 %t -DFIXIT
 // RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++17 -Wc++14-compat

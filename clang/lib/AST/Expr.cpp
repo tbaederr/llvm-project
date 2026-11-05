@@ -2949,34 +2949,10 @@ bool Expr::isUnusedResultAWarning(const Expr *&WarnE, SourceLocation &Loc,
   }
   case CXXFunctionalCastExprClass:
   case CStyleCastExprClass: {
-    // Ignore an explicit cast to void, except in C++98 if the operand is a
-    // volatile glvalue for which we would trigger an implicit read in any
-    // other language mode. (Such an implicit read always happens as part of
-    // the lvalue conversion in C, and happens in C++ for expressions of all
-    // forms where it seems likely the user intended to trigger a volatile
-    // load.)
+    // Ignore an explicit cast to void.
     const CastExpr *CE = cast<CastExpr>(this);
-    const Expr *SubE = CE->getSubExpr()->IgnoreParens();
-    if (CE->getCastKind() == CK_ToVoid) {
-      if (Ctx.getLangOpts().CPlusPlus && !Ctx.getLangOpts().CPlusPlus11 &&
-          SubE->isReadIfDiscardedInCPlusPlus11()) {
-        // Suppress the "unused value" warning for idiomatic usage of
-        // '(void)var;' used to suppress "unused variable" warnings.
-        if (auto *DRE = dyn_cast<DeclRefExpr>(SubE))
-          if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
-            if (!VD->isExternallyVisible())
-              return false;
-
-        // The lvalue-to-rvalue conversion would have no effect for an array.
-        // It's implausible that the programmer expected this to result in a
-        // volatile array load, so don't warn.
-        if (SubE->getType()->isArrayType())
-          return false;
-
-        return SubE->isUnusedResultAWarning(WarnE, Loc, R1, R2, Ctx);
-      }
+    if (CE->getCastKind() == CK_ToVoid)
       return false;
-    }
 
     // If this is a cast to a constructor conversion, check the operand.
     // Otherwise, the result of the cast is unused.
@@ -4110,7 +4086,7 @@ Expr::NullPointerConstantKind
 Expr::isNullPointerConstant(ASTContext &Ctx,
                             NullPointerConstantValueDependence NPC) const {
   if (isValueDependent() &&
-      (!Ctx.getLangOpts().CPlusPlus11 || Ctx.getLangOpts().MSVCCompat)) {
+      (!Ctx.getLangOpts().CPlusPlus || Ctx.getLangOpts().MSVCCompat)) {
     // Error-dependent expr should never be a null pointer.
     if (containsErrors())
       return NPCK_NotNull;
@@ -4193,7 +4169,7 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
     return NPCK_CXX11_nullptr;
 
   if (const RecordType *UT = getType()->getAsUnionType())
-    if (!Ctx.getLangOpts().CPlusPlus11 && UT &&
+    if (!Ctx.getLangOpts().CPlusPlus && UT &&
         UT->getDecl()->getMostRecentDecl()->hasAttr<TransparentUnionAttr>())
       if (const CompoundLiteralExpr *CLE = dyn_cast<CompoundLiteralExpr>(this)){
         const Expr *InitExpr = CLE->getInitializer();
@@ -4205,7 +4181,7 @@ Expr::isNullPointerConstant(ASTContext &Ctx,
       (Ctx.getLangOpts().CPlusPlus && getType()->isEnumeralType()))
     return NPCK_NotNull;
 
-  if (Ctx.getLangOpts().CPlusPlus11) {
+  if (Ctx.getLangOpts().CPlusPlus) {
     // C++11 [conv.ptr]p1: A null pointer constant is an integer literal with
     // value zero or a prvalue of type std::nullptr_t.
     // Microsoft mode permits C++98 rules reflecting MSVC behavior.

@@ -226,7 +226,7 @@ Parser::ParseConstraintLogicalAndExpression(bool IsTrailingRequiresClause) {
         // Check if the following tokens must be a part of a non-primary
         // expression
         getBinOpPrecedence(Tok.getKind(), GreaterThanIsOperator,
-                           /*CPlusPlus11=*/true) > prec::LogicalAnd ||
+                           /*CPlusPlus=*/true) > prec::LogicalAnd ||
         // Postfix operators other than '(' (which will be checked for in
         // CheckConstraintExpression).
         Tok.isOneOf(tok::period, tok::plusplus, tok::minusminus) ||
@@ -316,7 +316,7 @@ ExprResult
 Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
   prec::Level NextTokPrec = getBinOpPrecedence(Tok.getKind(),
                                                GreaterThanIsOperator,
-                                               getLangOpts().CPlusPlus11);
+                                               getLangOpts().CPlusPlus);
   SourceLocation ColonLoc;
 
   auto SavedType = PreferredType;
@@ -393,7 +393,7 @@ Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
     // Special case handling for the ternary operator.
     ExprResult TernaryMiddle(true);
     if (NextTokPrec == prec::Conditional) {
-      if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
+      if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
         // Parse a braced-init-list here for error recovery purposes.
         SourceLocation BraceLoc = Tok.getLocation();
         TernaryMiddle = ParseBraceInitializer();
@@ -468,7 +468,7 @@ Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
     // they only appear on the RHS of assignments later.
     ExprResult RHS;
     bool RHSIsInitList = false;
-    if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
+    if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
       RHS = ParseBraceInitializer();
       RHSIsInitList = true;
     } else if (getLangOpts().CPlusPlus && NextTokPrec <= prec::Conditional)
@@ -486,7 +486,7 @@ Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
     // operator immediately to the right of the RHS.
     prec::Level ThisPrec = NextTokPrec;
     NextTokPrec = getBinOpPrecedence(Tok.getKind(), GreaterThanIsOperator,
-                                     getLangOpts().CPlusPlus11);
+                                     getLangOpts().CPlusPlus);
 
     // Assignment and conditional expressions are right-associative.
     bool isRightAssoc = ThisPrec == prec::Conditional ||
@@ -515,14 +515,11 @@ Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
       }
 
       NextTokPrec = getBinOpPrecedence(Tok.getKind(), GreaterThanIsOperator,
-                                       getLangOpts().CPlusPlus11);
+                                       getLangOpts().CPlusPlus);
     }
 
-    if (!RHS.isInvalid() && RHSIsInitList) {
-      if (ThisPrec == prec::Assignment) {
-        Diag(OpToken, diag::compat_cxx11_generalized_initializer_lists)
-            << Actions.getExprRange(RHS.get());
-      } else if (ColonLoc.isValid()) {
+    if (!RHS.isInvalid() && RHSIsInitList && ThisPrec != prec::Assignment) {
+      if (ColonLoc.isValid()) {
         Diag(ColonLoc, diag::err_init_list_bin_op)
           << /*RHS*/1 << ":"
           << Actions.getExprRange(RHS.get());
@@ -542,15 +539,6 @@ Parser::ParseRHSOfBinaryExpression(ExprResult LHS, prec::Level MinPrec) {
                                          PrevTokLocation,
                                          {LHS.get()});
       } else if (TernaryMiddle.isInvalid()) {
-        // If we're using '>>' as an operator within a template
-        // argument list (in C++98), suggest the addition of
-        // parentheses so that the code remains well-formed in C++0x.
-        if (!GreaterThanIsOperator && OpToken.is(tok::greatergreater))
-          SuggestParentheses(OpToken.getLocation(),
-                             diag::warn_cxx11_right_shift_in_template_arg,
-                         SourceRange(Actions.getExprRange(LHS.get()).getBegin(),
-                                     Actions.getExprRange(RHS.get()).getEnd()));
-
         ExprResult BinOp =
             Actions.ActOnBinOp(getCurScope(), OpToken.getLocation(),
                                OpToken.getKind(), LHS.get(), RHS.get());
@@ -835,9 +823,7 @@ Parser::ParseCastExpression(CastParseKind ParseKind, bool isAddressOfOperand,
     break;
 
   case tok::kw_nullptr:
-    if (getLangOpts().CPlusPlus)
-      Diag(Tok, diag::warn_cxx98_compat_nullptr);
-    else
+    if (!getLangOpts().CPlusPlus)
       Diag(Tok, getLangOpts().C23 ? diag::warn_c23_compat_keyword
                                   : diag::ext_c_nullptr) << Tok.getName();
 
@@ -1379,13 +1365,9 @@ Parser::ParseCastExpression(CastParseKind ParseKind, bool isAddressOfOperand,
     DeclSpec DS(AttrFactory);
 
     ParseCXXSimpleTypeSpecifier(DS);
-    if (Tok.isNot(tok::l_paren) &&
-        (!getLangOpts().CPlusPlus11 || Tok.isNot(tok::l_brace)))
+    if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_brace))
       return ExprError(Diag(Tok, diag::err_expected_lparen_after_type)
                          << DS.getSourceRange());
-
-    if (Tok.is(tok::l_brace))
-      Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
 
     Res = ParseCXXTypeConstructExpression(DS);
     break;
@@ -1500,7 +1482,6 @@ Parser::ParseCastExpression(CastParseKind ParseKind, bool isAddressOfOperand,
   case tok::kw_noexcept: { // [C++0x] 'noexcept' '(' expression ')'
     if (NotPrimaryExpression)
       *NotPrimaryExpression = true;
-    Diag(Tok, diag::warn_cxx98_compat_noexcept_expr);
     SourceLocation KeyLoc = ConsumeToken();
     BalancedDelimiterTracker T(*this, tok::l_paren);
 
@@ -1733,8 +1714,7 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
           Tok.isNot(tok::colon)) {
         if (!getLangOpts().CPlusPlus23) {
           ExprResult Idx;
-          if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-            Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
+          if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
             Idx = ParseBraceInitializer();
           } else {
             Idx = ParseExpression(); // May be a comma expression
@@ -2272,10 +2252,7 @@ ExprResult Parser::ParseUnaryExprOrTypeTraitExpression() {
                                                 RParenLoc);
   }
 
-  if (getLangOpts().CPlusPlus &&
-      OpTok.isOneOf(tok::kw_alignof, tok::kw__Alignof))
-    Diag(OpTok, diag::warn_cxx98_compat_alignof);
-  else if (getLangOpts().C23 && OpTok.is(tok::kw_alignof))
+  if (getLangOpts().C23 && OpTok.is(tok::kw_alignof))
     Diag(OpTok, diag::warn_c23_compat_keyword) << OpTok.getName();
   else if (getLangOpts().C2y && OpTok.is(tok::kw__Countof))
     Diag(OpTok, diag::warn_c2y_compat_keyword) << OpTok.getName();
@@ -3219,10 +3196,9 @@ bool Parser::ParseExpressionList(SmallVectorImpl<Expr *> &Exprs,
       ExpressionStarts();
 
     ExprResult Expr;
-    if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-      Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
+    if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace))
       Expr = ParseBraceInitializer();
-    } else
+    else
       Expr = ParseAssignmentExpression();
 
     if (Tok.is(tok::ellipsis))

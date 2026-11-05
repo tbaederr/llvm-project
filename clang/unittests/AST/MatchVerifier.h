@@ -36,7 +36,7 @@ public:
   testing::AssertionResult match(const std::string &Code,
                                  const MatcherType &AMatcher) {
     std::vector<std::string> Args;
-    return match(Code, AMatcher, Args, Lang_CXX03);
+    return match(Code, AMatcher, Args, Lang_CXX11);
   }
 
   template <typename MatcherType>

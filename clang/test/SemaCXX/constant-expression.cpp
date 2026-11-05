@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 -pedantic %s
+// RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 -pedantic %s
 // C++ [expr.const]p1:
 //   In several places, C++ requires expressions that evaluate to an integral
 //   or enumeration constant: as array bounds, as case expressions, as
@@ -88,19 +88,19 @@ enum {
 
 void diags(int n) {
   switch (n) {
-    case (1/0, 1): // expected-error {{not an integral constant expression}} expected-note {{division by zero}} expected-warning {{left operand of comma operator has no effect}}
-    case (int)(1/0, 2.0): // expected-error {{not an integral constant expression}} expected-note {{division by zero}} expected-warning {{left operand of comma operator has no effect}}
-    case __imag(1/0): // expected-error {{not an integral constant expression}} expected-note {{division by zero}}
-    case (int)__imag((double)(1/0)): // expected-error {{not an integral constant expression}} expected-note {{division by zero}}
+    case (1/0, 1): // expected-error {{case value is not a constant expression}} expected-note {{division by zero}} expected-warning {{left operand of comma operator has no effect}}
+    case (int)(1/0, 2.0): // expected-error {{case value is not a constant expression}} expected-note {{division by zero}} expected-warning {{left operand of comma operator has no effect}}
+    case __imag(1/0): // expected-error {{case value is not a constant expression}} expected-note {{division by zero}}
+    case (int)__imag((double)(1/0)): // expected-error {{case value is not a constant expression}} expected-note {{division by zero}}
       ;
   }
 }
 
 namespace IntOrEnum {
   const int k = 0;
-  const int &p = k; // expected-note {{declared here}}
+  const int &p = k;
   template<int n> struct S {};
-  S<p> s; // expected-error {{not an integral constant expression}} expected-note {{read of variable 'p' of non-integral, non-enumeration type 'const int &'}}
+  S<p> s;
 }
 
 extern const int recurse1;
@@ -115,7 +115,7 @@ int array2[recurse2]; // expected-warning 2{{variable length array}} expected-no
 namespace FloatConvert {
   typedef int a[(int)42.3];
   typedef int a[(int)42.997];
-  typedef int b[(long long)4e20]; // expected-warning {{variable length}} expected-error {{variable length}} expected-warning {{'long long' is a C++11 extension}} expected-note {{value 4.0E+20 is outside the range of representable values}}
+  typedef int b[(long long)4e20]; // expected-warning {{variable length}} expected-error {{variable length}} expected-note {{value 4.0E+20 is outside the range of representable values}}
 }
 
 // PR12626

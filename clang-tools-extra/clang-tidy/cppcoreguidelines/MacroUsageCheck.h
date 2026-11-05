@@ -30,7 +30,7 @@ public:
         CheckCapsOnly(Options.get("CheckCapsOnly", false)),
         IgnoreCommandLineMacros(Options.get("IgnoreCommandLineMacros", true)) {}
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
-    return LangOpts.CPlusPlus11;
+    return LangOpts.CPlusPlus;
   }
   void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,

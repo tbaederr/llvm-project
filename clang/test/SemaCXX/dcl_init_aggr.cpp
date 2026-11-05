@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -pedantic -verify %s
-// RUN: %clang_cc1 -fsyntax-only -pedantic -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -pedantic -verify -std=c++11 %s
 // C++ [dcl.init.aggr]p2
 struct A { 
@@ -11,29 +10,17 @@ struct A {
 } a1 = { 1, { 2, 3 } };
 
 struct NonAggregate {
-#if __cplusplus >= 201103L
-// expected-note@-2 3 {{candidate constructor (the implicit copy constructor) not viable}}
-// expected-note@-3 3 {{candidate constructor (the implicit move constructor) not viable}}
-#endif
+// expected-note@-1 3 {{candidate constructor (the implicit copy constructor) not viable}}
+// expected-note@-2 3 {{candidate constructor (the implicit move constructor) not viable}}
   NonAggregate();
-#if __cplusplus >= 201103L
-// expected-note@-2 3 {{candidate constructor not viable: requires 0 arguments, but 2 were provided}}
-#endif
+// expected-note@-1 3 {{candidate constructor not viable: requires 0 arguments, but 2 were provided}}
   int a, b;
 };
 NonAggregate non_aggregate_test = { 1, 2 };
-#if __cplusplus <= 199711L
-// expected-error@-2 {{non-aggregate type 'NonAggregate' cannot be initialized with an initializer list}}
-#else
-// expected-error@-4 {{no matching constructor for initialization of 'NonAggregate'}}
-#endif
+// expected-error@-1 {{no matching constructor for initialization of 'NonAggregate'}}
 
 NonAggregate non_aggregate_test2[2] = { { 1, 2 }, { 3, 4 } };
-#if __cplusplus <= 199711L
-// expected-error@-2 2 {{non-aggregate type 'NonAggregate' cannot be initialized with an initializer list}}
-#else
-// expected-error@-4 2 {{no matching constructor for initialization of 'NonAggregate'}}
-#endif
+// expected-error@-1 2 {{no matching constructor for initialization of 'NonAggregate'}}
 
 // C++ [dcl.init.aggr]p3
 A a_init = A(); 
@@ -56,53 +43,28 @@ char cv[4] = { 'a', 's', 'd', 'f', 0 }; // expected-error{{excess elements in ar
 // C++ [dcl.init.aggr]p7
 struct TooFew { int a; char* b; int c; }; 
 TooFew too_few = { 1, "asdf" };
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{conversion from string literal to 'char *' is deprecated}}
-#else
-// expected-warning@-4 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
-#endif
+// expected-warning@-1 {{ISO C++11 does not allow conversion from string literal to 'char *'}}
 
 struct NoDefaultConstructor {
-#if __cplusplus <= 199711L
-// expected-note@-2 3 {{candidate constructor (the implicit copy constructor)}}
-// expected-note@-3 {{declared here}}
-#else
-// expected-note@-5 4 {{candidate constructor (the implicit copy constructor)}}
-// expected-note@-6 4 {{candidate constructor (the implicit move constructor)}}
-#endif
+// expected-note@-1 4 {{candidate constructor (the implicit copy constructor)}}
+// expected-note@-2 4 {{candidate constructor (the implicit move constructor)}}
 
   NoDefaultConstructor(int);
-#if __cplusplus <= 199711L
-  // expected-note@-2 3 {{candidate constructor not viable: requires 1 argument, but 0 were provided}}
-#else
-  // expected-note@-4 4 {{candidate constructor not viable: requires 1 argument, but 0 were provided}}
-#endif
+  // expected-note@-1 4 {{candidate constructor not viable: requires 1 argument, but 0 were provided}}
 
 };
 struct TooFewError {
-#if __cplusplus <= 199711L
-// expected-error@-2 {{implicit default constructor for}}
-#endif
 
   int a;
   NoDefaultConstructor nodef;
-#if __cplusplus <= 199711L
-// expected-note@-2 {{member is declared here}}
-// expected-note@-3 2{{in implicit initialization of field 'nodef' with omitted initializer}}
-#else
-// expected-note@-5 3{{in implicit initialization of field 'nodef' with omitted initializer}}
-#endif
+// expected-note@-1 3{{in implicit initialization of field 'nodef' with omitted initializer}}
 };
 TooFewError too_few_okay = { 1, 1 };
 TooFewError too_few_error = { 1 }; // expected-error{{no matching constructor}}
 
 TooFewError too_few_okay2[2] = { 1, 1 };
-#if __cplusplus <= 199711L
-// expected-note@-2 {{implicit default constructor for 'TooFewError' first required here}}
-#else
-// expected-error@-4 {{no matching constructor for initialization of 'NoDefaultConstructor'}}
-// expected-note@-5 {{in implicit initialization of array element 1 with omitted initializer}}
-#endif
+// expected-error@-1 {{no matching constructor for initialization of 'NoDefaultConstructor'}}
+// expected-note@-2 {{in implicit initialization of array element 1 with omitted initializer}}
 
 TooFewError too_few_error2[2] = { 1 }; // expected-error{{no matching constructor}}
 
@@ -168,9 +130,7 @@ B2 b2_3 = { c2, a2, a2 };
 
 // C++ [dcl.init.aggr]p15:
 union u { int a; char* b; }; // expected-note{{candidate constructor (the implicit copy constructor)}}
-#if __cplusplus >= 201103L
-// expected-note@-2 {{candidate constructor (the implicit move constructor)}}
-#endif
+// expected-note@-1 {{candidate constructor (the implicit move constructor)}}
 
 u u1 = { 1 }; 
 u u2 = u1; 

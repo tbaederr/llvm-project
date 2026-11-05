@@ -1,59 +1,32 @@
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,expected-cxx11 %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,expected-cxx11 -std=c++11 %s
 
 namespace BooleanFalse {
 int* j = false;
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{initialization of pointer of type 'int *' to null from a constant boolean expression}}
-#else
-// expected-error@-4 {{cannot initialize a variable of type 'int *' with an rvalue of type 'bool'}}
-#endif
+// expected-error@-1 {{cannot initialize a variable of type 'int *' with an rvalue of type 'bool'}}
 
-#if __cplusplus <= 199711L
-// expected-warning@+5 {{initialization of pointer of type 'int *' to null from a constant boolean expression}}
-#else
-// expected-error@+3 {{cannot initialize a parameter of type 'int *' with an rvalue of type 'bool'}}
-// expected-note@+2 {{passing argument to parameter 'j' here}}
-#endif
+// expected-error@+2 {{cannot initialize a parameter of type 'int *' with an rvalue of type 'bool'}}
+// expected-note@+1 {{passing argument to parameter 'j' here}}
 void bar(int *j = false);
 
-#if __cplusplus > 199711L
-// expected-note@+2 4{{candidate function not viable: no known conversion}}
-#endif
+// expected-note@+1 4{{candidate function not viable: no known conversion}}
 void foo(int *i)
 {
   foo(false);
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{initialization of pointer of type 'int *' to null from a constant boolean expression}}
-#else
-// expected-error@-4 {{no matching function for call to 'foo'}}
-#endif
+// expected-error@-1 {{no matching function for call to 'foo'}}
 
   foo((int*)false); // OK: explicit cast
   foo(0); // OK: not a bool, even though it's convertible to bool
 
   foo(false == true);
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{initialization of pointer of type 'int *' to null from a constant boolean expression}}
-#else
-// expected-error@-4 {{no matching function for call to 'foo'}}
-#endif
+// expected-error@-1 {{no matching function for call to 'foo'}}
 
   foo((42 + 24) < 32);
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{initialization of pointer of type 'int *' to null from a constant boolean expression}}
-#else
-// expected-error@-4 {{no matching function for call to 'foo'}}
-#endif
+// expected-error@-1 {{no matching function for call to 'foo'}}
 
   const bool kFlag = false;
   foo(kFlag);
-#if __cplusplus <= 199711L
-// expected-warning@-2 {{initialization of pointer of type 'int *' to null from a constant boolean expression}}
-#else
-// expected-error@-4 {{no matching function for call to 'foo'}}
-#endif
+// expected-error@-1 {{no matching function for call to 'foo'}}
 }
 
 char f(struct Undefined*);
@@ -81,7 +54,6 @@ struct S2 {
 
 bool f5();
 bool f6(int);
-#if __cplusplus >= 201103L
 auto f7 = []{};
 auto f8 = [](){};
 
@@ -107,7 +79,6 @@ static bool IsFalse(const T& p) {
 bool use_instantiation() {
   return IsFalse([]() { return 0; });
 }
-#endif
 
 void bar() {
   bool b;
@@ -232,14 +203,10 @@ namespace Template {
   int a, b[3], c[3][3], d();
   template void f<&a>(); // expected-note {{instantiation of}}
   template void f<b>(); // expected-note {{instantiation of}}
-#if __cplusplus >= 201103L
   template void f<(int*)nullptr>(); // expected-note {{instantiation of}}
-#endif
   template void g<&b>(); // expected-note {{instantiation of}}
   template void g<c>(); // expected-note {{instantiation of}}
-#if __cplusplus >= 201103L
   template void g<(int(*)[3])nullptr>(); // expected-note {{instantiation of}}
-#endif
   template void h<d>();
 }
 #endif // __cplusplus < 201703L

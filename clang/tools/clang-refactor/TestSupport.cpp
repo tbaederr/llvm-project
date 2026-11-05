@@ -314,7 +314,6 @@ findTestSelectionRanges(StringRef Filename) {
 
   LangOptions LangOpts;
   LangOpts.CPlusPlus = 1;
-  LangOpts.CPlusPlus11 = 1;
   Lexer Lex(SourceLocation::getFromRawEncoding(0), LangOpts, Source.begin(),
             Source.begin(), Source.end());
   Lex.SetCommentRetentionState(true);

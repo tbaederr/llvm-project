@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify %std_cxx98- %s
+// RUN: %clang_cc1 -fsyntax-only -verify %std_cxx11- %s
 
 struct A {};
 enum B { Dummy };
@@ -18,10 +18,7 @@ void (*A::*ppfie)() throw();
 #endif
 
 int B::*pbi;
-#if __cplusplus <= 199711L // C++03 or earlier modes
-// expected-warning@-2 {{use of enumeration in a nested name specifier is a C++11 extension}}
-#endif
-// expected-error@-4 {{'pbi' does not point into a class}}
+// expected-error@-1 {{'pbi' does not point into a class}}
 int C::*pci; // expected-error {{'pci' does not point into a class}}
 void A::*pdv; // expected-error {{'pdv' declared as a member pointer to void}}
 int& A::*pdr; // expected-error {{'pdr' declared as a member pointer to a reference}}

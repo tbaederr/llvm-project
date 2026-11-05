@@ -158,7 +158,7 @@ static IMAKind ClassifyImplicitMemberAccess(Sema &SemaRef,
   switch (SemaRef.ExprEvalContexts.back().Context) {
   case Sema::ExpressionEvaluationContext::Unevaluated:
   case Sema::ExpressionEvaluationContext::UnevaluatedList:
-    if (isField && SemaRef.getLangOpts().CPlusPlus11)
+    if (isField)
       AbstractInstanceResult = IMA_Field_Uneval_Context;
     break;
 
@@ -315,9 +315,6 @@ ExprResult Sema::BuildPossibleImplicitMemberExpr(
         SS, TemplateKWLoc, R, TemplateArgs,
         /*IsKnownInstance=*/Classification == IMA_Instance, S);
   case IMA_Field_Uneval_Context:
-    Diag(R.getNameLoc(), diag::warn_cxx98_compat_non_static_member_use)
-      << R.getLookupNameInfo().getName();
-    [[fallthrough]];
   case IMA_Static:
   case IMA_Abstract:
   case IMA_Mixed_StaticOrExplicitContext:

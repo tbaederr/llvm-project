@@ -37,11 +37,11 @@ or
 
 Notes
 -----
-  -std=c++(98|11|14|17|20)-or-later:
+  -std=c++(11|14|17|20)-or-later:
     This flag will cause multiple runs within the same check_clang_tidy
     execution. Make sure you don't have shared state across these runs.
 
-  -std=c++(98|11|14|17|20)-or-earlier:
+  -std=c++(11|14|17|20)-or-earlier:
     Like -or-later, but expands to the given standard and every earlier one
     instead.
 """
@@ -452,7 +452,6 @@ class CheckRunner:
 
 
 CPP_STANDARDS = [
-    "c++98",
     "c++11",
     ("c++14", "c++1y"),
     ("c++17", "c++1z"),

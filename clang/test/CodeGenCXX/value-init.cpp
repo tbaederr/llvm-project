@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -triple x86_64-apple-darwin10 -emit-llvm -o - | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-CXX98
 // RUN: %clang_cc1 -std=c++17 %s -triple x86_64-apple-darwin10 -emit-llvm -o - | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-CXX17
 
 struct A {
@@ -114,14 +113,12 @@ void f() {
 
   // CHECK: call void @llvm.memset.p0.i64
   // CHECK-NOT: call void @llvm.memset.p0.i64
-  // CHECK-CXX98: call void @_ZN6PR98015Test2C1Ev
   // CHECK-CXX17: call void @_ZN6PR98014TestC1Ev
   // CHECK-NOT: call void @_ZN6PR98015Test2C1Ev
   Test2 empty2[3] = {};
 
   // CHECK: call void @llvm.memset.p0.i64
   // CHECK-NOT: call void @llvm.memset.p0.i64
-  // CHECK-CXX98: call void @_ZN6PR98015Test3C1Ev
   // CHECK-CXX17: call void @_ZN6PR98014TestC2Ev
   // CHECK-NOT: call void @llvm.memset.p0.i64
   // CHECK-NOT: call void @_ZN6PR98015Test3C1Ev
@@ -219,9 +216,7 @@ namespace test6 {
   // CHECK-NEXT: [[END:%.*]] = getelementptr inbounds [20 x [[A]]], ptr [[ARR]], i64 10
   // CHECK-NEXT: br label
   // Inner loop.
-  // CHECK-CXX98: [[CUR:%.*]] = phi ptr [ [[BEGIN]], {{%.*}} ], [ [[NEXT:%.*]], {{%.*}} ]
 
-  // CHECK-CXX98: [[IBEGIN:%.*]] = getelementptr inbounds [20 x [[A]]], ptr [[CUR]], i{{32|64}} 0, i{{32|64}} 0
   // CHECK-CXX17: [[IBEGIN:%.*]] = phi ptr [ [[BEGIN]], {{%.*}} ], [ [[NEXT:%.*]], {{%.*}} ]
 
   // CHECK-NEXT: [[IEND:%.*]] = getelementptr inbounds [[A]], ptr [[IBEGIN]], i64 20
@@ -232,7 +227,6 @@ namespace test6 {
   // CHECK-NEXT: [[T0:%.*]] = icmp eq ptr [[INEXT]], [[IEND]]
   // CHECK-NEXT: br i1 [[T0]],
 
-  // CHECK-CXX98: [[NEXT]] = getelementptr inbounds [20 x [[A]]], ptr [[CUR]], i64 1
   // CHECK-CXX17: [[NEXT]] = getelementptr inbounds [20 x [[A]]], ptr [[IBEGIN]], i64 1
   // CHECK-NEXT: [[T0:%.*]] = icmp eq ptr [[NEXT]], [[END]]
   // CHECK-NEXT: br i1 [[T0]]
@@ -330,11 +324,9 @@ int explicitly_defaulted() {
 // CHECK-NEXT: call void @_ZN8zeroinit2X2IiEC2Ev
 // CHECK-NEXT: ret void
 
-#if __cplusplus >= 201103L
 namespace transparent_init_list {
   struct optional_assign_base {};
   struct optional_data_dtor_base { char dummy_[24]; };
   struct optional : optional_data_dtor_base, optional_assign_base {};
   optional f(optional a) { return {optional(a)}; }
 }
-#endif

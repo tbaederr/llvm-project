@@ -1,8 +1,6 @@
 // RUN: %clang_cc1 -triple %itanium_abi_triple -fsyntax-only -verify %s
-// RUN: %clang_cc1 -triple %itanium_abi_triple -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -triple %itanium_abi_triple -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -triple %ms_abi_triple -DMSABI -fsyntax-only -verify %s
-// RUN: %clang_cc1 -triple %ms_abi_triple -DMSABI -fsyntax-only -std=c++98 -verify %s
 // RUN: %clang_cc1 -triple %ms_abi_triple -DMSABI -fsyntax-only -std=c++11 -verify %s
 
 namespace PR5557 {
@@ -81,75 +79,50 @@ namespace std {
 
 namespace PR7114 {
   class A { virtual ~A(); };
-#if __cplusplus <= 199711L
-  // expected-note@-2{{declared private here}}
-#else
-  // expected-note@-4 3 {{overridden virtual function is here}}
-#endif
+  // expected-note@-1 3 {{overridden virtual function is here}}
 
   template<typename T>
   class B {
   public:
     class Inner : public A { };
-#if __cplusplus <= 199711L
-// expected-error@-2{{base class 'A' has private destructor}}
-#else
-// expected-error@-4 2 {{deleted function '~Inner' cannot override a non-deleted function}}
-// expected-note@-5 2 {{destructor of 'Inner' is implicitly deleted because base class 'A' has an inaccessible destructor}}
+// expected-error@-1 2 {{deleted function '~Inner' cannot override a non-deleted function}}
+// expected-note@-2 2 {{destructor of 'Inner' is implicitly deleted because base class 'A' has an inaccessible destructor}}
 #ifdef MSABI
-// expected-note@-7 1 {{destructor of 'Inner' is implicitly deleted because base class 'A' has an inaccessible destructor}}
-#endif
+// expected-note@-4 1 {{destructor of 'Inner' is implicitly deleted because base class 'A' has an inaccessible destructor}}
 #endif
 
     static Inner i;
     static const unsigned value = sizeof(i) == 4;
-#if __cplusplus >= 201103L
-// expected-note@-2 {{in instantiation of member class 'PR7114::B<int>::Inner' requested here}}
-// expected-note@-3 {{in instantiation of member class 'PR7114::B<float>::Inner' requested here}}
-#endif
+// expected-note@-1 {{in instantiation of member class 'PR7114::B<int>::Inner' requested here}}
+// expected-note@-2 {{in instantiation of member class 'PR7114::B<float>::Inner' requested here}}
   };
 
   int f() { return B<int>::value; }
-#if __cplusplus >= 201103L
-// expected-note@-2 {{in instantiation of template class 'PR7114::B<int>' requested here}}
-#endif
+// expected-note@-1 {{in instantiation of template class 'PR7114::B<int>' requested here}}
 
 #ifdef MSABI
   void test_typeid(B<float>::Inner bfi) {
-#if __cplusplus <= 199711L
-// expected-note@-2 {{implicit destructor}}
-#else
-// expected-error@-4 {{attempt to use a deleted function}}
-// expected-note@-5 {{in instantiation of template class 'PR7114::B<float>' requested here}}
-#endif
+// expected-error@-1 {{attempt to use a deleted function}}
+// expected-note@-2 {{in instantiation of template class 'PR7114::B<float>' requested here}}
 
     (void)typeid(bfi);
 #else
   void test_typeid(B<float>::Inner bfi) {
-#if __cplusplus >= 201103L
-// expected-note@-2 {{in instantiation of template class 'PR7114::B<float>' requested here}}
-#endif
+// expected-note@-1 {{in instantiation of template class 'PR7114::B<float>' requested here}}
     (void)typeid(bfi);
-#if __cplusplus <= 199711L
-// expected-note@-2 {{implicit destructor}}
-#endif
 #endif
   }
 
   template<typename T>
   struct X : A {
-#if __cplusplus >= 201103L
-// expected-error@-2 {{deleted function '~X' cannot override a non-deleted function}}
-// expected-note@-3  {{destructor of 'X<int>' is implicitly deleted because base class 'A' has an inaccessible destructor}}
-#endif
+// expected-error@-1 {{deleted function '~X' cannot override a non-deleted function}}
+// expected-note@-2  {{destructor of 'X<int>' is implicitly deleted because base class 'A' has an inaccessible destructor}}
     void f() { }
   };
 
   void test_X(X<int> &xi, X<float> &xf) {
     xi.f();
-#if __cplusplus >= 201103L
-// expected-note@-2 {{in instantiation of template class 'PR7114::X<int>' requested here}}
-#endif
+// expected-note@-1 {{in instantiation of template class 'PR7114::X<int>' requested here}}
   }
 }
 

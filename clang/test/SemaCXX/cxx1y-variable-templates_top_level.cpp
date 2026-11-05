@@ -1,15 +1,10 @@
-// RUN: %clang_cc1 -std=c++98 -verify -fsyntax-only -Wno-unused-value -Wno-c++11-extensions -Wno-c++1y-extensions %s -DPRECXX11
 // RUN: %clang_cc1 -std=c++11 -verify -fsyntax-only -Wno-unused-value -Wno-c++1y-extensions %s
 // RUN: %clang_cc1 -std=c++17 -verify -fsyntax-only -Wno-unused-value %s
 // RUN: %clang_cc1 -std=c++20 -verify -fsyntax-only -Wno-unused-value %s
 // RUN: %clang_cc1 -std=c++2c -verify -fsyntax-only -Wno-unused-value %s
 
 
-#ifdef PRECXX11
-  #define CONST const
-#else
   #define CONST constexpr
-#endif
 
 template<typename T>
 T pi = T(3.1415926535897932385); // expected-note 2{{declared here}}
@@ -18,9 +13,7 @@ template<typename T>
 CONST T cpi = T(3.1415926535897932385); // expected-note {{template is declared here}}
 
 template<typename T> extern CONST T vc;
-#ifndef PRECXX11
-// expected-error@-2 {{constexpr variable declaration must be a definition}}
-#endif
+// expected-error@-1 {{constexpr variable declaration must be a definition}}
 
 namespace use_in_top_level_funcs {
 
@@ -49,11 +42,9 @@ namespace use_in_top_level_funcs {
 
   double use_circular_area(double r) {
     CONST float t = const_circular_area(2.0) - 12;
-#ifndef PRECXX11
     static_assert(const_circular_area(2) == 12, "");
     CONST int test = (t > 0) && (t < 1);
     static_assert(test, "");
-#endif
     return circular_area(r);
   }
 }
@@ -103,15 +94,12 @@ namespace odr_tmpl {
                                           // expected-note {{previous declaration is here}}
     template<typename T> extern int v;    // expected-error {{redeclaration of 'v' with a different type: 'int' vs 'T'}}
 
-#ifndef PRECXX11
     template<typename T> extern auto v;   // expected-error {{declaration of variable 'v' with deduced type 'auto' requires an initializer}}
-#endif
 
     template<typename T> T var = T();     // expected-note {{previous definition is here}}
     extern int var;                       // expected-error {{redefinition of 'var' as different kind of symbol}}
   }
 
-#ifndef PRECXX11
   namespace pvt_auto {
     template<typename T> auto v0; // expected-error {{declaration of variable 'v0' with deduced type 'auto' requires an initializer}}
     template<typename T> auto v1 = T();  // expected-note {{previous definition is here}}
@@ -123,7 +111,6 @@ namespace odr_tmpl {
     template<typename T> auto v4 = T();
     template<typename T> extern auto v4;   // expected-error {{declaration of variable 'v4' with deduced type 'auto' requires an initializer}}
   }
-#endif
 
 }
 
@@ -158,7 +145,6 @@ namespace explicit_instantiation {
   template CONST int pi1<int>;   // expected-note {{previous explicit instantiation is here}}
   template CONST int pi1<int>;   // expected-error {{duplicate explicit instantiation of 'pi1<int>'}}
 
-#ifndef PRECXX11
   namespace auto_var {
     template<typename T> auto var0 = T();
     template auto var0<int>;    // expected-error {{'auto' variable template instantiation is not allowed}}
@@ -166,7 +152,6 @@ namespace explicit_instantiation {
     template<typename T> auto var = T();
     template int var<int>;
   }
-#endif
 
   template<typename=int> int missing_args; // expected-note {{here}}
   template int missing_args; // expected-error {{must specify a template argument list}}
@@ -190,7 +175,6 @@ namespace explicit_specialization {
 
     template<> CONST int pi2<int,int> = 4;
 
-#ifndef PRECXX11
     void foo() {
       static_assert(pi2<int,int> == 4, "");
       static_assert(pi2<float,int> == 2, "");
@@ -199,7 +183,6 @@ namespace explicit_specialization {
       static_assert(pi2<float,float> == 1, "");
       static_assert(pi2<float,float> == pi2<float,double>, "");
     }
-#endif
   }
 
   namespace ambiguous {
@@ -244,15 +227,11 @@ namespace explicit_specialization {
     T pi0 = T(3.1415926535897932385);
 
     template<> int pi0<int> = 10;   // expected-note 3{{previous definition is here}}
-#ifndef PRECXX11
-// expected-note@-2 {{previous definition is here}}
-#endif
+// expected-note@-1 {{previous definition is here}}
     template<> int pi0<int> = 10;   // expected-error {{redefinition of 'pi0<int>'}}
     template<> CONST int pi0<int> = 10; // expected-error {{redefinition of 'pi0' with a different type: 'const int' vs 'int'}}
     template<> float pi0<int> = 10; // expected-error {{redefinition of 'pi0' with a different type: 'float' vs 'int'}}
-#ifndef PRECXX11
     template<> auto pi0<int> = 10;  // expected-error {{redefinition of 'pi0<int>'}}
-#endif
 
 
     template<typename T>
@@ -291,7 +270,6 @@ namespace explicit_specialization {
     template<typename T> CONST int pi2<T,int> = 2;
   }
 
-#ifndef PRECXX11
   namespace auto_var {
     template<typename T, typename> auto var0 = T();
     template<typename T> auto var0<T,int> = T();
@@ -306,7 +284,6 @@ namespace explicit_specialization {
       int b = var<int,int>;
     }
   }
-#endif
 
   namespace extern_var {
     // TODO:
@@ -315,19 +292,15 @@ namespace explicit_specialization {
   namespace diff_type {
     // TODO:
     template<typename T> T* var = new T();
-#ifndef PRECXX11
     template<typename T> auto var<T*> = T();  // expected-note {{previous definition is here}}
     template<typename T> T var<T*> = T();     // expected-error {{redefinition of 'var' with a different type: 'T' vs 'auto'}}
-#endif
   }
 }
 
 namespace narrowing {
   template<typename T> T v = {1234};  // expected-warning {{implicit conversion from 'int' to 'char' changes value from 1234 to}}
-#ifndef PRECXX11
-  // expected-error@-2 {{constant expression evaluates to 1234 which cannot be narrowed to type 'char'}}\
-  // expected-note@-2 {{insert an explicit cast to silence this issue}}
-#endif
+  // expected-error@-1 {{constant expression evaluates to 1234 which cannot be narrowed to type 'char'}}\
+  // expected-note@-1 {{insert an explicit cast to silence this issue}}
   int k = v<char>;        // expected-note {{in instantiation of variable template specialization 'narrowing::v<char>' requested here}}
 }
 
@@ -339,7 +312,6 @@ namespace attributes {
   // TODO:
 }
 
-#ifndef PRECXX11
 namespace arrays {
   template<typename T>
   T* arr = new T[10]{T(10), T(23)};
@@ -357,7 +329,6 @@ namespace arrays {
     float nof = arr<float>[3];  // No bounds-check in C++
   }
 }
-#endif
 
 namespace nested {
 
@@ -391,15 +362,11 @@ namespace nested {
   namespace n1 {
     template<typename T>
     T pi1a = T(3.1415926535897932385); // expected-note {{explicitly specialized declaration is here}}
-#ifndef PRECXX11
-// expected-note@-2 {{explicit instantiation refers here}}
-#endif
+// expected-note@-1 {{explicit instantiation refers here}}
 
     template<typename T>
     T pi1b = T(3.1415926535897932385); // expected-note {{explicitly specialized declaration is here}}
-#ifndef PRECXX11
-// expected-note@-2 {{explicit instantiation refers here}}
-#endif
+// expected-note@-1 {{explicit instantiation refers here}}
   }
 
   namespace use_n1a {
@@ -407,9 +374,7 @@ namespace nested {
     int i1 = pi1a<int>;
 
     template float pi1a<float>;
-#ifndef PRECXX11
-// expected-error@-2 {{explicit instantiation of 'pi1a<float>' not in a namespace enclosing 'n1'}}
-#endif
+// expected-error@-1 {{explicit instantiation of 'pi1a<float>' not in a namespace enclosing 'n1'}}
     float f1 = pi1a<float>;
 
     template<> double pi1a<double> = 5.2; // expected-error {{not in a namespace enclosing 'n1'}}
@@ -420,9 +385,7 @@ namespace nested {
     int i1 = n1::pi1b<int>;
 
     template float n1::pi1b<float>;
-#ifndef PRECXX11
-// expected-error@-2 {{explicit instantiation of 'pi1b<float>' not in a namespace enclosing 'n1'}}
-#endif
+// expected-error@-1 {{explicit instantiation of 'pi1b<float>' not in a namespace enclosing 'n1'}}
     float f1 = n1::pi1b<float>;
 
     template<> double n1::pi1b<double> = 5.2;  // expected-error {{not in a namespace enclosing 'n1'}}
@@ -444,10 +407,8 @@ namespace PR18530 {
 }
 
 namespace PR19152 {
-#ifndef PRECXX11
   template<typename T> const auto x = 1;
   static_assert(x<int> == 1, "");
-#endif
 }
 
 namespace PR19169 {
@@ -459,19 +420,16 @@ namespace PR19169 {
   template<> int g<double>; // expected-error {{no variable template matches specialization; did you mean to use 'g' as function template instead?}}
 }
 
-#ifndef PRECXX11
 template <typename... Args> struct Variadic_t { };
 template <typename... Args> Variadic_t<Args...> Variadic;
 auto variadic1 = Variadic<>;
 auto variadic2 = Variadic<int, int>;
-#endif
 
 namespace VexingParse {
   template <typename> int var; // expected-note {{declared here}}
   int x(var); // expected-error {{use of variable template 'var' requires template arguments}}
 }
 
-#ifndef PRECXX11
 
 namespace GH79750 {
 
@@ -512,7 +470,6 @@ auto b<I, I * 2, 5> = b<I, I * 2, 5l>; // expected-error {{variable template par
 template <> auto b<0, 0, 0> = b<0, 0, 0>; // expected-error {{variable template explicit specialization 'b<0, 0, 0>' declared with deduced type 'auto' cannot appear in its own initializer}}
 }
 
-#endif
 
 #if __cplusplus > 201702L
 namespace GH140622 {

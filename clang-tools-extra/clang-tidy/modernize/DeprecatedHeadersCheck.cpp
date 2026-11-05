@@ -25,8 +25,7 @@ class IncludeModernizePPCallbacks : public PPCallbacks {
 public:
   explicit IncludeModernizePPCallbacks(
       std::vector<IncludeMarker> &IncludesToBeProcessed,
-      const LangOptions &LangOpts, const SourceManager &SM,
-      bool CheckHeaderFile);
+      const SourceManager &SM, bool CheckHeaderFile);
 
   void InclusionDirective(SourceLocation HashLoc, const Token &IncludeTok,
                           StringRef FileName, bool IsAngled,
@@ -86,8 +85,7 @@ void DeprecatedHeadersCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
 void DeprecatedHeadersCheck::registerPPCallbacks(
     const SourceManager &SM, Preprocessor *PP, Preprocessor *ModuleExpanderPP) {
   PP->addPPCallbacks(std::make_unique<IncludeModernizePPCallbacks>(
-      IncludesToBeProcessed, getLangOpts(), PP->getSourceManager(),
-      CheckHeaderFile));
+      IncludesToBeProcessed, PP->getSourceManager(), CheckHeaderFile));
 }
 void DeprecatedHeadersCheck::registerMatchers(
     ast_matchers::MatchFinder *Finder) {
@@ -132,7 +130,7 @@ void DeprecatedHeadersCheck::check(
 
 IncludeModernizePPCallbacks::IncludeModernizePPCallbacks(
     std::vector<IncludeMarker> &IncludesToBeProcessed,
-    const LangOptions &LangOpts, const SourceManager &SM, bool CheckHeaderFile)
+    const SourceManager &SM, bool CheckHeaderFile)
     : IncludesToBeProcessed(IncludesToBeProcessed), SM(SM),
       CheckHeaderFile(CheckHeaderFile) {
   static constexpr std::pair<StringRef, StringRef> CXX98Headers[] = {
@@ -153,8 +151,7 @@ IncludeModernizePPCallbacks::IncludeModernizePPCallbacks(
       {"inttypes.h", "cinttypes"}, {"tgmath.h", "ctgmath"},
       {"uchar.h", "cuchar"},
   };
-  if (LangOpts.CPlusPlus11)
-    CStyledHeaderToCxx.insert(std::begin(CXX11Headers), std::end(CXX11Headers));
+  CStyledHeaderToCxx.insert(std::begin(CXX11Headers), std::end(CXX11Headers));
 
   static constexpr StringRef HeadersToDelete[] = {"stdalign.h", "stdbool.h",
                                                   "iso646.h"};

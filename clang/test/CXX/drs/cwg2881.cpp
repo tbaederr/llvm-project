@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify=expected,cxx98-20
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify=expected,cxx98-20
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify=expected,cxx98-20
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify=expected,cxx98-20
@@ -115,7 +114,6 @@ struct Ambiguous : Indirect<T>, T {
     struct cwg2881::Ambiguous<class (lambda at {{.+}})> -> Indirect<class (lambda at {{.+}})> -> class (lambda at {{.+}})
     struct cwg2881::Ambiguous<class (lambda at {{.+}})> -> class (lambda at {{.+}})}}*/
 //   since-cxx23-note-re@#cwg2881-f4 {{in instantiation of template class 'cwg2881::Ambiguous<(lambda at {{.+}})>' requested here}}
-//   since-cxx34-note-re@#cwg2881-f4-call {{while substituting deduced template arguments into function template 'f4' [with L = (lambda at {{.+}})]}}
   using Indirect<T>::operator();
 };
 

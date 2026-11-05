@@ -2605,28 +2605,14 @@ static TryCastResult TryReinterpretCast(Sema &Self, ExprResult &SrcExpr,
   // Not casting away constness, so the only remaining check is for compatible
   // pointer categories.
 
-  if (SrcType->isFunctionPointerType()) {
-    if (DestType->isFunctionPointerType()) {
-      // C++ 5.2.10p6: A pointer to a function can be explicitly converted to
-      // a pointer to a function of a different type.
-      return SuccessResult;
-    }
-
-    // C++0x 5.2.10p8: Converting a pointer to a function into a pointer to
-    //   an object type or vice versa is conditionally-supported.
-    // Compilers support it in C++03 too, though, because it's necessary for
-    // casting the return value of dlsym() and GetProcAddress().
-    // FIXME: Conditionally-supported behavior should be configurable in the
-    // TargetInfo or similar.
-    Self.DiagCompat(OpRange.getBegin(), diag_compat::cast_fn_obj) << OpRange;
+  // C++ 5.2.10p6: A pointer to a function can be explicitly converted to
+  // a pointer to a function of a different type.
+  // C++11 5.2.10p8: Converting a pointer to a function into a pointer to
+  //   an object type or vice versa is conditionally-supported.
+  // FIXME: Conditionally-supported behavior should be configurable in the
+  // TargetInfo or similar.
+  if (SrcType->isFunctionPointerType() || DestType->isFunctionPointerType())
     return SuccessResult;
-  }
-
-  if (DestType->isFunctionPointerType()) {
-    // See above.
-    Self.DiagCompat(OpRange.getBegin(), diag_compat::cast_fn_obj) << OpRange;
-    return SuccessResult;
-  }
 
   // Diagnose address space conversion in nested pointers.
   QualType DestPtee = DestType->getPointeeType().isNull()

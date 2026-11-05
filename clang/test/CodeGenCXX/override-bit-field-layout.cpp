@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %std_cxx98-14 -w -triple=x86_64-pc-win32 -fms-compatibility -fdump-record-layouts-simple -foverride-record-layout=%S/Inputs/override-bit-field-layout.layout %s | FileCheck %s --check-prefixes=CHECK,PRE17
+// RUN: %clang_cc1 %std_cxx11-14 -w -triple=x86_64-pc-win32 -fms-compatibility -fdump-record-layouts-simple -foverride-record-layout=%S/Inputs/override-bit-field-layout.layout %s | FileCheck %s --check-prefixes=CHECK,PRE17
 // RUN: %clang_cc1 -std=c++17 -w -triple=x86_64-pc-win32 -fms-compatibility -fdump-record-layouts-simple -foverride-record-layout=%S/Inputs/override-bit-field-layout.layout %s | FileCheck %s --check-prefixes=CHECK,CXX17
 // RUN: %clang_cc1 %std_cxx20- -w -triple=x86_64-pc-win32 -fms-compatibility -fdump-record-layouts-simple -foverride-record-layout=%S/Inputs/override-bit-field-layout.layout %s | FileCheck %s --check-prefixes=CHECK,CXX20
 

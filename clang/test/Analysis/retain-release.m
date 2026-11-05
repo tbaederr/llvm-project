@@ -9,12 +9,12 @@
 // RUN:     -analyzer-checker=osx.cocoa.ClassRelease,osx.cocoa.RetainCount\
 // RUN:     -analyzer-checker=debug.ExprInspection -fblocks -verify %s\
 // RUN:     -Wno-objc-root-class -analyzer-output=plist -o %t.objcpp.plist\
-// RUN:     -x objective-c++ -std=gnu++98
+// RUN:     -x objective-c++ -std=gnu++11
 // RUN: %clang_analyze_cc1 -triple x86_64-apple-darwin10\
 // RUN:     -analyzer-checker=core,osx.coreFoundation.CFRetainRelease\
 // RUN:     -analyzer-checker=osx.cocoa.ClassRelease,osx.cocoa.RetainCount\
 // RUN:     -analyzer-checker=debug.ExprInspection -fblocks -verify %s\
-// RUN:     -Wno-objc-root-class -x objective-c++ -std=gnu++98\
+// RUN:     -Wno-objc-root-class -x objective-c++ -std=gnu++11\
 // RUN:     -analyzer-config osx.cocoa.RetainCount:TrackNSCFStartParam=true\
 // RUN:     -DTRACK_START_PARAM
 // RUN: %normalize_plist <%t.objcpp.plist | diff -ub %S/Inputs/expected-plists/retain-release.m.objcpp.plist -

@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wno-non-c-typedef-for-linkage -std=gnu++11 %s
-// RUN: %clang_cc1 -fsyntax-only -verify -Wno-non-c-typedef-for-linkage -Wno-c++11-extensions -Wno-local-type-template-args %s -std=gnu++98
 // RUN: %clang_cc1 -fsyntax-only -verify -Wno-non-c-typedef-for-linkage -Wno-c++11-extensions -Wno-local-type-template-args -fmodules %s
 
 namespace test1 {
@@ -250,9 +249,4 @@ namespace typedef_name_for_linkage {
   typedef struct {
     void f() { struct Inner {}; Use<Inner> ui; }
   } F;
-#if __cplusplus < 201103L
-  // expected-error@-4 {{given name for linkage purposes by typedef declaration after its linkage was computed}}
-  // expected-note@-4 {{due to this member}}
-  // expected-note@-4 {{by this typedef}}
-#endif
 }

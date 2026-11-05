@@ -1,6 +1,6 @@
-// RUN: not %clang -std=c++98 %s -Wno-c++0x-compat -fsyntax-only 2>&1 | FileCheck -check-prefix=CXX98 %s
-// RUN: not %clang -std=gnu++98 %s -Wno-c++0x-compat -fsyntax-only 2>&1 | FileCheck -check-prefix=GNUXX98 %s
-// RUN: not %clang -std=c++03 %s -Wno-c++0x-compat -fsyntax-only 2>&1 | FileCheck -check-prefix=CXX98 %s
+// RUN: not %clang -std=c++98 %s -fsyntax-only 2>&1 | FileCheck -check-prefix=CXX98 %s
+// RUN: not %clang -std=gnu++98 %s -fsyntax-only 2>&1 | FileCheck -check-prefix=GNUXX98 %s
+// RUN: not %clang -std=c++03 %s -fsyntax-only 2>&1 | FileCheck -check-prefix=CXX03 %s
 // RUN: not %clang -std=c++0x %s -fsyntax-only 2>&1 | FileCheck -check-prefix=CXX11 %s
 // RUN: not %clang -std=gnu++0x %s -fsyntax-only 2>&1 | FileCheck -check-prefix=GNUXX11 %s
 // RUN: not %clang -std=c++11 %s -fsyntax-only 2>&1 | FileCheck -check-prefix=CXX11 %s
@@ -19,11 +19,9 @@ void f(int n) {
   decltype(n)();
 }
 
-// CXX98: undeclared identifier 'typeof'
-// CXX98: undeclared identifier 'decltype'
-
-// GNUXX98-NOT: undeclared identifier 'typeof'
-// GNUXX98: undeclared identifier 'decltype'
+// CXX98: error: invalid value 'c++98' in '-std=c++98'
+// GNUXX98: error: invalid value 'gnu++98' in '-std=gnu++98'
+// CXX03: error: invalid value 'c++03' in '-std=c++03'
 
 // CXX11: undeclared identifier 'typeof'
 // CXX11-NOT: undeclared identifier 'decltype'

@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,CXX98
 // RUN: %clang_cc1 -std=c++11 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
 // RUN: %clang_cc1 -std=c++14 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
 // RUN: %clang_cc1 -std=c++17 %s -triple x86_64-linux-gnu -emit-llvm -o - -fexceptions -fcxx-exceptions -pedantic-errors | llvm-cxxfilt -n | FileCheck %s --check-prefixes CHECK,SINCE-CXX11
@@ -24,5 +23,4 @@ void f() {
 // CHECK:              br {{.+}}, label {{.+}}, label %arraydestroy.body
 // CHECK-LABEL:      arraydestroy.body:         
 // CHECK:              [[ARRAYDESTROY_ELEMENT:%.*]] = getelementptr {{.+}}, i64 -1
-// CXX98-NEXT:         invoke void @cwg1807::S::~S()({{.*}}[[ARRAYDESTROY_ELEMENT]])
 // SINCE-CXX11-NEXT:   call void @cwg1807::S::~S()({{.*}}[[ARRAYDESTROY_ELEMENT]])

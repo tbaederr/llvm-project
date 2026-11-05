@@ -2234,20 +2234,16 @@ Sema::AccessResult Sema::CheckDestructorAccess(SourceLocation Loc,
   return CheckAccess(*this, Loc, Entity);
 }
 
-Sema::AccessResult Sema::CheckConstructorAccess(SourceLocation UseLoc,
-                                                CXXConstructorDecl *Constructor,
-                                                DeclAccessPair Found,
-                                                const InitializedEntity &Entity,
-                                                bool IsCopyBindingRefToTemp) {
+Sema::AccessResult Sema::CheckConstructorAccess(
+    SourceLocation UseLoc, CXXConstructorDecl *Constructor,
+    DeclAccessPair Found, const InitializedEntity &Entity) {
   if (!getLangOpts().AccessControl || Found.getAccess() == AS_public)
     return AR_accessible;
 
   PartialDiagnostic PD(PDiag());
   switch (Entity.getKind()) {
   default:
-    PD = PDiag(IsCopyBindingRefToTemp
-                 ? diag::ext_rvalue_to_reference_access_ctor
-                 : diag::err_access_ctor);
+    PD = PDiag(diag::err_access_ctor);
 
     break;
 

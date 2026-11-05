@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-23,cxx98-11,cxx98-14,cxx98-17,cxx98
 // RUN: %clang_cc1 -std=c++11 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-23,cxx98-11,cxx98-14,cxx98-17,since-cxx11
 // RUN: %clang_cc1 -std=c++14 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-23,cxx98-14,cxx98-17,since-cxx11
 // RUN: %clang_cc1 -std=c++17 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-23,since-cxx17,cxx98-17,since-cxx11
@@ -6,17 +5,12 @@
 // RUN: %clang_cc1 -std=c++23 %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx98-23,since-cxx23,since-cxx20,since-cxx17,since-cxx11
 // RUN: %clang_cc1 -std=c++2c %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx26,since-cxx23,since-cxx20,since-cxx17,since-cxx11
 
-#if __cplusplus == 199711L
-#define static_assert(...) __extension__ _Static_assert(__VA_ARGS__)
-// cxx98-error@-1 {{variadic macros are a C99 feature}}
-#endif
 
 // FIXME: This is included to avoid a diagnostic with no source location
 // pointing at the implicit operator new. We can't match such a diagnostic
 // with -verify.
 __extension__ typedef __SIZE_TYPE__ size_t;
 void *operator new(size_t); // #cwg5xx-global-operator-new
-// cxx98-error@-1 {{'operator new' is missing exception specification 'throw(std::bad_alloc)'}}
 #if __cplusplus >= 201703L
 namespace std {
   enum class align_val_t : size_t {};
@@ -80,8 +74,7 @@ namespace cwg506 { // cwg506: 2.7
   struct NonPod { ~NonPod(); };
   void f(...);
   void g(NonPod np) { f(np); }
-  // cxx98-error@-1 {{cannot pass object of non-POD type 'NonPod' through variadic function; call will abort at runtime}}
-  // since-cxx11-error@-2 {{cannot pass object of non-trivial type 'NonPod' through variadic function; call will abort at runtime}}
+  // since-cxx11-error@-1 {{cannot pass object of non-trivial type 'NonPod' through variadic function; call will abort at runtime}}
 } // namespace cwg506
 
 // cwg508: na
@@ -93,9 +86,6 @@ namespace cwg512 { // cwg512: 3.0
     A(int); // #cwg512-A-ctor
   };
   union U { A a; };
-  // cxx98-error@-1 {{union member 'a' has a non-trivial default constructor}}
-  //   cxx98-note@#cwg512-A {{because type 'cwg512::A' has no default constructor}}
-  //   cxx98-note@#cwg512-A-ctor {{implicit default constructor suppressed by user-declared constructor}}
 } // namespace cwg512
 
 // cwg513: na
@@ -117,7 +107,6 @@ namespace cwg515 { // cwg515: sup 1017
 
   struct A { int a; };
   struct B { void f() { int k = sizeof(A::a); } };
-  // cxx98-error@-1 {{invalid use of non-static data member 'a'}}
 } // namespace cwg515
 
 // cwg516: na
@@ -145,7 +134,6 @@ namespace cwg517 { // cwg517: no
 
 namespace cwg518 { // cwg518: 2.7 c++11
   enum E { e, };
-  // cxx98-error@-1 {{commas at the end of enumerator lists are a C++11 extension}}
 } // namespace cwg518
 
 // cwg519 is in cwg519.cpp
@@ -455,7 +443,6 @@ namespace cwg535 { // cwg535: 3.1
 
   void f() { throw a1; }
 
-#if __cplusplus >= 201103L
   struct C {
     constexpr C() : n(0) {}
     template<typename T> constexpr C(T&t) : n(t.n == 0 ? throw 0 : 0) {}
@@ -464,7 +451,6 @@ namespace cwg535 { // cwg535: 3.1
   constexpr C c() { return C(); }
   // ok, copy is elided
   constexpr C x = c();
-#endif
 } // namespace cwg535
 
 // cwg536: na
@@ -501,7 +487,6 @@ const cwg539_f(const a) {
     operator const();
     // expected-error@-1 {{expected a type}}
   };
-#if __cplusplus >= 201103L
   int arr[3];
   // FIXME: The extra braces here are to avoid the parser getting too
   // badly confused when recovering here. We should fix this recovery.
@@ -526,7 +511,6 @@ const cwg539_f(const a) {
   // since-cxx11-error@-1 {{expected a type}}
   auto f() -> const;
   // since-cxx11-error@-1 {{expected a type}}
-#endif
 }
 } // namespace cwg539
 
@@ -575,7 +559,6 @@ namespace cwg541 { // cwg541: 2.7
 } // namespace cwg541
 
 namespace cwg542 { // cwg542: 3.5
-#if __cplusplus >= 201103L
   // In C++20 A and B are no longer aggregates and thus the constructor is
   // called, which fails.
   struct A { A() = delete; int n; }; // #cwg542-A
@@ -593,7 +576,6 @@ namespace cwg542 { // cwg542: 3.5
   B b[32] = {}; // ok, constructor not called
   // since-cxx20-error@-1 {{calling a private constructor of class 'cwg542::B'}}
   //   since-cxx20-note@#cwg542-B-ctor {{declared private here}}
-#endif
 } // namespace cwg542
 
 namespace cwg543 { // cwg543: 3.0
@@ -821,7 +803,6 @@ namespace cwg565 { // cwg565: 2.7
   template<typename T> int f(T*);
   template<typename T> void f(T);
   template<typename T, int = 0> int f(T);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T> int f(T, int = 0);
   template<typename T> int f(T);
   // expected-error@-1 {{declaration conflicts with target of using declaration already in scope}}
@@ -830,9 +811,7 @@ namespace cwg565 { // cwg565: 2.7
 } // namespace cwg565
 
 namespace cwg566 { // cwg566: 3.1
-#if __cplusplus >= 201103L
   static_assert(int(-3.99) == -3, "");
-#endif
 } // namespace cwg566
 
 // cwg567: na
@@ -867,12 +846,9 @@ namespace cwg568 { // cwg568: 3.0 c++11
 
   void f(...);
   void g(trivial t) { f(t); }
-  // cxx98-error@-1 {{cannot pass object of non-POD type 'trivial' through variadic function; call will abort at runtime}}
 
   void jump() {
     goto x;
-    // cxx98-error@-1 {{cannot jump from this goto statement to its label}}
-    //   cxx98-note@#cwg568-t {{jump bypasses initialization of non-POD variable}}
     trivial t; // #cwg568-t
   x: ;
   }
@@ -882,7 +858,6 @@ namespace cwg569 { // cwg569: 2.7 c++11
   // FIXME: This is a DR issue against C++98, so should probably apply there
   // too.
   ;;;;;
-  // cxx98-error@-1 {{extra ';' outside of a function is a C++11 extension}}
 } // namespace cwg569
 
 namespace cwg570 { // cwg570: dup 633
@@ -904,9 +879,7 @@ namespace cwg573 { // cwg573: no
   void *a;
   int *b = reinterpret_cast<int*>(a);
   void (*c)() = reinterpret_cast<void(*)()>(a);
-  // cxx98-error@-1 {{cast between pointer-to-function and pointer-to-object is a C++11 extension}}
   void *d = reinterpret_cast<void*>(c);
-  // cxx98-error@-1 {{cast between pointer-to-function and pointer-to-object is a C++11 extension}}
   void f() { delete a; }
   // cxx98-23-error@-1 {{cannot delete expression with pointer-to-'void' type 'void *'}}
   // since-cxx26-error@-2 {{cannot delete pointer to incomplete type 'void'}}
@@ -924,7 +897,6 @@ namespace cwg574 { // cwg574: 3.0
   struct B {
     B &operator=(const B&) volatile; // #cwg574-B-copy-assign
   };
-#if __cplusplus >= 201103L
   struct C {
     C &operator=(const C&) &; // #cwg574-C-copy-assign
   };
@@ -941,7 +913,6 @@ namespace cwg574 { // cwg574: 3.0
     //   since-cxx11-note@#cwg574-D-copy-assign {{candidate function not viable: expects an rvalue for object argument}}
     D() = d;
   }
-#endif
   struct Test {
     friend A &A::operator=(const A&);
     // expected-error@-1 {{friend declaration of 'operator=' does not match any declaration in 'cwg574::A'}}
@@ -956,7 +927,7 @@ namespace cwg574 { // cwg574: 3.0
     friend D &D::operator=(const D&);
     // since-cxx23-error@-1 {{conflicting types for 'operator='}}
     //   since-cxx23-note@#cwg574-D-copy-assign {{previous declaration is here}}
-#elif __cplusplus >= 201103L
+#else
     // FIXME: We shouldn't produce the 'cannot overload' diagnostics here.
     friend C &C::operator=(const C&); // #cwg574-test-C
     // since-cxx11-error@#cwg574-test-C {{cannot overload a member function with ref-qualifier '&' with a member function without a ref-qualifier}}
@@ -974,11 +945,8 @@ namespace cwg574 { // cwg574: 3.0
 
 namespace cwg575 { // cwg575: 2.7
   template<typename T, typename U = typename T::type> void a(T); void a(...);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T, typename T::type U = 0> void b(T); void b(...);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T, int U = T::value> void c(T); void c(...);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T> void d(T, int = T::value); void d(...);
   // expected-error@-1 {{type 'int' cannot be used prior to '::' because it has no members}}
   //   expected-note@#cwg575-d {{in instantiation of default function argument expression for 'd<int>' required here}}
@@ -990,9 +958,7 @@ namespace cwg575 { // cwg575: 2.7
   }
 
   template<typename T = int&> void f(T* = 0);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   template<typename T = int> void f(T = 0);
-  // cxx98-error@-1 {{default template arguments for a function template are a C++11 extension}}
   void g() { f<>(); }
 
   template<typename T> T &h(T *);

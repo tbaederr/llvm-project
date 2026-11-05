@@ -1,9 +1,3 @@
-// RUN: %clang_cc1 %s -triple x86_64-apple-darwin10 -emit-llvm -o - -mconstructor-aliases -fcxx-exceptions -fexceptions -O1 -disable-llvm-passes -std=c++03 > %t
-// RUN: FileCheck --check-prefix=CHECK1 --input-file=%t %s
-// RUN: FileCheck --check-prefix=CHECK2 --input-file=%t %s
-// RUN: FileCheck --check-prefix=CHECK3 --input-file=%t %s
-// RUN: FileCheck --check-prefixes=CHECK4,CHECK4v03 --input-file=%t %s
-// RUN: FileCheck --check-prefixes=CHECK5,CHECK5v03 --input-file=%t %s
 // RUN: %clang_cc1 %s -triple x86_64-apple-darwin10 -emit-llvm -o - -mconstructor-aliases -fcxx-exceptions -fexceptions -O1 -disable-llvm-passes -std=c++11 > %t2
 // RUN: FileCheck --check-prefix=CHECK1    --input-file=%t2 %s
 // RUN: FileCheck --check-prefix=CHECK2v11 --input-file=%t2 %s
@@ -96,12 +90,6 @@ namespace test0 {
 
 // complete destructor alias tested above
 
-// CHECK2-LABEL: @_ZN5test01AD1Ev ={{.*}} unnamed_addr alias {{.*}} @_ZN5test01AD2Ev
-// CHECK2-LABEL: define{{.*}} void @_ZN5test01AD2Ev(ptr {{[^,]*}} %this) unnamed_addr
-// CHECK2: invoke void @_ZN5test06MemberD1Ev
-// CHECK2:   unwind label [[MEM_UNWIND:%[a-zA-Z0-9.]+]]
-// CHECK2: invoke void @_ZN5test04BaseD2Ev
-// CHECK2:   unwind label [[BASE_UNWIND:%[a-zA-Z0-9.]+]]
 
 // In C++11, the destructors are often known not to throw.
 // CHECK2v11-LABEL: @_ZN5test01AD1Ev ={{.*}} unnamed_addr alias {{.*}} @_ZN5test01AD2Ev
@@ -116,23 +104,11 @@ namespace test0 {
   B::~B() try { } catch (int i) {}
   // It will suppress the delegation optimization here, though.
 
-// CHECK2-LABEL: define{{.*}} void @_ZN5test01BD2Ev(ptr {{[^,]*}} %this, ptr noundef %vtt) unnamed_addr
-// CHECK2: invoke void @_ZN5test06MemberD1Ev
-// CHECK2:   unwind label [[MEM_UNWIND:%[a-zA-Z0-9.]+]]
-// CHECK2: invoke void @_ZN5test04BaseD2Ev
-// CHECK2:   unwind label [[BASE_UNWIND:%[a-zA-Z0-9.]+]]
 
 // CHECK2v11-LABEL: define{{.*}} void @_ZN5test01BD2Ev(ptr {{[^,]*}} %this, ptr noundef %vtt) unnamed_addr
 // CHECK2v11: call void @_ZN5test06MemberD1Ev
 // CHECK2v11: call void @_ZN5test04BaseD2Ev
 
-// CHECK2-LABEL: define{{.*}} void @_ZN5test01BD1Ev(ptr {{[^,]*}} %this) unnamed_addr
-// CHECK2: invoke void @_ZN5test06MemberD1Ev
-// CHECK2:   unwind label [[MEM_UNWIND:%[a-zA-Z0-9.]+]]
-// CHECK2: invoke void @_ZN5test04BaseD2Ev
-// CHECK2:   unwind label [[BASE_UNWIND:%[a-zA-Z0-9.]+]]
-// CHECK2: invoke void @_ZN5test05VBaseD2Ev
-// CHECK2:   unwind label [[VBASE_UNWIND:%[a-zA-Z0-9.]+]]
 
 // CHECK2v11-LABEL: define{{.*}} void @_ZN5test01BD1Ev(ptr {{[^,]*}} %this) unnamed_addr
 // CHECK2v11: call void @_ZN5test06MemberD1Ev
@@ -209,21 +185,14 @@ namespace test3 {
   }
 
   // CHECK4-LABEL: define internal void @_ZN5test312_GLOBAL__N_11CD2Ev(ptr {{[^,]*}} %this) unnamed_addr
-  // CHECK4v03: invoke void @_ZN5test31BD2Ev(
   // CHECK4v11: call   void @_ZN5test31BD2Ev(
   // CHECK4: call void @_ZN5test31AD2Ev(
   // CHECK4: ret void
 
   // CHECK4-LABEL: define internal void @_ZN5test312_GLOBAL__N_11DD0Ev(ptr {{[^,]*}} %this) unnamed_addr
-  // CHECK4v03-SAME:  personality ptr @__gxx_personality_v0
-  // CHECK4v03: invoke void @_ZN5test312_GLOBAL__N_11CD2Ev
   // CHECK4v11: call   void @_ZN5test312_GLOBAL__N_11CD2Ev
   // CHECK4: call void @_ZdlPv({{.*}}) [[NUW:#[0-9]+]]
   // CHECK4: ret void
-  // CHECK4v03: landingpad { ptr, i32 }
-  // CHECK4v03-NEXT: cleanup
-  // CHECK4v03: call void @_ZdlPv({{.*}}) [[NUW]]
-  // CHECK4v03: resume { ptr, i32 }
   // CHECK4v11-NOT: landingpad
 
   // CHECK4-LABEL: define internal void @_ZThn8_N5test312_GLOBAL__N_11DD1Ev(
@@ -237,15 +206,9 @@ namespace test3 {
   // CHECK4: ret void
 
   // CHECK4-LABEL: define internal void @_ZN5test312_GLOBAL__N_11CD0Ev(ptr {{[^,]*}} %this) unnamed_addr
-  // CHECK4v03-SAME:  personality ptr @__gxx_personality_v0
-  // CHECK4v03: invoke void @_ZN5test312_GLOBAL__N_11CD2Ev(
   // CHECK4v11: call   void @_ZN5test312_GLOBAL__N_11CD2Ev(
   // CHECK4: call void @_ZdlPv({{.*}}) [[NUW]]
   // CHECK4: ret void
-  // CHECK4v03: landingpad { ptr, i32 }
-  // CHECK4v03-NEXT: cleanup
-  // CHECK4v03: call void @_ZdlPv({{.*}}) [[NUW]]
-  // CHECK4v03: resume { ptr, i32 }
 
   // CHECK4-LABEL: define internal void @_ZThn8_N5test312_GLOBAL__N_11CD1Ev(
   // CHECK4: getelementptr inbounds i8, ptr {{.*}}, i64 -8
@@ -306,28 +269,18 @@ namespace test5 {
 
   // CHECK5-LABEL: define{{.*}} void @_ZN5test53fooEv()
   // CHECK5:      [[ELEMS:%.*]] = alloca [5 x [[A:%.*]]], align
-  // CHECK5v03-NEXT: [[EXN:%.*]] = alloca ptr
-  // CHECK5v03-NEXT: [[SEL:%.*]] = alloca i32
   // CHECK5-NEXT: call void @llvm.lifetime.start.p0(ptr [[ELEMS]])
   // CHECK5-NEXT: [[BEGIN:%.*]] = getelementptr inbounds [5 x [[A]]], ptr [[ELEMS]], i32 0, i32 0
   // CHECK5-NEXT: [[END:%.*]] = getelementptr inbounds [[A]], ptr [[BEGIN]], i64 5
   // CHECK5-NEXT: br label
   // CHECK5:      [[POST:%.*]] = phi ptr [ [[END]], {{%.*}} ], [ [[ELT:%.*]], {{%.*}} ]
   // CHECK5-NEXT: [[ELT]] = getelementptr inbounds [[A]], ptr [[POST]], i64 -1
-  // CHECK5v03-NEXT: invoke void @_ZN5test51AD1Ev(ptr {{[^,]*}} [[ELT]])
   // CHECK5v11-NEXT: call   void @_ZN5test51AD1Ev(ptr {{[^,]*}} [[ELT]])
   // CHECK5:      [[T0:%.*]] = icmp eq ptr [[ELT]], [[BEGIN]]
   // CHECK5-NEXT: br i1 [[T0]],
   // CHECK5:      call void @llvm.lifetime.end
   // CHECK5-NEXT: ret void
   // lpad
-  // CHECK5v03:      [[EMPTY:%.*]] = icmp eq ptr [[BEGIN]], [[ELT]]
-  // CHECK5v03-NEXT: br i1 [[EMPTY]]
-  // CHECK5v03:      [[AFTER:%.*]] = phi ptr [ [[ELT]], {{%.*}} ], [ [[CUR:%.*]], {{%.*}} ]
-  // CHECK5v03-NEXT: [[CUR:%.*]] = getelementptr inbounds [[A]], ptr [[AFTER]], i64 -1
-  // CHECK5v03-NEXT: invoke void @_ZN5test51AD1Ev(ptr {{[^,]*}} [[CUR]])
-  // CHECK5v03:      [[DONE:%.*]] = icmp eq ptr [[CUR]], [[BEGIN]]
-  // CHECK5v03-NEXT: br i1 [[DONE]],
   // CHECK5v11-NOT: landingpad
   // CHECK5v11:   }
   void foo() {
@@ -360,29 +313,14 @@ namespace test6 {
   C::~C() { opaque(); }
   // CHECK5-LABEL: define{{.*}} void @_ZN5test61CD2Ev(ptr {{[^,]*}} %this, ptr noundef %vtt) unnamed_addr
   // CHECK5:   invoke void @_ZN5test66opaqueEv
-  // CHECK5v03:   invoke void @_ZN5test61AD1Ev
-  // CHECK5v03:   invoke void @_ZN5test61AD1Ev
-  // CHECK5v03:   invoke void @_ZN5test61AD1Ev
-  // CHECK5v03:   invoke void @_ZN5test61BILj1EED2Ev
   // CHECK5v11:   call   void @_ZN5test61AD1Ev
   // CHECK5v11:   call   void @_ZN5test61AD1Ev
   // CHECK5v11:   call   void @_ZN5test61AD1Ev
   // CHECK5v11:   call   void @_ZN5test61BILj1EED2Ev
   // CHECK5:   call void @_ZN5test61BILj0EED2Ev
   // CHECK5:   ret void
-  // CHECK5v03:   invoke void @_ZN5test61AD1Ev
-  // CHECK5v03:   invoke void @_ZN5test61AD1Ev
-  // CHECK5v03:   invoke void @_ZN5test61AD1Ev
-  // CHECK5v03:   invoke void @_ZN5test61BILj1EED2Ev
-  // CHECK5v03:   invoke void @_ZN5test61BILj0EED2Ev
 
   // CHECK5-LABEL: define{{.*}} void @_ZN5test61CD1Ev(ptr {{[^,]*}} %this) unnamed_addr
-  // CHECK5v03:   invoke void @_ZN5test61CD2Ev
-  // CHECK5v03:   invoke void @_ZN5test61BILj3EED2Ev
-  // CHECK5v03:   call void @_ZN5test61BILj2EED2Ev
-  // CHECK5v03:   ret void
-  // CHECK5v03:   invoke void @_ZN5test61BILj3EED2Ev
-  // CHECK5v03:   invoke void @_ZN5test61BILj2EED2Ev
 
   // CHECK5v11:   call void @_ZN5test61CD2Ev
   // CHECK5v11:   call void @_ZN5test61BILj3EED2Ev
@@ -404,7 +342,6 @@ namespace test7 {
 
   // Verify that this doesn't get emitted as an alias
   // CHECK5-LABEL: define{{.*}} void @_ZN5test71BD2Ev(
-  // CHECK5v03:   invoke void @_ZN5test71DD1Ev(
   // CHECK5v11:   call   void @_ZN5test71DD1Ev(
   // CHECK5:   call void @_ZN5test71AD2Ev(
   B::~B() {}
@@ -430,7 +367,6 @@ namespace test8 {
   // CHECK5:      call void @_ZN5test81AC1Ev(ptr {{[^,]*}} [[X]])
   // CHECK5-NEXT: br label
   // CHECK5:      invoke void @_ZN5test81AC1Ev(ptr {{[^,]*}} [[Y]])
-  // CHECK5v03:   invoke void @_ZN5test81AD1Ev(ptr {{[^,]*}} [[Y]])
   // CHECK5v11:   call   void @_ZN5test81AD1Ev(ptr {{[^,]*}} [[Y]])
   // CHECK5-NOT:  switch
   // CHECK5:      invoke void @_ZN5test83dieEv()
@@ -469,7 +405,6 @@ namespace test10 {
   }
 }
 
-#if __cplusplus >= 201103L
 namespace test11 {
 
 // Check that lifetime.end is emitted in the landing pad.
@@ -556,4 +491,3 @@ namespace final_dtor {
     {D d;}
   }
 }
-#endif

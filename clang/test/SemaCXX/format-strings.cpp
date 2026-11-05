@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -Wformat-nonliteral -Wformat-non-iso -Wformat-pedantic -fblocks %s
-// RUN: %clang_cc1 -fsyntax-only -verify -Wformat-nonliteral -Wformat-non-iso -fblocks -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -Wformat-nonliteral -Wformat-non-iso -Wformat-pedantic -fblocks -std=c++11 %s
 
 #include <stdarg.h>
@@ -12,11 +11,7 @@ extern int vprintf(const char *restrict, va_list);
 
 void f(char **sp, float *fp) {
   scanf("%as", sp);
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{'a' length modifier is not supported by ISO C}}
-#else
-  // expected-warning@-4 {{format specifies type 'float *' but the argument has type 'char **'}}
-#endif
+  // expected-warning@-1 {{format specifies type 'float *' but the argument has type 'char **'}}
 
   printf("%a", 1.0);
   scanf("%afoobar", fp);
@@ -52,19 +47,13 @@ void h(int *i) {
 // Test handling __null for format string literal checking.
 extern "C" {
   int test_null_format(const char *format, ...) __attribute__((__format__ (__printf__, 1, 2)));
-#if __cplusplus >= 201103L
-  // expected-note@-2 {{candidate function not viable: no known conversion from 'bool' to 'const char *' for 1st argument}}
-#endif
+  // expected-note@-1 {{candidate function not viable: no known conversion from 'bool' to 'const char *' for 1st argument}}
 }
 
 void rdar8269537(const char *f)
 {
   test_null_format(false);
-#if __cplusplus <= 199711L
-  // expected-warning@-2 {{null from a constant boolean}}
-#else
-  // expected-error@-4 {{no matching function for call to 'test_null_format'}}
-#endif
+  // expected-error@-1 {{no matching function for call to 'test_null_format'}}
   test_null_format(0); // no-warning
   test_null_format(__null); // no-warning
   test_null_format(f); // expected-warning {{not a string literal}}
@@ -163,7 +152,6 @@ void f() {
   t::func4("Hello %s"); // expected-warning {{more '%' conversions than data arguments}}
 }
 }
-#if __cplusplus >= 201103L
 namespace evaluated {
 
 constexpr const char *basic() { 
@@ -237,4 +225,3 @@ void f(Scoped1 S1, Scoped2 S2) {
 }
 }
 
-#endif

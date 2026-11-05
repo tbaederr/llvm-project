@@ -27,7 +27,8 @@ public:
 
 TEST(RecursiveASTVisitor, VisitsImplicitCopyConstructors) {
   ImplicitCtorVisitor Visitor;
-  Visitor.ExpectMatch("Simple", 2, 8);
+  // Implicit copy and move constructors.
+  Visitor.ExpectMatch("Simple", 2, 8, 2);
   // Note: Clang lazily instantiates implicit declarations, so we need
   // to use them in order to force them to appear in the AST.
   EXPECT_TRUE(Visitor.runOver(

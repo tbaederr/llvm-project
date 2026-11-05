@@ -876,11 +876,6 @@ public:
     /// Reference binding to a temporary.
     SK_BindReferenceToTemporary,
 
-    /// An optional copy of a temporary object to another
-    /// temporary object, which is permitted (but not required) by
-    /// C++98/03 but not C++0x.
-    SK_ExtraneousCopyToTemporary,
-
     /// Direct-initialization from a reference-related object in the
     /// final stage of class copy-initialization.
     SK_FinalCopy,
@@ -1325,18 +1320,6 @@ public:
   /// object (thereby extending its lifetime); false if we are binding to an
   /// lvalue or an lvalue treated as an rvalue.
   void AddReferenceBindingStep(QualType T, bool BindingTemporary);
-
-  /// Add a new step that makes an extraneous copy of the input
-  /// to a temporary of the same class type.
-  ///
-  /// This extraneous copy only occurs during reference binding in
-  /// C++98/03, where we are permitted (but not required) to introduce
-  /// an extra copy. At a bare minimum, we must check that we could
-  /// call the copy constructor, and produce a diagnostic if the copy
-  /// constructor is inaccessible or no copy constructor matches.
-  //
-  /// \param T The type of the temporary being created.
-  void AddExtraneousCopyToTemporary(QualType T);
 
   /// Add a new step that makes a copy of the input to an object of
   /// the given type, as the final step in class copy-initialization.

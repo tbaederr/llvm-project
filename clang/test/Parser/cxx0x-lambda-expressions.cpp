@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -verify=expected,cxx14ext,cxx17ext,cxx20ext,cxx23ext -std=c++03 -Wno-c99-designator %s -Wno-c++11-extensions -Wno-local-type-template-args
 // RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -verify=expected,cxx14ext,cxx17ext,cxx20ext,cxx23ext -std=c++11 -Wno-c99-designator %s
 // RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -verify=expected,cxx17ext,cxx20ext,cxx23ext          -std=c++14 -Wno-c99-designator %s
 // RUN: %clang_cc1 -fsyntax-only -Wno-unused-value -verify=expected,cxx20ext,cxx23ext                   -std=c++17 -Wno-c99-designator %s
@@ -7,9 +6,7 @@
 
 enum E { e };
 
-#if __cplusplus >= 201103L
 constexpr int id(int n) { return n; }
-#endif
 
 class C {
 
@@ -53,16 +50,12 @@ class C {
     int a6[1] = {[this] = 1 }; // expected-error{{integral constant expression must have integral or unscoped enumeration type, not 'C *'}}
     int a7[1] = {[d(0)] { return d; } ()}; // cxx14ext-warning {{initialized lambda captures are a C++14 extension}}
     int a8[1] = {[d = 0] { return d; } ()}; // cxx14ext-warning {{initialized lambda captures are a C++14 extension}}
-#if __cplusplus >= 201103L
     int a10[1] = {[id(0)] { return id; } ()}; // cxx14ext-warning {{initialized lambda captures are a C++14 extension}}
-#endif
     int a9[1] = {[d = 0] = 1}; // expected-error{{is not an integral constant expression}}
 #if __cplusplus >= 201402L
     // expected-note@-2{{constant expression cannot modify an object that is visible outside that expression}}
 #endif
-#if __cplusplus >= 201103L
     int a11[1] = {[id(0)] = 1};
-#endif
   }
 
   void delete_lambda(int *p) {
@@ -105,9 +98,7 @@ class C {
     []() [[]] {};
     []() [[]] -> void {};
     []() mutable [[]] -> void {};
-#if __cplusplus >= 201103L
     []() mutable noexcept [[]] -> void {};
-#endif
 
     // Testing GNU-style attributes on lambdas -- the attribute is specified
     // before the mutable specifier instead of after (unlike C++11).
@@ -127,9 +118,7 @@ class C {
 
   void missing_parens() {
     [] mutable {}; // cxx23ext-warning {{is a C++23 extension}}
-#if __cplusplus >= 201103L
     [] noexcept {}; // cxx23ext-warning {{is a C++23 extension}}
-#endif
   }
 };
 

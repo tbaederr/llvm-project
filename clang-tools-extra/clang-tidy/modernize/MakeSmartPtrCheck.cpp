@@ -70,7 +70,7 @@ void MakeSmartPtrCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
 
 bool MakeSmartPtrCheck::isLanguageVersionSupported(
     const LangOptions &LangOpts) const {
-  return LangOpts.CPlusPlus11;
+  return LangOpts.CPlusPlus;
 }
 
 void MakeSmartPtrCheck::registerPPCallbacks(const SourceManager &SM,

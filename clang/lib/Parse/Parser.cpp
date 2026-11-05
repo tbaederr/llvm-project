@@ -226,15 +226,8 @@ void Parser::ConsumeExtraSemi(ExtraSemiKind Kind, DeclSpec::TST TST) {
 
   // C++11 allows extra semicolons at namespace scope, but not in any of the
   // other contexts.
-  if (Kind == ExtraSemiKind::OutsideFunction && getLangOpts().CPlusPlus) {
-    if (getLangOpts().CPlusPlus11)
-      Diag(StartLoc, diag::warn_cxx98_compat_top_level_semi)
-          << FixItHint::CreateRemoval(SourceRange(StartLoc, EndLoc));
-    else
-      Diag(StartLoc, diag::ext_extra_semi_cxx11)
-          << FixItHint::CreateRemoval(SourceRange(StartLoc, EndLoc));
+  if (Kind == ExtraSemiKind::OutsideFunction && getLangOpts().CPlusPlus)
     return;
-  }
 
   if (Kind != ExtraSemiKind::AfterMemberFunctionDefinition || HadMultipleSemis)
     Diag(StartLoc, diag::ext_extra_semi)
@@ -953,7 +946,7 @@ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
     if (getLangOpts().CPlusPlus) {
       tok::TokenKind NextKind = NextToken().getKind();
 
-      // Inline namespaces. Allowed as an extension even in C++03.
+      // Inline namespaces.
       if (NextKind == tok::kw_namespace) {
         SourceLocation DeclEnd;
         return ParseDeclaration(DeclaratorContext::File, DeclEnd, Attrs,
@@ -979,8 +972,6 @@ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
       // Extern templates
       SourceLocation ExternLoc = ConsumeToken();
       SourceLocation TemplateLoc = ConsumeToken();
-      DiagCompat(ExternLoc, diag_compat::extern_template)
-          << SourceRange(ExternLoc, TemplateLoc);
       SourceLocation DeclEnd;
       return ParseExplicitInstantiation(DeclaratorContext::File, ExternLoc,
                                         TemplateLoc, DeclEnd, Attrs);
@@ -1311,14 +1302,10 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
     assert(getLangOpts().CPlusPlus && "Only C++ function definitions have '='");
 
     if (TryConsumeToken(tok::kw_delete, KWLoc)) {
-      DiagCompat(KWLoc, diag_compat::defaulted_deleted_function)
-          << 1 /* deleted */;
       BodyKind = Sema::FnBodyKind::Delete;
       DeletedMessage = ParseCXXDeletedFunctionMessage();
       D.SetRangeEnd(PrevTokLocation);
     } else if (TryConsumeToken(tok::kw_default, KWLoc)) {
-      DiagCompat(KWLoc, diag_compat::defaulted_deleted_function)
-          << 0 /* defaulted */;
       BodyKind = Sema::FnBodyKind::Default;
       D.SetRangeEnd(PrevTokLocation);
     } else {
@@ -1577,7 +1564,7 @@ ExprResult Parser::ParseAsmStringLiteral(bool ForAsmLabel) {
           << SL->isWide() << SL->getSourceRange();
       return ExprError();
     }
-  } else if (!ForAsmLabel && getLangOpts().CPlusPlus11 &&
+  } else if (!ForAsmLabel && getLangOpts().CPlusPlus &&
              Tok.is(tok::l_paren)) {
     ParenParseOption ExprType = ParenParseOption::SimpleExpr;
     SourceLocation RParenLoc;
@@ -1595,7 +1582,7 @@ ExprResult Parser::ParseAsmStringLiteral(bool ForAsmLabel) {
       return ExprError();
   } else {
     Diag(Tok, diag::err_asm_expected_string) << /*and expression=*/(
-        (getLangOpts().CPlusPlus11 && !ForAsmLabel) ? 0 : 1);
+        (getLangOpts().CPlusPlus && !ForAsmLabel) ? 0 : 1);
   }
 
   return Actions.ActOnGCCAsmStmtString(AsmString.get(), ForAsmLabel);

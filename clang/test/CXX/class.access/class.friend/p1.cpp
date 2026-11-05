@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++14 %s
 // RUN: %clang_cc1 -fsyntax-only -verify %s
@@ -218,9 +217,7 @@ namespace test6 {
 
   struct B {
     friend
-#if __cplusplus >= 201103L
       constexpr
-#endif
       A::A()
 #if __cplusplus >= 201703L
       noexcept
@@ -251,9 +248,7 @@ namespace test7 {
     friend void X<int>::foo();
     friend X<int>::X();
     friend
-#if __cplusplus >= 201103L
       constexpr
-#endif
       X<int>::X(const X&)
 #if __cplusplus >= 201703L
       noexcept

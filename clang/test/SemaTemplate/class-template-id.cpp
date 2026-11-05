@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx23,precxx17 %std_cxx98-14 %s
+// RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx23,precxx17 %std_cxx11-14 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,precxx23,cxx17 %std_cxx17-20 %s
 // RUN: %clang_cc1 -fsyntax-only -verify=expected,cxx17,cxx23 %std_cxx23- %s
 template<typename T, typename U = float> struct A { };

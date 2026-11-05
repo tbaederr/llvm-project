@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // Clang used to crash trying to recover while adding 'this->' before Work(x);
@@ -30,18 +29,11 @@ namespace PR16225 {
   template <typename C> void g(C*) {
     struct LocalStruct : UnknownBase<Mumble, C> { };  // expected-error {{use of undeclared identifier 'Mumble'}}
     f<LocalStruct>();
-#if __cplusplus <= 199711L
-    // expected-warning@-2 {{template argument uses local type 'LocalStruct'}}
-    // expected-note@-3 {{while substituting explicitly-specified template arguments}}
-#endif
     struct LocalStruct2 : UnknownBase<C> { };  // expected-error {{no template named 'UnknownBase'}}
   }
   struct S;
   void h() {
     g<S>(0);
-#if __cplusplus <= 199711L
-    // expected-note@-2 {{in instantiation of function template specialization}}
-#endif
   }
 }
 

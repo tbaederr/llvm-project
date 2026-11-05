@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=c++98 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected
 // RUN: %clang_cc1 -std=c++11 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-14,since-cxx11
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,cxx11-14,since-cxx11
 // RUN: %clang_cc1 -std=c++17 -triple x86_64-unknown-unknown %s -fexceptions -fcxx-exceptions -pedantic-errors -verify-directives -verify=expected,since-cxx11
@@ -23,13 +22,11 @@ void foo(A* p) {
 
 namespace cwg2516 { // cwg2516: 3.0
                    // NB: reusing 1482 test
-#if __cplusplus >= 201103L
 template <typename T> struct S {
   typedef char I;
 };
 enum E2 : S<E2>::I { e };
 // since-cxx11-error@-1 {{use of undeclared identifier 'E2'}}
-#endif
 } // namespace cwg2516
 
 namespace cwg2517 { // cwg2517: 21
@@ -54,7 +51,6 @@ static_assert(!LargeArray<Small>);
 
 namespace cwg2518 { // cwg2518: 17
 
-#if __cplusplus >= 201103L
 template <class T>
 void f(T t) {
   if constexpr (sizeof(T) != sizeof(int)) {
@@ -86,12 +82,10 @@ int test_specialization() {
   S<float> s2;
   S<double> s3; // #cwg2518-S-double
 }
-#endif
 
 } // namespace cwg2518
 
 namespace cwg2521 { // cwg2521: 17
-#if __cplusplus >= 201103L
 #pragma clang diagnostic push
 #pragma clang diagnostic warning "-Wdeprecated-literal-operator"
 long double operator""      _\u03C0___(long double);
@@ -109,7 +103,6 @@ using ::cwg2521::operator""_div;
 long double operator"" _RESERVED(long double);
 // since-cxx11-warning@-1 {{identifier '_RESERVED' preceded by whitespace in a literal operator declaration is deprecated}}
 #pragma clang diagnostic pop
-#endif
 } // namespace cwg2521
 
 namespace cwg2547 { // cwg2547: 20
@@ -263,7 +256,6 @@ namespace cwg2565 { // cwg2565: 16 open 2023-06-07
 } // namespace cwg2565
 
 namespace cwg2583 { // cwg2583: 19
-#if __cplusplus >= 201103L
 struct A {
   int i;
   char c;
@@ -286,7 +278,6 @@ union V {
 
 static_assert(!__is_layout_compatible(A, B), "");
 static_assert(__is_layout_compatible(U, V), "");
-#endif
 } // namespace cwg2583
 
 namespace cwg2586 { // cwg2586: 20
@@ -325,7 +316,6 @@ struct Z {
 } // namespace cwg2586
 
 namespace cwg2598 { // cwg2598: 18
-#if __cplusplus >= 201103L
 struct NonLiteral {
     NonLiteral();
 };
@@ -380,6 +370,5 @@ union U {
   constexpr ~U() {}
 };
 static_assert(!__is_literal(U), "");
-#endif
 #endif
 } // namespace cwg2598

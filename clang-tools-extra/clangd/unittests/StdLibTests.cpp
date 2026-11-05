@@ -117,10 +117,10 @@ TEST(StdLibTests, StdLibSet) {
 
   EXPECT_FALSE(Add(LO, {"std"})) << "No <vector> found";
   FS.Files["std/vector"] = "class vector;";
-  EXPECT_TRUE(Add(LO, {"std"})) << "Indexing as C++98";
-  EXPECT_FALSE(Add(LO, {"std"})) << "Don't reindex";
-  LO.CPlusPlus11 = true;
   EXPECT_TRUE(Add(LO, {"std"})) << "Indexing as C++11";
+  EXPECT_FALSE(Add(LO, {"std"})) << "Don't reindex";
+  LO.CPlusPlus14 = true;
+  EXPECT_TRUE(Add(LO, {"std"})) << "Indexing as C++14";
   LO.CPlusPlus = false;
   EXPECT_FALSE(Add(LO, {"libc"})) << "No <stdio.h>";
   FS.Files["libc/stdio.h"] = true;

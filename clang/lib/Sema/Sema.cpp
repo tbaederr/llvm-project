@@ -725,7 +725,7 @@ void Sema::diagnoseFunctionEffectConversion(QualType DstType, QualType SrcType,
 
 void Sema::diagnoseZeroToNullptrConversion(CastKind Kind, const Expr *E) {
   // nullptr only exists from C++11 on, so don't warn on its absence earlier.
-  if (!getLangOpts().CPlusPlus11)
+  if (!getLangOpts().CPlusPlus)
     return;
 
   if (Kind != CK_NullToPointer && Kind != CK_NullToMemberPointer)
@@ -824,9 +824,8 @@ ExprResult Sema::ImpCastExprToType(Expr *E, QualType Ty,
     // C++1z [conv.array]: The temporary materialization conversion is applied.
     // We also use this to fuel C++ DR1213, which applies to C++11 onwards.
     if (getLangOpts().CPlusPlus && E->isPRValue()) {
-      // The temporary is an lvalue in C++98 and an xvalue otherwise.
       ExprResult Materialized = CreateMaterializeTemporaryExpr(
-          E->getType(), E, !getLangOpts().CPlusPlus11);
+          E->getType(), E, /*BoundToLvalueReference=*/false);
       if (Materialized.isInvalid())
         return ExprError();
       E = Materialized.get();
@@ -1379,7 +1378,7 @@ void Sema::ActOnEndOfTranslationUnit() {
             << WeakIDs.first;
   }
 
-  if (LangOpts.CPlusPlus11 &&
+  if (LangOpts.CPlusPlus &&
       !Diags.isIgnored(diag::warn_delegating_ctor_cycle, SourceLocation()))
     CheckDelegatingCtorCycles();
 
@@ -1837,10 +1836,8 @@ void Sema::EmitDiagnostic(unsigned DiagID, const DiagnosticBuilder &DB) {
       // Additionally, the WithAccessChecking flag can be used to temporarily
       // make access control a part of SFINAE for the purposes of checking
       // type traits.
-      if (!Trap->withAccessChecking() && !getLangOpts().CPlusPlus11)
+      if (!Trap->withAccessChecking() && !getLangOpts().CPlusPlus)
         break;
-
-      SourceLocation Loc = DiagInfo.getLocation();
 
       // Suppress this diagnostic.
       Trap->setErrorOccurred();
@@ -1852,13 +1849,6 @@ void Sema::EmitDiagnostic(unsigned DiagID, const DiagnosticBuilder &DB) {
             DiagInfo.getLocation(),
             PartialDiagnostic(DiagInfo, Context.getDiagAllocator()));
 
-      Diags.setLastDiagnosticIgnored(true);
-
-      // Now produce a C++98 compatibility warning.
-      Diag(Loc, diag::warn_cxx98_compat_sfinae_access_control);
-
-      // The last diagnostic which Sema produced was ignored. Suppress any
-      // notes attached to it.
       Diags.setLastDiagnosticIgnored(true);
       return;
     }

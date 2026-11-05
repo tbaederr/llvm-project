@@ -45,7 +45,7 @@
 // CHECK2-LABEL: define available_externally void @gnu_ei_inline()
 
 // RUN: echo "C++ tests:"
-// RUN: %clang_cc1 -x c++ %s -triple i386-unknown-unknown -O1 -disable-llvm-passes -emit-llvm -o - -std=c++98 | FileCheck %s --check-prefix=CHECK3
+// RUN: %clang_cc1 -x c++ %s -triple i386-unknown-unknown -O1 -disable-llvm-passes -emit-llvm -o - -std=c++11 | FileCheck %s --check-prefix=CHECK3
 // CHECK3-LABEL: define{{.*}} i32 @_Z3barv()
 // CHECK3-LABEL: define linkonce_odr noundef i32 @_Z3foov()
 // CHECK3-NOT: unreferenced

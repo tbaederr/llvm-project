@@ -461,8 +461,7 @@ bool Parser::ParseAttributeArgumentList(
     ExprResult Expr;
     if (ArgsProperties.isStringLiteralArg(Arg)) {
       Expr = ParseUnevaluatedStringInAttribute(AttrName);
-    } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-      Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
+    } else if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
       Expr = ParseBraceInitializer();
     } else {
       Expr = ParseAssignmentExpression();
@@ -1931,7 +1930,7 @@ Parser::DeclGroupPtrTy Parser::ParseDeclaration(DeclaratorContext Context,
     ProhibitAttributes(DeclSpecAttrs);
     return ParseDeclarationStartingWithTemplate(Context, DeclEnd, DeclAttrs);
   case tok::kw_inline:
-    // Could be the start of an inline namespace. Allowed as an ext in C++03.
+    // Could be the start of an inline namespace.
     if (getLangOpts().CPlusPlus && NextToken().is(tok::kw_namespace)) {
       ProhibitAttributes(DeclAttrs);
       ProhibitAttributes(DeclSpecAttrs);
@@ -2039,7 +2038,7 @@ bool Parser::MightBeDeclarator(DeclaratorContext Context) {
     return getLangOpts().CPlusPlus;
 
   case tok::l_square: // Might be an attribute on an unnamed bit-field.
-    return Context == DeclaratorContext::Member && getLangOpts().CPlusPlus11 &&
+    return Context == DeclaratorContext::Member && getLangOpts().CPlusPlus &&
            NextToken().is(tok::l_square);
 
   case tok::colon: // Might be a typo for '::' or an unnamed bit-field.
@@ -2073,7 +2072,7 @@ bool Parser::MightBeDeclarator(DeclaratorContext Context) {
              (getLangOpts().CPlusPlus && Context == DeclaratorContext::File);
 
     case tok::identifier: // Possible virt-specifier.
-      return getLangOpts().CPlusPlus11 && isCXX11VirtSpecifier(NextToken());
+      return getLangOpts().CPlusPlus && isCXX11VirtSpecifier(NextToken());
 
     default:
       return Tok.isRegularKeywordAttribute();
@@ -2553,7 +2552,7 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
     TheInitKind = InitKind::Equal;
   else if (getLangOpts().CPlusPlus && Tok.is(tok::l_paren))
     TheInitKind = InitKind::CXXDirect;
-  else if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace) &&
+  else if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace) &&
            (!CurParsedObjCImpl || !D.isFunctionDeclarator()))
     TheInitKind = InitKind::CXXBraced;
   else
@@ -2742,8 +2741,6 @@ Decl *Parser::ParseDeclarationAfterDeclaratorAndAttributes(
   }
   case InitKind::CXXBraced: {
     // Parse C++0x braced-init-list.
-    Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
-
     InitializerScopeRAII InitScope(*this, D, ThisDecl);
 
     PreferredType.enterVariableInit(Tok.getLocation(), ThisDecl);
@@ -2889,7 +2886,7 @@ bool Parser::ParseImplicitInt(DeclSpec &DS, CXXScopeSpec *SS,
   if (getLangOpts().CPlusPlus &&
       DS.getStorageClassSpec() == DeclSpec::SCS_auto) {
     // Don't require a type specifier if we have the 'auto' storage class
-    // specifier in C++98 -- we'll promote it to a type specifier.
+    // specifier -- we'll promote it to a type specifier.
     if (SS)
       AnnotateScopeToken(*SS, /*IsNewAnnotation*/false);
     return false;
@@ -3139,7 +3136,7 @@ ExprResult Parser::ParseAlignArgument(StringRef KWName, SourceLocation Start,
     IsType = false;
   }
 
-  if (getLangOpts().CPlusPlus11)
+  if (getLangOpts().CPlusPlus)
     TryConsumeToken(tok::ellipsis, EllipsisLoc);
 
   return ER;
@@ -4138,7 +4135,7 @@ void Parser::ParseDeclarationSpecifiers(
       isStorageClass = true;
       break;
     case tok::kw_auto:
-      if (getLangOpts().CPlusPlus11 || getLangOpts().C23) {
+      if (getLangOpts().CPlusPlus || getLangOpts().C23) {
         auto IsTypedefName = [&](const Token &T) {
           if (!T.is(tok::identifier))
             return false;
@@ -5161,7 +5158,6 @@ void Parser::ParseEnumSpecifier(SourceLocation StartLoc, DeclSpec &DS,
 
   // In C++11, recognize 'enum class' and 'enum struct'.
   if (Tok.isOneOf(tok::kw_class, tok::kw_struct) && getLangOpts().CPlusPlus) {
-    DiagCompat(Tok, diag_compat::scoped_enum);
     IsScopedUsingClassTag = Tok.is(tok::kw_class);
     ScopedEnumKWLoc = ConsumeToken();
 
@@ -5189,7 +5185,7 @@ void Parser::ParseEnumSpecifier(SourceLocation StartLoc, DeclSpec &DS,
       isDefiningTypeSpecifierContext(DSC, getLangOpts().CPlusPlus);
   bool CanBeOpaqueEnumDeclaration =
       DS.isEmpty() && isOpaqueEnumDeclarationContext(DSC);
-  bool CanHaveEnumBase = (getLangOpts().CPlusPlus11 || getLangOpts().ObjC ||
+  bool CanHaveEnumBase = (getLangOpts().CPlusPlus || getLangOpts().ObjC ||
                           getLangOpts().MicrosoftExt) &&
                          (AllowEnumSpecifier == AllowDefiningTypeSpec::Yes ||
                           CanBeOpaqueEnumDeclaration);
@@ -5297,7 +5293,7 @@ void Parser::ParseEnumSpecifier(SourceLocation StartLoc, DeclSpec &DS,
     if (CanBeBitfield && !isEnumBase(CanBeOpaqueEnumDeclaration)) {
       // Outside C++11, do not interpret the tokens as an enum-base if they do
       // not make sense as one. In C++11, it's an error if this happens.
-      if (getLangOpts().CPlusPlus11)
+      if (getLangOpts().CPlusPlus)
         Diag(Tok.getLocation(), diag::err_anonymous_enum_bitfield);
     } else if (CanHaveEnumBase || !ColonIsSacred) {
       SourceLocation ColonLoc = ConsumeToken();
@@ -5317,11 +5313,8 @@ void Parser::ParseEnumSpecifier(SourceLocation StartLoc, DeclSpec &DS,
 
       BaseRange = SourceRange(ColonLoc, DeclaratorInfo.getSourceRange().getEnd());
 
-      if (!getLangOpts().ObjC) {
-        if (getLangOpts().CPlusPlus)
-          DiagCompat(ColonLoc, diag_compat::cxx_enum_fixed_underlying_type)
-              << BaseRange;
-        else if (getLangOpts().MicrosoftExt && !getLangOpts().C23)
+      if (!getLangOpts().ObjC && !getLangOpts().CPlusPlus) {
+        if (getLangOpts().MicrosoftExt && !getLangOpts().C23)
           Diag(ColonLoc, diag::ext_ms_c_enum_fixed_underlying_type)
               << BaseRange;
         else
@@ -5389,7 +5382,7 @@ void Parser::ParseEnumSpecifier(SourceLocation StartLoc, DeclSpec &DS,
   MultiTemplateParamsArg TParams;
   if (TemplateInfo.Kind != ParsedTemplateKind::NonTemplate &&
       TUK != TagUseKind::Reference) {
-    if (!getLangOpts().CPlusPlus11 || !SS.isSet()) {
+    if (!SS.isSet()) {
       // Skip the rest of this declarator, up until the comma or semicolon.
       Diag(Tok, diag::err_enum_template);
       SkipUntil(tok::comma, StopAtSemi);
@@ -5626,10 +5619,7 @@ void Parser::ParseEnumBody(SourceLocation StartLoc, Decl *EnumDecl,
 
     // If comma is followed by r_brace, emit appropriate warning.
     if (Tok.is(tok::r_brace) && CommaLoc.isValid()) {
-      if (getLangOpts().CPlusPlus)
-        DiagCompat(CommaLoc, diag_compat::cxx_enumerator_list_comma)
-            << FixItHint::CreateRemoval(CommaLoc);
-      else if (!getLangOpts().C99)
+      if (!getLangOpts().CPlusPlus && !getLangOpts().C99)
         Diag(CommaLoc, diag::ext_enumerator_list_comma_c)
             << FixItHint::CreateRemoval(CommaLoc);
       break;
@@ -6532,8 +6522,7 @@ void Parser::ParseDeclarator(Declarator &D) {
   });
 }
 
-static bool isPtrOperatorToken(tok::TokenKind Kind, const LangOptions &Lang,
-                               DeclaratorContext TheContext) {
+static bool isPtrOperatorToken(tok::TokenKind Kind, const LangOptions &Lang) {
   if (Kind == tok::star || Kind == tok::caret)
     return true;
 
@@ -6545,19 +6534,7 @@ static bool isPtrOperatorToken(tok::TokenKind Kind, const LangOptions &Lang,
   if (!Lang.CPlusPlus)
     return false;
 
-  if (Kind == tok::amp)
-    return true;
-
-  // We parse rvalue refs in C++03, because otherwise the errors are scary.
-  // But we must not parse them in conversion-type-ids and new-type-ids, since
-  // those can be legitimately followed by a && operator.
-  // (The same thing can in theory happen after a trailing-return-type, but
-  // since those are a C++11 feature, there is no rejects-valid issue there.)
-  if (Kind == tok::ampamp)
-    return Lang.CPlusPlus11 || (TheContext != DeclaratorContext::ConversionId &&
-                                TheContext != DeclaratorContext::CXXNew);
-
-  return false;
+  return Kind == tok::amp || Kind == tok::ampamp;
 }
 
 // Indicates whether the given declarator is a pipe declarator.
@@ -6666,7 +6643,7 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
   }
 
   // Not a pointer, C++ reference, or block.
-  if (!isPtrOperatorToken(Kind, getLangOpts(), D.getContext())) {
+  if (!isPtrOperatorToken(Kind, getLangOpts())) {
     if (DirectDeclParser)
       (this->*DirectDeclParser)(D);
     return;
@@ -6710,11 +6687,6 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
   } else {
     // Is a reference
     DeclSpec DS(AttrFactory);
-
-    // Complain about rvalue references in C++03, but then go on and build
-    // the declarator.
-    if (Kind == tok::ampamp)
-      DiagCompat(Loc, diag_compat::rvalue_reference);
 
     // GNU-style and C++11 attributes are allowed here, as is restrict.
     ParseTypeQualifierListOpt(DS);
@@ -6792,7 +6764,7 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
     ColonProtectionRAIIObject X(
         *this, D.getContext() == DeclaratorContext::Member ||
                    (D.getContext() == DeclaratorContext::ForInit &&
-                    getLangOpts().CPlusPlus11));
+                    getLangOpts().CPlusPlus));
 
     // ParseDeclaratorInternal might already have parsed the scope.
     if (D.getCXXScopeSpec().isEmpty()) {
@@ -6845,7 +6817,7 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
           !Actions.containsUnexpandedParameterPacks(D) &&
           D.getDeclSpec().getTypeSpecType() != TST_auto)) {
       SourceLocation EllipsisLoc = ConsumeToken();
-      if (isPtrOperatorToken(Tok.getKind(), getLangOpts(), D.getContext())) {
+      if (isPtrOperatorToken(Tok.getKind(), getLangOpts())) {
         // The ellipsis was put in the wrong place. Recover, and explain to
         // the user what they should have done.
         ParseDeclarator(D);
@@ -7366,7 +7338,7 @@ void Parser::InitCXXThisScopeForDeclaratorIfRelevant(
   //   declarator.
   // FIXME: currently, "static" case isn't handled correctly.
   bool IsCXX11MemberFunction =
-      getLangOpts().CPlusPlus11 &&
+      getLangOpts().CPlusPlus &&
       D.getDeclSpec().getStorageClassSpec() != DeclSpec::SCS_typedef &&
       (D.getContext() == DeclaratorContext::Member
            ? !D.getDeclSpec().isFriendSpecified()
@@ -7539,8 +7511,7 @@ void Parser::ParseFunctionDeclarator(Declarator &D,
 
       // Parse trailing-return-type[opt].
       LocalEndLoc = EndLoc;
-      if (getLangOpts().CPlusPlus11 && Tok.is(tok::arrow)) {
-        Diag(Tok, diag::warn_cxx98_compat_trailing_return_type);
+      if (Tok.is(tok::arrow)) {
         if (D.getDeclSpec().getTypeSpecType() == TST_auto)
           StartLoc = D.getDeclSpec().getTypeSpecTypeLoc();
         LocalEndLoc = Tok.getLocation();
@@ -7596,7 +7567,6 @@ void Parser::ParseFunctionDeclarator(Declarator &D,
 bool Parser::ParseRefQualifier(bool &RefQualifierIsLValueRef,
                                SourceLocation &RefQualifierLoc) {
   if (Tok.isOneOf(tok::amp, tok::ampamp)) {
-    DiagCompat(Tok, diag_compat::ref_qualifier);
     RefQualifierIsLValueRef = Tok.is(tok::amp);
     RefQualifierLoc = ConsumeToken();
     return true;
@@ -7896,8 +7866,7 @@ void Parser::ParseParameterDeclarationClause(
               Param);
 
           ExprResult DefArgResult;
-          if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-            Diag(Tok, diag::compat_cxx11_generalized_initializer_lists);
+          if (getLangOpts().CPlusPlus && Tok.is(tok::l_brace)) {
             DefArgResult = ParseBraceInitializer();
           } else {
             if (Tok.is(tok::l_paren) && NextToken().is(tok::l_brace)) {

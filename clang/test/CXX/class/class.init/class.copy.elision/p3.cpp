@@ -1,7 +1,6 @@
 // RUN: %clang_cc1 -std=c++23 -fsyntax-only -fcxx-exceptions                       -verify=expected,cxx11_23,cxx23    %s
 // RUN: %clang_cc1 -std=c++20 -fsyntax-only -fcxx-exceptions                       -verify=expected,cxx98_20,cxx11_23,cxx11_20 %s
 // RUN: %clang_cc1 -std=c++11 -fsyntax-only -fcxx-exceptions                       -verify=expected,cxx98_20,cxx11_23,cxx11_20 %s
-// RUN: %clang_cc1 -std=c++98 -fsyntax-only -fcxx-exceptions -Wno-c++11-extensions -verify=expected,cxx98_20,cxx98 %s
 
 namespace test_delete_function {
 struct A1 {
@@ -128,7 +127,6 @@ void test3(A1 a) try {
   throw a; // expected-error {{call to deleted constructor of 'A1'}}
 }
 
-#if __cplusplus >= 201103L
 namespace PR54341 {
 void test4(A1 a) {
   void f(decltype((throw a, 0)));
@@ -141,7 +139,6 @@ void test4(A1 a) {
 void test5(A1 a, int = decltype(throw a, 0){}) {}
 // expected-error@-1 {{call to deleted constructor of 'A1'}}
 } // namespace PR54341
-#endif
 
 } // namespace test_throw_parameter
 
@@ -206,7 +203,7 @@ struct NeedRvalueRef {
   NeedRvalueRef(B2 &&);
 };
 struct NeedValue {
-  NeedValue(A1); // cxx98-note 2 {{passing argument to parameter here}}
+  NeedValue(A1);
   NeedValue(A2);
   NeedValue(B1); // cxx11_23-note 2 {{passing argument to parameter here}}
   NeedValue(B2);
@@ -215,13 +212,13 @@ struct NeedValue {
 struct A1 {
   A1();
   A1(A1 &&);
-  A1(const A1 &) = delete; // cxx98-note 2 {{marked deleted here}}
+  A1(const A1 &) = delete;
 };
 NeedValue test_1_1() {
   // not rvalue reference
   // same type
   A1 a;
-  return a; // cxx98-error {{call to deleted constructor}}
+  return a;
 }
 class DerivedA1 : public A1 {};
 A1 test_1_2() {
@@ -234,7 +231,7 @@ NeedValue test_1_3() {
   // not rvalue reference
   // not same type
   DerivedA1 a;
-  return a; // cxx98-error {{call to deleted constructor}}
+  return a;
 }
 
 struct A2 {
@@ -242,13 +239,13 @@ struct A2 {
   A2(A2 &&);
 
 private:
-  A2(const A2 &); // cxx98-note 2 {{declared private here}}
+  A2(const A2 &);
 };
 NeedValue test_2_1() {
   // not rvalue reference
   // same type
   A2 a;
-  return a; // cxx98-error {{calling a private constructor}}
+  return a;
 }
 class DerivedA2 : public A2 {};
 A2 test_2_2() {
@@ -261,14 +258,13 @@ NeedValue test_2_3() {
   // not rvalue reference
   // not same type
   DerivedA2 a;
-  return a; // cxx98-error {{calling a private constructor}}
+  return a;
 }
 
 struct B1 {
   B1();
   B1(const B1 &);
   B1(B1 &&) = delete; // cxx11_23-note 3 {{'B1' has been explicitly marked deleted here}}
-                      // cxx98-note@-1 {{'B1' has been explicitly marked deleted here}}
 };
 NeedValue test_3_1() {
   // not rvalue reference
@@ -296,7 +292,6 @@ struct B2 {
 
 private:
   B2(B2 &&); // cxx11_23-note 3 {{declared private here}}
-             // cxx98-note@-1 {{declared private here}}
 };
 NeedValue test_4_1() {
   // not rvalue reference
@@ -426,12 +421,12 @@ Target t4() {
 namespace test_constandnonconstcopy {
 struct ConstCopyOnly {
   ConstCopyOnly();
-  ConstCopyOnly(ConstCopyOnly &) = delete; // cxx98-note {{marked deleted here}}
+  ConstCopyOnly(ConstCopyOnly &) = delete;
   ConstCopyOnly(const ConstCopyOnly &);
 };
 ConstCopyOnly t1() {
   ConstCopyOnly x;
-  return x; // cxx98-error {{call to deleted constructor}}
+  return x;
 }
 
 struct NonConstCopyOnly {
@@ -450,12 +445,12 @@ namespace test_conversion {
 
 struct B;
 struct A {
-  A(B &) = delete; // cxx98-note {{has been explicitly deleted}}
+  A(B &) = delete;
 };
 struct B {
-  operator A(); // cxx98-note {{candidate function}}
+  operator A();
 };
-A test1(B x) { return x; } // cxx98-error-re {{conversion {{.*}} is ambiguous}}
+A test1(B x) { return x; }
 
 struct C {};
 struct D {

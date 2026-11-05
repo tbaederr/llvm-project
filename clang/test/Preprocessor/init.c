@@ -86,15 +86,6 @@
 // CXX11:#define __private_extern__ extern
 //
 //
-// RUN: %clang_cc1 -x c++ -fgnuc-version=4.2.1 -std=c++98 -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix CXX98 %s
-//
-// CXX98:#define __GNUG__ 4
-// CXX98:#define __GXX_RTTI 1
-// CXX98:#define __GXX_WEAK__ 1
-// CXX98:#define __cplusplus 199711L
-// CXX98:#define __private_extern__ extern
-//
-//
 // RUN: %clang_cc1 -fdeprecated-macro -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix DEPRECATED %s
 //
 // DEPRECATED:#define __DEPRECATED 1
@@ -279,14 +270,6 @@
 // GXX11:#define __GXX_WEAK__ 1
 // GXX11:#define __cplusplus 201103L
 // GXX11:#define __private_extern__ extern
-//
-//
-// RUN: %clang_cc1 -x c++ -fgnuc-version=4.2.1 -std=gnu++98 -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix GXX98 %s
-//
-// GXX98:#define __GNUG__ 4
-// GXX98:#define __GXX_WEAK__ 1
-// GXX98:#define __cplusplus 199711L
-// GXX98:#define __private_extern__ extern
 //
 //
 // RUN: %clang_cc1 -std=iso9899:199409 -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix C94 %s
@@ -1580,7 +1563,7 @@
 // RUN: %clang_cc1 -x objective-c -triple i386-unknown-freebsd -fobjc-runtime=gnustep-2.5 -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix GNUSTEP2 %s
 // GNUSTEP2:#define __OBJC_GNUSTEP_RUNTIME_ABI__ 20
 //
-// RUN: %clang_cc1 -x c++ -fgnuc-version=4.2.1 -std=c++98 -fno-rtti -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix NORTTI %s
+// RUN: %clang_cc1 -x c++ -fgnuc-version=4.2.1 -std=c++11 -fno-rtti -E -dM < /dev/null | FileCheck -match-full-lines -check-prefix NORTTI %s
 // NORTTI: #define __GXX_ABI_VERSION {{.*}}
 // NORTTI-NOT:#define __GXX_RTTI
 // NORTTI:#define __STDC__ 1

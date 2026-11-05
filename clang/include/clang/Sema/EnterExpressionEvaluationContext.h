@@ -51,7 +51,7 @@ public:
     // Therefore we still need to instantiate constexpr functions used in such
     // a context.
     if (ShouldEnter && Actions.isUnevaluatedContext() &&
-        Actions.getLangOpts().CPlusPlus11) {
+        Actions.getLangOpts().CPlusPlus) {
       Actions.PushExpressionEvaluationContext(
           Sema::ExpressionEvaluationContext::UnevaluatedList);
       Entered = true;

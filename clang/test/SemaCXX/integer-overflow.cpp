@@ -1,7 +1,5 @@
-// RUN: %clang_cc1 %s -verify -fsyntax-only -std=gnu++98 -triple x86_64-pc-linux-gnu
 // RUN: %clang_cc1 %s -verify -fsyntax-only -std=gnu++2a -triple x86_64-pc-linux-gnu
 
-// RUN: %clang_cc1 %s -verify -fsyntax-only -std=gnu++98 -triple x86_64-pc-linux-gnu -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 %s -verify -fsyntax-only -std=gnu++2a -triple x86_64-pc-linux-gnu -fexperimental-new-constant-interpreter
 
 
@@ -78,29 +76,6 @@ uint64_t check_integer_overflows(int i) { //expected-note 0+{{declared here}}
   if ((uint64_t)((uint64_t)(4608 * 1024 * 1024) * (uint64_t)(4608 * 1024 * 1024)))
     return 5;
 
-#if __cplusplus < 201103L
-  switch (i) {
-// expected-warning@+1 {{overflow in expression; result is 536'870'912 with type 'int'}}
-  case 4608 * 1024 * 1024:
-    return 6;
-// expected-warning@+1 {{overflow in expression; result is 537'919'488 with type 'int'}}
-  case (uint64_t)(4609 * 1024 * 1024):
-    return 7;
-// expected-warning@+1 {{overflow in expression; result is 537'919'488 with type 'int'}}
-  case 1 + static_cast<uint64_t>(4609 * 1024 * 1024):
-    return 7;
-// expected-error@+1 {{expression is not an integral constant expression}}
-  case ((uint64_t)(4608 * 1024 * 1024 * i)):
-    return 8;
-// expected-warning@+1 {{overflow in expression; result is 536'870'912 with type 'int'}}
-  case ((1ULL * ((4608) * ((1024) * (1024))) + 2ULL)):
-    return 9;
-// expected-warning@+2 2{{overflow in expression; result is 536'870'912 with type 'int'}}
-// expected-warning@+1 {{overflow converting case value to switch condition type (288230376151711744 to 0)}}
-  case ((uint64_t)((uint64_t)(4608 * 1024 * 1024) * (uint64_t)(4608 * 1024 * 1024))):
-    return 10;
-  }
-#endif
 
 // expected-warning@+1 {{overflow in expression; result is 536'870'912 with type 'int'}}
   while (4608 * 1024 * 1024);
@@ -170,10 +145,6 @@ uint64_t check_integer_overflows(int i) { //expected-note 0+{{declared here}}
 // expected-warning@+2 {{overflow in expression; result is 536'870'912 with type 'int'}}
   uint64_t a[10];
   a[4608 * 1024 * 1024] = 1;
-#if __cplusplus < 201103L
-// expected-warning@-2 {{array index 536'870'912 is past the end of the array (that has type 'uint64_t[10]' (aka 'unsigned long long[10]'))}}
-// expected-note@-4 {{array 'a' declared here}}
-#endif
 
 // expected-warning@+1 2{{overflow in expression; result is 536'870'912 with type 'int'}}
   return ((4608 * 1024 * 1024) + ((uint64_t)(4608 * 1024 * 1024)));
@@ -219,7 +190,6 @@ void f() {
 }
 }
 
-#if __cplusplus >= 201103L
 namespace GH63629 {
 typedef long long int64_t;
 
@@ -252,4 +222,3 @@ void f() {
     struct { int v; } &&r = {512 * 1024 * 1024 * 1024}; // expected-warning {{overflow in expression; result is 0 with type 'int'}}
 }
 }
-#endif

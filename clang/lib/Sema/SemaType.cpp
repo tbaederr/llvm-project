@@ -1048,14 +1048,9 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
         if (S.getLangOpts().OpenCL) {
           // OpenCL v3.0 s6.3.4: 'long long' is a reserved data type.
           S.Diag(DS.getTypeSpecWidthLoc(), diag::warn_opencl_longlong);
-        } else if (!S.getLangOpts().C99) {
+        } else if (!S.getLangOpts().C99 && !S.getLangOpts().CPlusPlus) {
           // 'long long' is a C99 or C++11 feature.
-          if (S.getLangOpts().CPlusPlus)
-            S.Diag(DS.getTypeSpecWidthLoc(),
-                   S.getLangOpts().CPlusPlus11 ?
-                   diag::warn_cxx98_compat_longlong : diag::ext_cxx11_longlong);
-          else
-            S.Diag(DS.getTypeSpecWidthLoc(), diag::ext_c99_longlong);
+          S.Diag(DS.getTypeSpecWidthLoc(), diag::ext_c99_longlong);
         }
         break;
       }
@@ -1076,14 +1071,9 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
         if (S.getLangOpts().OpenCL) {
           // OpenCL v3.0 s6.3.4: 'long long' is a reserved data type.
           S.Diag(DS.getTypeSpecWidthLoc(), diag::warn_opencl_longlong);
-        } else if (!S.getLangOpts().C99) {
+        } else if (!S.getLangOpts().C99 && !S.getLangOpts().CPlusPlus) {
           // 'long long' is a C99 or C++11 feature.
-          if (S.getLangOpts().CPlusPlus)
-            S.Diag(DS.getTypeSpecWidthLoc(),
-                   S.getLangOpts().CPlusPlus11 ?
-                   diag::warn_cxx98_compat_longlong : diag::ext_cxx11_longlong);
-          else
-            S.Diag(DS.getTypeSpecWidthLoc(), diag::ext_c99_longlong);
+          S.Diag(DS.getTypeSpecWidthLoc(), diag::ext_c99_longlong);
         }
         break;
       }
@@ -2233,7 +2223,7 @@ QualType Sema::BuildArrayType(QualType T, ArraySizeModifier ASM,
 
   // C99 6.7.5.2p1: The size expression shall have integer type.
   // C++11 allows contextual conversions to such types.
-  if (!getLangOpts().CPlusPlus11 &&
+  if (!getLangOpts().CPlusPlus &&
       ArraySize && !ArraySize->isTypeDependent() &&
       !ArraySize->getType()->isIntegralOrUnscopedEnumerationType()) {
     Diag(ArraySize->getBeginLoc(), diag::err_array_size_non_int)
@@ -2279,7 +2269,7 @@ QualType Sema::BuildArrayType(QualType T, ArraySizeModifier ASM,
     VLADiag = diag::err_openmp_vla_in_task_untied;
     VLAIsError = true;
   } else if (getLangOpts().CPlusPlus) {
-    if (getLangOpts().CPlusPlus11 && IsStaticAssertLike(ArraySize, Context))
+    if (IsStaticAssertLike(ArraySize, Context))
       VLADiag = getLangOpts().GNUMode
                     ? diag::ext_vla_cxx_in_gnu_mode_static_assert
                     : diag::ext_vla_cxx_static_assert;
@@ -3475,7 +3465,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
     // In Objective-C it is an error to use 'auto' on a function declarator
     // (and everywhere for '__auto_type').
     if (D.isFunctionDeclarator() &&
-        (!SemaRef.getLangOpts().CPlusPlus11 || !IsCXXAutoType))
+        (!SemaRef.getLangOpts().CPlusPlus || !IsCXXAutoType))
       Error = 13;
 
     if (Error != -1) {
@@ -3504,8 +3494,6 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
       T = SemaRef.Context.IntTy;
       D.setInvalidType(true);
     } else if (Auto && D.getContext() != DeclaratorContext::LambdaExpr) {
-      // If there was a trailing return type, we already got
-      // warn_cxx98_compat_trailing_return_type in the parser.
       // If there was a decltype(auto), we already got
       // warn_cxx11_compat_decltype_auto_type_specifier.
       unsigned DiagId = 0;
@@ -3513,8 +3501,6 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
         DiagId = diag::warn_cxx11_compat_generic_lambda;
       else if (IsDeducedReturnType)
         DiagId = diag::warn_cxx11_compat_deduced_return_type;
-      else if (Auto->getKeyword() == AutoTypeKeyword::Auto)
-        DiagId = diag::warn_cxx98_compat_auto_type_specifier;
 
       if (DiagId)
         SemaRef.Diag(AutoRange.getBegin(), DiagId) << AutoRange;
@@ -3678,7 +3664,7 @@ static void warnAboutAmbiguousFunction(Sema &S, Declarator &D,
     else {
       std::string Init =
           S.getFixItZeroInitializerForType(RT, ParenRange.getBegin());
-      if (Init.empty() && S.LangOpts.CPlusPlus11)
+      if (Init.empty())
         Init = "{}";
       if (!Init.empty())
         S.Diag(DeclType.Loc, diag::note_empty_parens_zero_initialize)
@@ -5779,8 +5765,6 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       // it expands those parameter packs.
       if (T->containsUnexpandedParameterPack())
         T = Context.getPackExpansionType(T, std::nullopt);
-      else
-        S.DiagCompat(D.getEllipsisLoc(), diag_compat::variadic_templates);
       break;
 
     case DeclaratorContext::File:

@@ -544,16 +544,11 @@ void ProTypeMemberInitCheck::checkMissingMemberInitializer(
   if (FieldsToFix.empty())
     return;
 
-  // Use in-class initialization if possible.
-  if (Context.getLangOpts().CPlusPlus11) {
-    for (const FieldDecl *Field : FieldsToFix) {
-      Diag << FixItHint::CreateInsertion(
-          getLocationForEndOfToken(Context, Field->getSourceRange().getEnd()),
-          getInitializer(Field->getType(), UseAssignment));
-    }
-  } else if (Ctor) {
-    // Otherwise, rewrite the constructor's initializer list.
-    fixInitializerList(Context, Diag, Ctor, FieldsToFix);
+  // Use in-class initialization.
+  for (const FieldDecl *Field : FieldsToFix) {
+    Diag << FixItHint::CreateInsertion(
+        getLocationForEndOfToken(Context, Field->getSourceRange().getEnd()),
+        getInitializer(Field->getType(), UseAssignment));
   }
 }
 
@@ -618,8 +613,7 @@ void ProTypeMemberInitCheck::checkUninitializedTrivialType(
       diag(Var->getBeginLoc(), "uninitialized record type: %0") << Var;
 
   Diag << FixItHint::CreateInsertion(
-      getLocationForEndOfToken(Context, Var->getSourceRange().getEnd()),
-      Context.getLangOpts().CPlusPlus11 ? "{}" : " = {}");
+      getLocationForEndOfToken(Context, Var->getSourceRange().getEnd()), "{}");
 }
 
 } // namespace clang::tidy::cppcoreguidelines

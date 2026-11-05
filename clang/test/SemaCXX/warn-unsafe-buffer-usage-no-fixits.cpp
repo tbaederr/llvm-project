@@ -25,12 +25,6 @@
 // RUN:            -fsafe-buffer-usage-suggestions \
 // RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
 
-// RUN: %clang_cc1 -x c++ -std=c++98 -Wunsafe-buffer-usage \
-// RUN:            -fsafe-buffer-usage-suggestions \
-// RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
-// RUN: %clang_cc1 -x c++ -std=gnu++98 -Wunsafe-buffer-usage \
-// RUN:            -fsafe-buffer-usage-suggestions \
-// RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
 // RUN: %clang_cc1 -x c++ -std=c++17 -Wunsafe-buffer-usage \
 // RUN:            -fsafe-buffer-usage-suggestions \
 // RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
@@ -38,12 +32,6 @@
 // RUN:            -fsafe-buffer-usage-suggestions \
 // RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
 
-// RUN: %clang_cc1 -x objective-c++ -std=c++98 -Wunsafe-buffer-usage \
-// RUN:            -fsafe-buffer-usage-suggestions \
-// RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
-// RUN: %clang_cc1 -x objective-c++ -std=gnu++98 -Wunsafe-buffer-usage \
-// RUN:            -fsafe-buffer-usage-suggestions \
-// RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s
 // RUN: %clang_cc1 -x objective-c++ -std=c++17 -Wunsafe-buffer-usage \
 // RUN:            -fsafe-buffer-usage-suggestions \
 // RUN:            -fdiagnostics-parseable-fixits %s 2>&1 | FileCheck %s

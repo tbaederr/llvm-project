@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++98 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
 
 // PR10034
@@ -43,14 +42,8 @@ struct Z {
 
 void test_Z() {
   goto end;
-#if __cplusplus <= 199711L
-  // expected-error@-2 {{cannot jump from this goto statement to its label}}
-#endif
 
   Z z;
-#if __cplusplus <= 199711L
-  // expected-note@-2 {{jump bypasses initialization of non-POD variable}}
-#endif
 
  end:
   return;

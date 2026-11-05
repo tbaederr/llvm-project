@@ -700,7 +700,7 @@ class LLVMConfig:
         # https://discourse.llvm.org/t/lit-run-a-run-line-multiple-times-with-different-replacements/64932
         # has a solution, provide substitutions to conveniently try every standard with LIT_CLANG_STD_GROUP.
         clang_std_group = int(os.environ.get("LIT_CLANG_STD_GROUP", "0"))
-        clang_std_values = ("98", "11", "14", "17", "20", "2b")
+        clang_std_values = ("11", "14", "17", "20", "2b")
 
         def add_std_cxx(s):
             t = s[8:]
@@ -713,8 +713,6 @@ class LLVMConfig:
             l = h - clang_std_group % (h - l + 1)
             self.config.substitutions.append((s, "-std=c++" + clang_std_values[l]))
 
-        add_std_cxx("%std_cxx98-14")
-        add_std_cxx("%std_cxx98-")
         add_std_cxx("%std_cxx11-14")
         add_std_cxx("%std_cxx11-")
         add_std_cxx("%std_cxx14-")
