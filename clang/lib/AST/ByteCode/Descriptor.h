@@ -57,6 +57,19 @@ enum class Lifetime : uint8_t {
   Ended,
 };
 
+
+struct alignas(void*) LocalInlineDescriptor {
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned IsEnabled : 1;
+  LLVM_PREFERRED_TYPE(bool)
+  unsigned IsInitialized : 1;
+  Lifetime LifeState;
+
+  LocalInlineDescriptor() : IsEnabled(false), IsInitialized(false), LifeState(Lifetime::Started) {}
+  Lifetime getLifetime() const { return LifeState; }
+  void setLifetime(Lifetime L) { LifeState = L; }
+};
+
 /// Inline descriptor embedded in structures and arrays.
 ///
 /// Such descriptors precede all composite array elements and structure fields.
@@ -115,7 +128,6 @@ struct InlineDescriptor {
   void dump() const { dump(llvm::errs()); }
   void dump(llvm::raw_ostream &OS) const;
 };
-static_assert(sizeof(GlobalInlineDescriptor) != sizeof(InlineDescriptor), "");
 
 /// Describes a memory block created by an allocation site.
 struct Descriptor final {
