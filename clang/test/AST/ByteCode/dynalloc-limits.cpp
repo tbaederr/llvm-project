@@ -109,7 +109,10 @@ constexpr int capture_copy(const A &a) {
 }
 
 constexpr T src_ok[1024][0] = {};
-constexpr T src_limit[1025][0] = {};
+/// Without array fillers, the current interpreter already rejects the source.
+constexpr T src_limit[1025][0] = {}; // ref-error {{constexpr variable 'src_limit' must be initialized by a constant expression}} \
+                                     // ref-note {{cannot allocate array; evaluated array bound 1025 exceeds the limit (1024)}} \
+                                     // ref-note {{use -fconstexpr-steps}}
 constexpr int capture_ok = capture_copy(src_ok);
 constexpr int capture_limit = capture_copy(src_limit); // both-error {{constexpr variable 'capture_limit' must be initialized by a constant expression}} \
                                                        // both-note {{in call}}

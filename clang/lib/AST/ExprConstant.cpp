@@ -3727,36 +3727,40 @@ static void expandStringLiteral(EvalInfo &Info, const StringLiteral *S,
   assert(CharType->isIntegerType() && "unexpected character type");
 
   unsigned Elts = CAT->getZExtSize();
-  Result = APValue(APValue::UninitArray(),
-                   std::min(S->getLength(), Elts), Elts);
+  Result = APValue(APValue::UninitArray(), Elts, Elts);
   APSInt Value(Info.Ctx.getTypeSize(CharType),
                CharType->isUnsignedIntegerType());
-  if (Result.hasArrayFiller())
-    Result.getArrayFiller() = APValue(Value);
-  for (unsigned I = 0, N = Result.getArrayInitializedElts(); I != N; ++I) {
+  for (unsigned I = 0, N = std::min(S->getLength(), Elts); I != N; ++I) {
     Value = S->getCodeUnit(I);
     Result.getArrayInitializedElt(I) = APValue(Value);
   }
+
+  // Elements past the literal are zero.
+  Value = 0;
+  for (unsigned I = std::min(S->getLength(), Elts); I != Elts; ++I)
+    Result.getArrayInitializedElt(I) = APValue(Value);
 }
 
-// Expand an array so that it has more than Index filled elements.
-static void expandArray(APValue &Array, unsigned Index) {
-  unsigned Size = Array.getArraySize();
-  assert(Index < Size);
+/// Returns element \p I of \p Array, which may be an array filler element.
+static const APValue &getArrayElt(const APValue &Array, unsigned I) {
+  if (I < Array.getArrayInitializedElts())
+    return Array.getArrayInitializedElt(I);
+  return Array.getArrayFiller();
+}
 
-  // Always at least double the number of elements for which we store a value.
+// Expand an array with a filler, so that all its elements are stored.
+// Arrays with fillers can still come from outside of this evaluator, e.g. the
+// bytecode interpreter.
+static void expandArray(APValue &Array) {
+  unsigned Size = Array.getArraySize();
   unsigned OldElts = Array.getArrayInitializedElts();
-  unsigned NewElts = std::max(Index+1, OldElts * 2);
-  NewElts = std::min(Size, std::max(NewElts, 8u));
 
   // Copy the data across.
-  APValue NewValue(APValue::UninitArray(), NewElts, Size);
+  APValue NewValue(APValue::UninitArray(), Size, Size);
   for (unsigned I = 0; I != OldElts; ++I)
     NewValue.getArrayInitializedElt(I).swap(Array.getArrayInitializedElt(I));
-  for (unsigned I = OldElts; I != NewElts; ++I)
+  for (unsigned I = OldElts; I != Size; ++I)
     NewValue.getArrayInitializedElt(I) = Array.getArrayFiller();
-  if (NewValue.hasArrayFiller())
-    NewValue.getArrayFiller() = Array.getArrayFiller();
   Array.swap(NewValue);
 }
 
@@ -4447,7 +4451,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
             CAT && !CheckArraySize(Info, CAT, E->getExprLoc()))
           return handler.failed();
 
-        expandArray(*O, Index);
+        expandArray(*O);
         O = &O->getArrayInitializedElt(Index);
       } else
         O = &O->getArrayFiller();
@@ -5622,7 +5626,7 @@ static bool HandleBaseToDerivedCast(EvalInfo &Info, const CastExpr *E,
 
 /// Get the value to use for a default-initialized object of type T.
 /// Return false if it encounters something invalid.
-static bool handleDefaultInitValue(QualType T, APValue &Result,
+static bool handleDefaultInitValue(EvalInfo &Info, QualType T, APValue &Result,
                                    bool IsCompleteClass = true) {
   bool Success = true;
 
@@ -5650,8 +5654,9 @@ static bool handleDefaultInitValue(QualType T, APValue &Result,
     for (const CXXBaseSpecifier &B : RD->bases()) {
       if (B.isVirtual())
         continue;
-      Success &= handleDefaultInitValue(
-          B.getType(), Result.getStructBase(Index), /*IsCompleteClass=*/false);
+      Success &=
+          handleDefaultInitValue(Info, B.getType(), Result.getStructBase(Index),
+                                 /*IsCompleteClass=*/false);
       ++Index;
     }
 
@@ -5659,14 +5664,14 @@ static bool handleDefaultInitValue(QualType T, APValue &Result,
       if (I->isUnnamedBitField())
         continue;
       Success &= handleDefaultInitValue(
-          I->getType(), Result.getStructField(I->getFieldIndex()));
+          Info, I->getType(), Result.getStructField(I->getFieldIndex()));
     }
 
     if (IsCompleteClass) {
       Index = 0;
 
       for (const auto &B : RD->vbases()) {
-        Success &= handleDefaultInitValue(B.getType(),
+        Success &= handleDefaultInitValue(Info, B.getType(),
                                           Result.getStructVirtualBase(Index),
                                           /*IsCompleteClass=*/false);
         ++Index;
@@ -5681,10 +5686,18 @@ static bool handleDefaultInitValue(QualType T, APValue &Result,
 
   if (auto *AT =
           dyn_cast_or_null<ConstantArrayType>(T->getAsArrayTypeUnsafe())) {
-    Result = APValue(APValue::UninitArray(), 0, AT->getZExtSize());
-    if (Result.hasArrayFiller())
-      Success &=
-          handleDefaultInitValue(AT->getElementType(), Result.getArrayFiller());
+    if (!CheckArraySize(Info, AT))
+      return false;
+
+    // Compute one element and copy it to the others.
+    unsigned Size = AT->getZExtSize();
+    Result = APValue(APValue::UninitArray(), Size, Size);
+    if (Size == 0)
+      return Success;
+    Success &= handleDefaultInitValue(Info, AT->getElementType(),
+                                      Result.getArrayInitializedElt(0));
+    for (unsigned I = 1; I != Size; ++I)
+      Result.getArrayInitializedElt(I) = Result.getArrayInitializedElt(0);
     return Success;
   }
 
@@ -5747,7 +5760,7 @@ static bool EvaluateVarDecl(EvalInfo &Info, const VarDecl *VD) {
   if (!InitE) {
     if (VD->getType()->isDependentType())
       return Info.noteSideEffect();
-    return handleDefaultInitValue(VD->getType(), Val);
+    return handleDefaultInitValue(Info, VD->getType(), Val);
   }
   if (InitE->isValueDependent())
     return false;
@@ -7041,7 +7054,7 @@ struct StartLifetimeOfUnionMemberHandler {
       return false;
     }
     APValue Result;
-    Failed = !handleDefaultInitValue(Field->getType(), Result);
+    Failed = !handleDefaultInitValue(Info, Field->getType(), Result);
     Subobj.setUnion(Field, Result);
     return true;
   }
@@ -7465,7 +7478,7 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
       assert(FieldIt != RD->field_end() && "missing field?");
       if (!FieldIt->isUnnamedBitField())
         Success &= handleDefaultInitValue(
-            FieldIt->getType(),
+            Info, FieldIt->getType(),
             Result.getStructField(FieldIt->getFieldIndex()));
     }
     ++FieldIt;
@@ -7527,8 +7540,8 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
             // FIXME: This immediately starts the lifetime of all members of
             // an anonymous struct. It would be preferable to strictly start
             // member lifetime in initialization order.
-            Success &= handleDefaultInitValue(Info.Ctx.getCanonicalTagType(CD),
-                                              *Value);
+            Success &= handleDefaultInitValue(
+                Info, Info.Ctx.getCanonicalTagType(CD), *Value);
         }
         // Store Subobject as its parent before updating it for the last element
         // in the chain.
@@ -7590,7 +7603,7 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
     for (; FieldIt != RD->field_end(); ++FieldIt) {
       if (!FieldIt->isUnnamedBitField())
         Success &= handleDefaultInitValue(
-            FieldIt->getType(),
+            Info, FieldIt->getType(),
             Result.getStructField(FieldIt->getFieldIndex()));
     }
   }
@@ -7639,7 +7652,7 @@ static bool HandleDestructionImpl(EvalInfo &Info, SourceRange CallRange,
     // destructors might mutate the value, so we can't run them on the array
     // filler.
     if (Size && Size > Value.getArrayInitializedElts())
-      expandArray(Value, Value.getArraySize() - 1);
+      expandArray(Value);
 
     // The size of the array might have been reduced by
     // a placement new.
@@ -7914,7 +7927,8 @@ static bool HandleOperatorNewCall(EvalInfo &Info, const CallExpr *E,
   QualType AllocType = Info.Ctx.getConstantArrayType(
       ElemType, Size, nullptr, ArraySizeModifier::Normal, 0);
   APValue *Val = Info.createHeapAlloc(Caller.Call, AllocType, Result);
-  *Val = APValue(APValue::UninitArray(), 0, Size.getZExtValue());
+  *Val =
+      APValue(APValue::UninitArray(), Size.getZExtValue(), Size.getZExtValue());
   Result.addArray(Info, E, cast<ConstantArrayType>(AllocType));
   return true;
 }
@@ -11372,7 +11386,7 @@ bool PointerExprEvaluator::VisitCXXNewExpr(const CXXNewExpr *E) {
   } else if (Init) {
     if (!EvaluateInPlace(*Val, Info, Result, Init))
       return false;
-  } else if (!handleDefaultInitValue(AllocType, *Val)) {
+  } else if (!handleDefaultInitValue(Info, AllocType, *Val)) {
     return false;
   }
 
@@ -11947,7 +11961,7 @@ bool RecordExprEvaluator::VisitCXXConstructExpr(const CXXConstructExpr *E,
     if (ZeroInit)
       return ZeroInitialization(E, T);
 
-    return handleDefaultInitValue(T, Result);
+    return handleDefaultInitValue(Info, T, Result);
   }
 
   TryInstantiateFunctionBeforeCall(FD, Info, E->getBeginLoc());
@@ -15771,15 +15785,24 @@ namespace {
         return Error(E);
       }
 
-      Result = APValue(APValue::UninitArray(), 0, CAT->getZExtSize());
-      if (!Result.hasArrayFiller())
+      if (!CheckArraySize(Info, CAT, E->getExprLoc()))
+        return false;
+
+      unsigned Size = CAT->getZExtSize();
+      Result = APValue(APValue::UninitArray(), Size, Size);
+      if (Size == 0)
         return true;
 
-      // Zero-initialize all elements.
+      // Zero-initialize one element and copy it to the others.
       LValue Subobject = This;
       Subobject.addArray(Info, E, CAT);
       ImplicitValueInitExpr VIE(CAT->getElementType());
-      return EvaluateInPlace(Result.getArrayFiller(), Info, Subobject, &VIE);
+      if (!EvaluateInPlace(Result.getArrayInitializedElt(0), Info, Subobject,
+                           &VIE))
+        return false;
+      for (unsigned I = 1; I != Size; ++I)
+        Result.getArrayInitializedElt(I) = Result.getArrayInitializedElt(0);
+      return true;
     }
 
     bool VisitCallExpr(const CallExpr *E) {
@@ -15795,6 +15818,10 @@ namespace {
                                APValue *Value, QualType Type);
     bool VisitStringLiteral(const StringLiteral *E,
                             QualType AllocType = QualType()) {
+      if (const ConstantArrayType *CAT = Info.Ctx.getAsConstantArrayType(
+              AllocType.isNull() ? E->getType() : AllocType);
+          CAT && !CheckArraySize(Info, CAT, E->getExprLoc()))
+        return false;
       expandStringLiteral(Info, E, Result, AllocType);
       return true;
     }
@@ -15951,43 +15978,18 @@ bool ArrayExprEvaluator::VisitCXXParenListOrInitListExpr(
     // If we have extra elements in the list, they will be discarded.
     if (NumEltsToInit > NumElts)
       NumEltsToInit = NumElts;
-    // If we're overwriting memory which already has an object, make sure we
-    // don't reduce the number of non-filler elements.  (It's possible to
-    // optimize this in some cases, but the logic gets really complicated.)
-    if (Result.hasValue() && NumEltsToInit < Result.getArrayInitializedElts())
-      NumEltsToInit = Result.getArrayInitializedElts();
   }
 
   LLVM_DEBUG(llvm::dbgs() << "The number of elements to initialize: "
                           << NumEltsToInit << ".\n");
 
-  if (!Result.hasValue()) {
-    Result = APValue(APValue::UninitArray(), NumEltsToInit, NumElts);
-  } else if (Result.getArrayInitializedElts() != NumEltsToInit) {
-    // Number of inititalized elts changed. Recreate the APValue, and copy over
-    // the relevant elements.  (This is essentially just fixing the internal
-    // representation of the value, because it's tied to the number of
-    // non-filler elements.)
-    //
-    // This should be hit rarely, but there are some edge cases:
-    //
-    // - The array could be zero-initialized.
-    // - There could be a DesignatedInitListExpr.
-    // - operator new[] can be used to start the lifetime early.
-    APValue NewResult = APValue(APValue::UninitArray(), NumEltsToInit, NumElts);
-    // First copy existing elements.
-    unsigned NumOldElts = Result.getArrayInitializedElts();
-    for (unsigned I = 0; I < NumOldElts; ++I) {
-      NewResult.getArrayInitializedElt(I) =
-          std::move(Result.getArrayInitializedElt(I));
-    }
-    // Then copy the array filler over the remaining elements.
-    for (unsigned I = Result.getArrayInitializedElts(); I < NumEltsToInit; ++I)
-      NewResult.getArrayInitializedElt(I) = Result.getArrayFiller();
-    if (NewResult.hasArrayFiller() && Result.hasArrayFiller())
-      NewResult.getArrayFiller() = Result.getArrayFiller();
-    Result = std::move(NewResult);
-  }
+  // All elements are stored, even the ones initialized by the filler.
+  if (!CheckArraySize(Info, CAT, ExprToVisit->getExprLoc()))
+    return false;
+  if (!Result.hasValue())
+    Result = APValue(APValue::UninitArray(), NumElts, NumElts);
+  else if (Result.getArrayInitializedElts() != NumElts)
+    expandArray(Result);
 
   LValue Subobject = This;
   Subobject.addArray(Info, ExprToVisit, CAT);
@@ -16044,15 +16046,18 @@ bool ArrayExprEvaluator::VisitCXXParenListOrInitListExpr(
     }
   }
 
-  if (!Result.hasArrayFiller())
+  if (NumEltsToInit == NumElts)
     return Success;
 
   // If we get here, we have a trivial filler, which we can just evaluate
-  // once and splat over the rest of the array elements.
+  // once and copy over the rest of the array elements.
   assert(ArrayFiller && "no array filler for incomplete init list");
-  return EvaluateInPlace(Result.getArrayFiller(), Info, Subobject,
-                         ArrayFiller) &&
-         Success;
+  APValue &FillerValue = Result.getArrayInitializedElt(NumEltsToInit);
+  if (!EvaluateInPlace(FillerValue, Info, Subobject, ArrayFiller))
+    return false;
+  for (unsigned I = NumEltsToInit + 1; I != NumElts; ++I)
+    Result.getArrayInitializedElt(I) = FillerValue;
+  return Success;
 }
 
 bool ArrayExprEvaluator::VisitArrayInitLoopExpr(const ArrayInitLoopExpr *E) {
@@ -16118,10 +16123,10 @@ bool ArrayExprEvaluator::VisitCXXConstructExpr(const CXXConstructExpr *E,
       return false;
     unsigned FinalSize = CAT->getZExtSize();
 
-    // Preserve the array filler if we had prior zero-initialization.
-    APValue Filler =
-      HadZeroInit && Value->hasArrayFiller() ? Value->getArrayFiller()
-                                             : APValue();
+    // Preserve the elements of a prior zero-initialization.
+    APValue ZeroInit;
+    if (HadZeroInit)
+      ZeroInit = std::move(*Value);
 
     *Value = APValue(APValue::UninitArray(), 0, FinalSize);
     if (FinalSize == 0)
@@ -16151,7 +16156,7 @@ bool ArrayExprEvaluator::VisitCXXConstructExpr(const CXXConstructExpr *E,
 
       if (HadZeroInit)
         for (unsigned I = OldElts; I < N; ++I)
-          Value->getArrayInitializedElt(I) = Filler;
+          Value->getArrayInitializedElt(I) = getArrayElt(ZeroInit, I);
 
       if (HasTrivialConstructor && N == FinalSize && FinalSize != 1) {
         // If we have a trivial constructor, only evaluate it once and copy
@@ -22777,10 +22782,15 @@ static bool doEvaluateDestruction(const VarDecl *VD, SemaProxy *SProxy,
   // Otherwise, treat the value as default-initialized; if the destructor works
   // anyway, then the destruction is constant (and must be essentially empty).
   APValue DestroyedValue;
-  if (VD->getEvaluatedValue())
+  if (VD->getEvaluatedValue()) {
     DestroyedValue = *VD->getEvaluatedValue();
-  else if (!handleDefaultInitValue(VarTy, DestroyedValue))
-    return false;
+  } else {
+    EvalInfo Info(Ctx, SProxy, EStatus,
+                  IsConstantDestruction ? EvaluationMode::ConstantExpression
+                                        : EvaluationMode::ConstantFold);
+    if (!handleDefaultInitValue(Info, VarTy, DestroyedValue))
+      return false;
+  }
 
   if (Ctx.getLangOpts().EnableNewConstInterp) {
     interp::EvalSettings Settings(IsConstantDestruction
